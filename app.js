@@ -24,6 +24,16 @@ app.get('/calendar', (req, res) => {
     res.render('calendar.ejs');
 });
 
+app.post('/addEvent', (req, res) => {
+
+    console.log(req.body);
+    //Send to database
+
+    //Show events on calendar
+
+    res.redirect('/calendar');
+});
+
 app.listen(app.get('port'), () => {
     console.log(`Listening on port: ${app.get('port')}`)
 })

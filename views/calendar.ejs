@@ -6,9 +6,9 @@
 
     <div class="modal-overlay" id="modal-overlay">
         <div class="modal-box"> 
-            <span class="close-btn">&times;</span>
+            <span class="close-btn" id="close-btn">&times;</span>
             <!-- <div class="modal-header">Enter an event.</div> -->
-            <form method="post" action="/app.js" class="calendar-form">
+            <form class="calendar-form" id="calendar-form">
                 <input type="text" name="title" id="title" placeholder="Title" required>
                 <label for="allDay">Whole day? </label>
                 <input type="checkbox" name="allDay" id="allDay">
@@ -16,6 +16,7 @@
                 <input type="date" name="startDate" id="startDate">
                 <label for="startDate">To:</label>
                 <input type="date" name="endDate" id="endDate">
+                <button type="submit">Add Event</button>
             </form>
         </div>
     </div>
