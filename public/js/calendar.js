@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const calendarEl = document.querySelector("#calendar");
   const modalOverlayForm = document.querySelector("#modal-overlay");
   const closeBtn = document.querySelector("#close-btn");
-  const form = document.querySelector("#calendarForm");
+  const form = document.querySelector("form");
 
   let calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
@@ -34,10 +34,36 @@ document.addEventListener("DOMContentLoaded", function () {
     modalOverlayForm.style.setProperty("display", "none");
   });
 
-  form.addEventListener('submit', (event) => {
-    event.preventDefault()
+  // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
 
-    console.log(event);
+    const formData = new FormData(form);
 
-  })
+    console.log(formData);
+
+    let title = formData.get('title');
+    let startDate  = formData.get('startDate');
+    let endDate = formData.get('endDate');
+
+    //Send data to the backend
+    axios.post('http://localhost:3000/addEvent', {
+      title: title,
+      startDate: startDate,
+      endDate: endDate
+    })
+
+    // Then add event to calender without reloading page
+
+  });
+
+  // After formData event triggered can change the form data itself. 
+  form.addEventListener("formdata", (e) => {
+
+    const formData = e.formData;
+
+    for (let [key, val] of formData.entries()) {
+      console.log(key, val);
+    }
+  });
 });

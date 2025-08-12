@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from 'url';
 import ejs from "ejs";
 import bodyParser from "body-parser";
+import cors from "cors";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -10,6 +11,8 @@ const __dirname = path.dirname(__filename);
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+app.use(cors());
 
 app.set('port', process.env.PORT || 3000);
 app.set('view engine', 'ejs');
