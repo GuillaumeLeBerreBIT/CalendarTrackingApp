@@ -54,7 +54,14 @@ document.addEventListener("DOMContentLoaded", function () {
         title: event['title'],
         start: event['startDate'],
         end: event['endDate'],
+        allDay: true,
       });
+
+      modalOverlayForm.style.setProperty('display', 'none');
+    } else {
+      modalOverlayForm.style.setProperty('display', 'none');
+
+      alert('Something went wrong, could not be able to create an event ...');
     }
   });
 });
