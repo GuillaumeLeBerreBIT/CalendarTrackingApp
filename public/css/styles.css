@@ -1,3 +1,13 @@
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+.container {
+    height: auto;
+    width: 100vw;
+}
+
 .container-calendar {
     width: 80vw;
     height: auto;

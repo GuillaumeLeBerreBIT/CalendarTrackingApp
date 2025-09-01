@@ -37,6 +37,11 @@ app.get('/calendar', (req, res) => {
     res.render('calendar.ejs');
 });
 
+app.get('/todo', (req, res) => {
+    
+    res.render('todo.ejs');
+});
+
 
 //API Endpoints
 app.post('/addEvent', async (req, res) => {

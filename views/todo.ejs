@@ -1,0 +1,78 @@
+<%- include('partials/header.ejs') %>
+
+<h1>Todo Lists</h1>
+<span>Collaborate on tasks with your teams</span>
+
+<select name="filter" id="filter">
+    <option value="all">All Tasks</option>
+    <option value="completed">Active</option>
+    <option value="active">Completed</option>
+</select>
+<button>Add Tasks</button>
+
+<!--Show Groups-->
+<h4>Groups</h4>
+<div class="groups">
+    <div class="groups-card">
+        <div class="group-name">All Groups</div>
+        <div class="group-tasks">3 total tasks</div>
+        <div class="group-members"></div>
+    </div>
+        <div>Development Team</div>
+        <div>2 active tasks</div>
+        <div>4 members</div>
+    </div>
+    <div>
+        <div>Marketing Campaign</div>
+        <div>0 active tasks</div>
+        <div></div>
+    </div>
+    <div>
+        <div>Personal goals</div>
+        <div>0 active tasks</div>
+        <div>1 member</div>
+    </div>
+</div>
+
+<!--Show tasks-->
+<div>
+    <div>
+        <input type="radio">
+        <h4>Implement user authentication</h4>
+        <div>Add login and registration functionality</div>
+
+        <div>High</div>
+
+        <div>Development Team</div>
+
+        <div>22-1-2025</div>
+        <div>@John</div>
+    </div>
+    <div>
+        <input type="radio">
+        <h4>Design landing page mockups</h4>
+        <div>Create initial wireframes and designs</div>
+
+        <div>Medium</div>
+
+        <div>Marketing campaign</div>
+
+        <div>22-1-2025</div>
+        <div>@Gui</div>
+    </div>
+    <div>
+        <input type="radio">
+        <h4>Review code documentation</h4>
+        <div>Ensure all functions are properly documented</div>
+
+        <div>Low</div>
+
+        <div>Development team</div>
+
+        <div>22-1-2025</div>
+        <div>@Gui</div>
+    </div>
+</div>
+
+
+<%- include('partials/footer.ejs') %>
