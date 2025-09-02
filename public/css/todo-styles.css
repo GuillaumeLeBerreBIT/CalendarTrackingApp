@@ -1,0 +1,75 @@
+.todo-header-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  flex-wrap: wrap;
+
+  gap: 1rem;
+  width: 80vw;
+  margin: 20px auto;
+  padding: 10px;
+}
+
+.todo-header-container > * {
+  margin: auto;
+}
+
+.group-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: 20px;
+}
+
+.group-card {
+  display: flex;
+  flex-direction: column;
+  width: 60vw;
+  max-width: 800px;
+
+  gap: 10px;
+}
+
+.group-header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+
+  gap: 20px;
+  margin: 10px 0px;
+
+  .header-item {
+    margin-left: auto;
+    gap: 10px;
+  }
+
+  h4 {
+    margin: 0px 0px;
+  }
+}
+
+.task-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: 20px;
+}
+
+.task-card {
+  display: flex;
+  flex-direction: row;
+}
+
+.radio-box {
+    width: 40px;
+    
+  input {
+    margin: 22px auto 0px auto;
+  }
+}

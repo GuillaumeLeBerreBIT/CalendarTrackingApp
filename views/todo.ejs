@@ -1,78 +1,76 @@
 <%- include('partials/header.ejs') %>
 
-<h1>Todo Lists</h1>
-<span>Collaborate on tasks with your teams</span>
+    <div class="todo-header-container">
+        <h1>Todo Lists</h1>
 
-<select name="filter" id="filter">
-    <option value="all">All Tasks</option>
-    <option value="completed">Active</option>
-    <option value="active">Completed</option>
-</select>
-<button>Add Tasks</button>
+        <div class="center-vertical">
+            <input type="search" placeholder="Search task">
+        </div>
 
-<!--Show Groups-->
-<h4>Groups</h4>
-<div class="groups">
-    <div class="groups-card">
-        <div class="group-name">All Groups</div>
-        <div class="group-tasks">3 total tasks</div>
-        <div class="group-members"></div>
+        <div class="center-vertical">
+            <select name="filter" id="filter">
+                <option value="all">All Tasks</option>
+                <option value="completed">Active</option>
+                <option value="active">Completed</option>
+                <option value="to-me">Assigned to Me</option>
+            </select>
+            <button>Add New List</button>
+        </div>
     </div>
-        <div>Development Team</div>
-        <div>2 active tasks</div>
-        <div>4 members</div>
+
+    <!--Show Groups with list items-->
+    <div class="group-container">
+        <div class="group-card">
+            <div class="group-header">
+                <h4>Study Tasks</h4>
+                <span>Study Group</span>
+
+                <div class="header-item">
+                    <button>Add Task</button>
+                    <button>...</button>
+                </div>
+            </div>
+
+            <span>Tasks for upcoming exams and assignments.</span>
+
+            <div>Progress</div>
+
+            <div class="tasks-container">
+                <div class="task-card">
+                    <div class="radio-box">
+                        <input type="radio" name="task-completion" id="task-completion">
+                    </div>
+                    <div class="task-content">
+                        <div>
+                            <h4>Review Chapter 5 - Data Structures</h4>
+                            <span>High</span>
+                        </div>
+                        <div>
+                            Read and summarize key concepts from the data structures chapter.
+                        </div>
+                        <div>
+                            <div>John Doe</div>
+                            <div>Due Sep 4</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="task-card">
+                    <div>
+                        <input type="radio" name="task-completion" id="task-completion">
+                    </div>
+                    <div class="task-content">
+                        <h4>Complete Practice Problems</h4>
+                        <span>Medium</span>
+                    </div>
+                    <div>
+                        Solve problems 1-15 from the textbook.
+                    </div>
+                    <div>
+                        <div>Jane Smith</div>
+                        <div>Completed Sep 2</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div>
-        <div>Marketing Campaign</div>
-        <div>0 active tasks</div>
-        <div></div>
-    </div>
-    <div>
-        <div>Personal goals</div>
-        <div>0 active tasks</div>
-        <div>1 member</div>
-    </div>
-</div>
-
-<!--Show tasks-->
-<div>
-    <div>
-        <input type="radio">
-        <h4>Implement user authentication</h4>
-        <div>Add login and registration functionality</div>
-
-        <div>High</div>
-
-        <div>Development Team</div>
-
-        <div>22-1-2025</div>
-        <div>@John</div>
-    </div>
-    <div>
-        <input type="radio">
-        <h4>Design landing page mockups</h4>
-        <div>Create initial wireframes and designs</div>
-
-        <div>Medium</div>
-
-        <div>Marketing campaign</div>
-
-        <div>22-1-2025</div>
-        <div>@Gui</div>
-    </div>
-    <div>
-        <input type="radio">
-        <h4>Review code documentation</h4>
-        <div>Ensure all functions are properly documented</div>
-
-        <div>Low</div>
-
-        <div>Development team</div>
-
-        <div>22-1-2025</div>
-        <div>@Gui</div>
-    </div>
-</div>
-
-
-<%- include('partials/footer.ejs') %>
+    <%- include('partials/footer.ejs') %>
