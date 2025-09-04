@@ -20,54 +20,61 @@
 
     <!--Show Groups with list items-->
     <div class="group-container">
-        <div class="group-card">
+        <div class="group-card card-shape">
             <div class="group-header">
-                <h4>Study Tasks</h4>
-                <span>Study Group</span>
+                <div class="justify-start">
+                    <h3>Study Tasks</h3>
+                    <div class="badge-secondary">Study Group</div>
+                </div>
 
                 <div class="header-item">
-                    <button>Add Task</button>
-                    <button>...</button>
+                    <button class="btn btn-soft">Add Task</button>
+                    <button class="btn btn-soft">...</button>
                 </div>
             </div>
 
-            <span>Tasks for upcoming exams and assignments.</span>
+            <p>Tasks for upcoming exams and assignments.</p>
 
-            <div>Progress</div>
+            <div class="justify-between">
+                <span class="progress-bar">Progress</span>
+                <span class="progress-bar">1 of 2 completed</span>
+            </div>
 
-            <div class="tasks-container">
-                <div class="task-card">
+            <div class="task-container">
+                <div class="task-card card-shape">
                     <div class="radio-box">
                         <input type="checkbox" name="task-completion" id="task-completion">
                     </div>
                     <div class="task-content">
-                        <div>
+                        <div class="justify-between">
                             <h4>Review Chapter 5 - Data Structures</h4>
                             <span>High</span>
                         </div>
-                        <div>
+                        <p>
                             Read and summarize key concepts from the data structures chapter.
-                        </div>
+                        </p>
                         <div>
-                            <div>John Doe</div>
-                            <div>Due Sep 4</div>
+                            <span>John Doe</span>
+                            <span>Due Sep 4</span>
                         </div>
                     </div>
                 </div>
-                <div class="task-card">
+                <div class="task-card card-shape">
                     <div class="radio-box">
                         <input type="checkbox" name="task-completion" id="task-completion">
                     </div>
                     <div class="task-content">
-                        <h4>Complete Practice Problems</h4>
-                        <span>Medium</span>
-                    </div>
-                    <div>
-                        Solve problems 1-15 from the textbook.
-                    </div>
-                    <div>
-                        <div>Jane Smith</div>
-                        <div>Completed Sep 2</div>
+                        <div class="justify-between">
+                            <h4>Complete Practice Problems</h4>
+                            <span>Medium</span>
+                        </div>
+                        <p>
+                            Solve problems 1-15 from the textbook.
+                        </p>
+                        <div>
+                            <span>Jane Smith</span>
+                            <span>Completed Sep 2</span>
+                        </div>
                     </div>
                 </div>
             </div>
