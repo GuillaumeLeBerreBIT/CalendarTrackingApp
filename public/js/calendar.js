@@ -6,11 +6,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
-    headerToolbar: {
-      left: "prev,next today",
-      center: "title",
-      right: "dayGridMonth,timeGridWeek,listWeek",
+    customButtons: {
+      addEventBtn: {
+        text: 'Add Event',
+        click: function(){
+          modalOverlayForm.style.setProperty("display", "flex");
+        }
+      }
     },
+    headerToolbar: {
+      left: "dayGridDay,timeGridWeek,dayGridMonth,multiMonthYear",
+      center: "title",
+      right: "addEventBtn prevYear,prev,next,nextYear",
+    },
+    multiMonthMaxColumns: 1,
 
     // Cick on calander field to add an event.
     dateClick: function (info) {
