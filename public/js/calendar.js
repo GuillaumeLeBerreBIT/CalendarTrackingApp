@@ -12,12 +12,18 @@ document.addEventListener("DOMContentLoaded", function () {
         click: function(){
           modalOverlayForm.style.setProperty("display", "flex");
         }
+      },
+      todayBtn: {
+        text:'Today',
+        click: function(){
+          alert('Go to today.');
+        }
       }
     },
     headerToolbar: {
-      left: "dayGridDay,timeGridWeek,dayGridMonth,multiMonthYear",
-      center: "title",
-      right: "addEventBtn prevYear,prev,next,nextYear",
+      left: "prev title next",
+      right: "today addEventBtn dayGridDay,timeGridWeek,dayGridMonth,multiMonthYear",
+      
     },
     multiMonthMaxColumns: 1,
 
