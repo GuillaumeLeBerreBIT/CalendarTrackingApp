@@ -1,5 +1,5 @@
 #calendar {
-    margin-top: 30px;
+  margin-top: 30px;
 }
 
 .fc-toolbar {
@@ -25,10 +25,11 @@
   text-align: center;
   flex-wrap: wrap;
 
-
   .fc-toolbar-title {
     text-align: left;
     margin: 0 20px;
+    min-width: 225px;
+    text-align: center;
   }
 
   .fc-next-button {
@@ -37,7 +38,7 @@
 }
 
 @media (max-width: 1040px) {
-  .fc-prev-button {
+  /* .fc-prev-button {
     order: 5;
   }
 
@@ -48,5 +49,37 @@
   .fc-toolbar-title {
     flex: 1 1 100%;
     margin-left: 0 !important; 
+  } */
+
+  .fc-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .fc-toolbar-chunk {
+    display: flex;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 540px) {
+
+  .fc-toolbar-chunk {
+    display: flex;
+    justify-content: center !important;
+  } 
+
+  .fc-prev-button {
+    order: 5;
+  }
+
+  .fc-next-button {
+    order: 7;
+  }
+
+  .fc-toolbar-title {
+    flex: 1 1 100%;
+    /* margin-left: 0 !important;  */
   }
 }

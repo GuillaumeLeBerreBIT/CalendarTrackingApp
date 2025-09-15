@@ -8,24 +8,32 @@ document.addEventListener("DOMContentLoaded", function () {
     initialView: "dayGridMonth",
     customButtons: {
       addEventBtn: {
-        text: 'Add Event',
-        click: function(){
+        text: "+ Add Event",
+        click: function () {
           modalOverlayForm.style.setProperty("display", "flex");
-        }
+        },
       },
       todayBtn: {
-        text:'Today',
-        click: function(){
-          alert('Go to today.');
-        }
-      }
+        text: "Today",
+        click: function () {
+          alert("Go to today.");
+        },
+      },
     },
     headerToolbar: {
       left: "prev title next",
-      right: "today addEventBtn dayGridDay,timeGridWeek,dayGridMonth,multiMonthYear",
-      
+      right: "today addEventBtn listWeek,timeGridWeek,dayGridMonth",
+      },
+    buttonText: {
+      today: "Today",
+      month: "Month",
+      week: "Week",
+      day: "Day",
+      list: "List",
     },
     multiMonthMaxColumns: 1,
+    contentHeight: "auto",
+    nowIndicator: true,
 
     // Cick on calander field to add an event.
     dateClick: function (info) {
@@ -66,17 +74,17 @@ document.addEventListener("DOMContentLoaded", function () {
       calendar.addEvent({
         // start: response.data['title'],
         // end: info.dateStr, // T12:30:00
-        title: event['title'],
-        start: event['startDate'],
-        end: event['endDate'],
+        title: event["title"],
+        start: event["startDate"],
+        end: event["endDate"],
         allDay: true,
       });
 
-      modalOverlayForm.style.setProperty('display', 'none');
+      modalOverlayForm.style.setProperty("display", "none");
     } else {
-      modalOverlayForm.style.setProperty('display', 'none');
+      modalOverlayForm.style.setProperty("display", "none");
 
-      alert('Something went wrong, could not be able to create an event ...');
+      alert("Something went wrong, could not be able to create an event ...");
     }
   });
 });
