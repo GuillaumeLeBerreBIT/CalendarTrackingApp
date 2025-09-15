@@ -82,4 +82,12 @@
     flex: 1 1 100%;
     /* margin-left: 0 !important;  */
   }
+
+  .fc-today-button {
+    order: -5;
+  }
+
+  .fc-addEventBtn-button {
+    order: -2;
+  }
 }

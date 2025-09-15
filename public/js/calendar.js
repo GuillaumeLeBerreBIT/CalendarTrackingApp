@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     headerToolbar: {
       left: "prev title next",
-      right: "today addEventBtn listWeek,timeGridWeek,dayGridMonth",
+      right: "today listWeek,timeGridWeek,dayGridMonth addEventBtn",
       },
     buttonText: {
       today: "Today",
