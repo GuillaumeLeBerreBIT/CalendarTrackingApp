@@ -42,6 +42,11 @@ app.get('/todo', (req, res) => {
     res.render('todo.ejs');
 });
 
+app.get('/groups', (req, res) => {
+
+    res.render('groups.ejs');
+})
+
 
 //API Endpoints
 app.post('/addEvent', async (req, res) => {
