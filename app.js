@@ -16,6 +16,11 @@ const supabase = createClient(
     supabaseKey
 );
 
+const authRequire = function (req, res, next) {
+
+    next();
+};
+
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -47,6 +52,26 @@ app.get('/groups', (req, res) => {
     res.render('groups.ejs');
 })
 
+//Load the User login pages
+app.get('/login', (req, res) => {
+
+    res.render('login.ejs');
+});
+
+app.get('/register', (req, res) => {
+
+    res.render('register.ejs');
+}); 
+// Processing the user login form.
+app.post('/login', (req, res) => {
+    console.log(req.body);
+    //Now need to login the user
+})
+
+app.post('/register', (req, res) => {
+    console.log(req.body);
+    // Need to register a user and then also log in direclty.
+})
 
 //API Endpoints
 app.post('/addEvent', async (req, res) => {

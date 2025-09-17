@@ -1,0 +1,33 @@
+
+
+<div>
+    <h2>CalendarTracking</h2>
+
+    <div>
+        <h2>Welcome!</h2>
+        <p>Please enter your details.</p>
+        
+        <form method="post" action="/register">
+
+            <label>Username</label>
+            <input type="text" id="username" name="username">
+
+            <label>Email</label>
+            <input type="email" id="email" name="email">
+
+            <label>Password</label>
+            <input type="password" id="password" name="password">
+            
+            <label>Confirm Password</label>
+            <input type="password" id="passwordConfirm" name="passwordConfirm">
+
+            <input type="submit" value="Register">
+        </form>
+
+        <p>Signed up already?</p>
+
+        <form method="get" action="/login">
+            <input type="submit" value="Login">
+        </form>
+    </div>
+</div>
