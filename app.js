@@ -7,6 +7,7 @@ import cors from "cors";
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import { createClient } from '@supabase/supabase-js';
+import validatePassword from './utils/utils.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -76,7 +77,7 @@ app.post('/login', async (req, res) => {
     });
 
     if (error) {
-        res.status(400).json({succes: false, message: error.message});
+        return res.status(400).render('login.ejs', {succes: false, message: error.message});
     } else {
         res.render('groups.ejs');
     }
@@ -85,10 +86,17 @@ app.post('/login', async (req, res) => {
 app.post('/register', async (req, res) => {
     console.log(req.body);
     // Need to register a user and then also log in direclty.
+    let isValid, messageSuccess;
 
     if (req.body['password'] != req.body['passwordConfirm']) {
         
-        res.status(400).json({succes: false, error: 'Make sure the passwords entered are identical to each other.'});
+        return res.status(422).render('register.ejs', {succes: false, error: 'Make sure the passwords entered are identical to each other.'});
+    }
+
+    [isValid, messageSuccess] = validatePassword(req.body['password']);
+
+    if (!isValid) {
+        return res.status(422).render('register.ejs', {succes: false, error: messageSuccess})
     }
 
     // let hash_pass = await bcrypt.hash(req.body['password'], SALT_ROUNDS)
@@ -104,7 +112,7 @@ app.post('/register', async (req, res) => {
     });
 
     if (error) {
-        res.status(400).json({succes: false, error: error.message});
+        return res.status(400).render('register.ejs', {succes: false, error: error.message});
     } else {
         res.render('groups.ejs');
     }
