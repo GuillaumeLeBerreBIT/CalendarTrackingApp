@@ -6,6 +6,7 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
+import cookieParser from "cookie-parser";
 import { createClient } from '@supabase/supabase-js';
 import validatePassword from './utils/utils.js';
 
@@ -18,8 +19,23 @@ const supabase = createClient(
     supabaseKey
 );
 
-const authRequire = function (req, res, next) {
+const authRequire = async function (req, res, next) {
     
+    const supaToken = req.cookies.authCookie;
+
+    if (!supaToken) {
+        return res.redirect('/login');
+    };
+
+    const { data, error} = await supabase.auth.getUser(supaToken);
+
+    if (error || !data.user ) {
+        res.clearCookie('authCookie');
+        return res.redirect('login');
+    };
+
+    req.user = data.user;
+
     next();
 };
 
@@ -27,6 +43,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(cors());
+app.use(cookieParser());
 
 const SALT_ROUNDS = 10;
 
@@ -38,21 +55,22 @@ app.listen(app.get('port'), () => {
     console.log(`Listening on port: ${app.get('port')}`)
 })
 
-app.get('/', (req, res) => {
+app.get('/', authRequire, (req, res) => {
     res.render('index.ejs');
 });
 
-app.get('/calendar', (req, res) => {
+app.get('/calendar', authRequire, (req, res) => {
     res.render('calendar.ejs');
 });
 
-app.get('/todo', (req, res) => {
+app.get('/todo', authRequire, (req, res) => {
     
     res.render('todo.ejs');
 });
 
-app.get('/groups', (req, res) => {
+app.get('/groups', authRequire, (req, res) => {
 
+    console.log(req.cookies,req.cookies.authCookie);
     res.render('groups.ejs');
 })
 
@@ -79,24 +97,26 @@ app.post('/login', async (req, res) => {
     if (error) {
         return res.status(400).render('login.ejs', {succes: false, message: error.message});
     } else {
-        res.render('groups.ejs');
+
+        res.cookie('authCookie', data.session.access_token, {maxAge: 3 * 60 * 60 * 1000, httpOnly: true});
+
+        res.redirect('/groups');
     }
 })
 
 app.post('/register', async (req, res) => {
     console.log(req.body);
     // Need to register a user and then also log in direclty.
-    let isValid, messageSuccess;
 
     if (req.body['password'] != req.body['passwordConfirm']) {
         
         return res.status(422).render('register.ejs', {succes: false, error: 'Make sure the passwords entered are identical to each other.'});
     }
 
-    [isValid, messageSuccess] = validatePassword(req.body['password']);
+    const [isValid, messageSuccess] = validatePassword(req.body['password']);
 
     if (!isValid) {
-        return res.status(422).render('register.ejs', {succes: false, error: messageSuccess})
+        return res.status(422).render('register.ejs', {succes: false, error: messageSuccess});
     }
 
     // let hash_pass = await bcrypt.hash(req.body['password'], SALT_ROUNDS)
@@ -110,12 +130,20 @@ app.post('/register', async (req, res) => {
             }
         } 
     });
+    const refreshToken = data.session.refresh_token;
 
     if (error) {
         return res.status(400).render('register.ejs', {succes: false, error: error.message});
     } else {
-        res.render('groups.ejs');
+        res.cookie('authCookie', data.session.access_token, {maxAge: 3 * 60 * 60 * 1000, httpOnly: true});
+        res.redirect('/groups');
     }
+})
+
+app.post('/logout', async (req, res) => {
+
+    res.clearCookie('authCookie');
+    res.redirect('/login');
 })
 
 //API Endpoints

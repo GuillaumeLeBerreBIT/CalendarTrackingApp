@@ -7,20 +7,20 @@ export default function validatePassword(password) {
 
     if (password.length < minLength) {
 
-        return false, 'Password is to small please provide a passsword with more then 8 characters.'
+        return [false, 'Password is to small please provide a passsword with more then 8 characters.']
     } 
 
     if (!hasUpper) {
-        return false, 'Provide at least one capital.'
+        return [false, 'Provide at least one capital.']
     } 
-    if (hasNumber) {
-        return false, 'Provide at least one number.'
+    if (!hasNumber) {
+        return [false, 'Provide at least one number.']
     }
 
     if (!hasSpecialChar) {
-        return false, 'Use at least one special character: !@#$%^&*'
+        return [false, 'Use at least one special character: !@#$%^&*']
     }
 
-    return true, null
+    return [true, null]
 
 };
