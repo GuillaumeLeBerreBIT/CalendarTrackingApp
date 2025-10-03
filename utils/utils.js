@@ -3,7 +3,7 @@ export default function validatePassword(password) {
     const minLength = 8;
     const hasUpper = /[A-Z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
-    const hasSpecialChar = /[!@#$%^&*]/.test(password)
+    const hasSpecialChar = /[!@#$%^&*/]/.test(password)
 
     if (password.length < minLength) {
 
