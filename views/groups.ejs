@@ -99,12 +99,40 @@
                 <textarea id="group-description" name="group-description" rows="3" cols="33"></textarea>
                 <label for="tag-name">Tag Name:</label>
                 <input type="text" name="tag-name" id="tag-name">
-                <label for='invite-user'>Invite a User:</label>
+                <label for='invite-user'>Invite user:</label>
                 <input type="text" placeholder="email/username" name="invite-user" id="invite-user">
+                <button type="button" class="addUserBtn" id="addUserBtn">Add User</button>
+                
+                <div class="selectedUsers" id="selectedUsers">
+                    <!--Show the users selected by the user-->
+                </div>
                 <button type="submit">Add Group</button>
             </form>
 
         </div>
     </div>
 <div>
+<script>
+
+    const selectedUsers = document.querySelector('#selectedUsers');
+    const addUserBtn = document.querySelector('#addUserBtn');
+    const userToAdd = document.querySelector('#invite-user');
+
+    addUserBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+
+        const userText = userToAdd.value;
+        const newDiv = document.createElement('div');
+
+        newDiv.innerText = userText;
+        newDiv.classList.add("badge-secondary");
+
+        selectedUsers.appendChild(newDiv);
+
+        userText.value = '';
+
+    });
+
+    
+</script>
 <%- include('partials/footer.ejs') %>
