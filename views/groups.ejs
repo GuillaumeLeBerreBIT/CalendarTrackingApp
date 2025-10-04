@@ -1,138 +1,135 @@
 <%- include('partials/header.ejs') %>
 
-<div>
-    <div class="groups-header-container">
-        <h2>Groups</h2>
+    <div>
+        <div class="groups-header-container">
+            <h2>Groups</h2>
 
-        <div class="groups-header-nav">
-            <h2>All Groups</h2>
-            <button>+ Create Group</button>
-            <form method="POST" action="/logout">
-                <input type="submit" value="Log Out">
-            </form>
-        </div>
-    </div>
-
-    <div class="group-container">
-        <div class="group-card card-shape">
-            <div class="group-header">
-                <h3>Development Team</h3>
-                <div class="badge-secondary">Study Group</div>
+            <div class="groups-header-nav">
+                <h2>All Groups</h2>
+                <button class="create-group-btn" id="create-group-btn">+ Create Group</button>
+                <form method="POST" action="/logout">
+                    <input type="submit" value="Log Out">
+                </form>
             </div>
-
-            <p>Core development team working on product features</p>
-
-            <div class="group-header-stat">
-                <div class="group-stat">
-                    <i></i>
-                    <span>3</span>
-                    <p>Todo lists</p>
-                </div>
-                <div class="group-stat">
-                    <i></i>
-                    <span>3</span>
-                    <p>Events</p>
-                </div>
-                <div class="group-stat">
-                    <i></i>
-                    <span>3</span>
-                    <p>Timers</p>
-                </div>
-            </div>
-
-            <div class="groups-card-header">
-                <h4>Members (4)</h4>
-                <div>
-                    <button>Invite</button>
-                </div>
-            </div>
-
-            <div class="group-members">
-                <div class="card-member card-shape">
-                    <div class="card-title">
-                        <h5>You</h5>
-                        <div class="badge-secondary">Admin</div>
-                    </div>
-                    <div>you@company.com</div>
-                </div>
-                <div class="card-member card-shape">
-                    <div class="card-title">
-                        <h5>Alice Johnson</h5>
-                        <div class="badge-secondary">Editor</div>
-                    </div>
-                    <div>you@company.com</div>
-                </div>
-                <div class="card-member card-shape">
-                    <div class="card-title">
-                        <h5>You</h5>
-                        <div class="badge-secondary">Manager</div>
-                    </div>
-                    <div>you@company.com</div>
-                </div>
-            </div>
-
-            <span class="justify-center">+1 More members</span>
-
-            <hr>
-
-            <div class="group-footer">
-                <p>Created at 1-1-2024</p>
-                <div class="group-end-btn">
-                    <button>View Details</button>
-                    <button>Manage</button>
-                </div>
-            </div>
-
-
         </div>
 
-    </div>
-
-
-    <div class="modal-overlay-groups" id="modal-overlay-groups">
-        <div class="modal-box-groups">
-            <span class="close-btn" id="close-btn">&times;</span>
-
-            <form method="post" action="/create-group" class="form-modal-groups">
-                <input type="text" name="group-title" id="group-title" placeholder="Group Name" required>
-                <label for="group-description">Description:</label>
-                <textarea id="group-description" name="group-description" rows="3" cols="33"></textarea>
-                <label for="tag-name">Tag Name:</label>
-                <input type="text" name="tag-name" id="tag-name">
-                <label for='invite-user'>Invite user:</label>
-                <input type="text" placeholder="email/username" name="invite-user" id="invite-user">
-                <button type="button" class="addUserBtn" id="addUserBtn">Add User</button>
-                
-                <div class="selectedUsers" id="selectedUsers">
-                    <!--Show the users selected by the user-->
+        <div class="group-container">
+            <div class="group-card card-shape">
+                <div class="group-header">
+                    <h3>Development Team</h3>
+                    <div class="badge-secondary">Study Group</div>
                 </div>
-                <button type="submit">Add Group</button>
-            </form>
+
+                <p>Core development team working on product features</p>
+
+                <div class="group-header-stat">
+                    <div class="group-stat">
+                        <i></i>
+                        <span>3</span>
+                        <p>Todo lists</p>
+                    </div>
+                    <div class="group-stat">
+                        <i></i>
+                        <span>3</span>
+                        <p>Events</p>
+                    </div>
+                    <div class="group-stat">
+                        <i></i>
+                        <span>3</span>
+                        <p>Timers</p>
+                    </div>
+                </div>
+
+                <div class="groups-card-header">
+                    <h4>Members (4)</h4>
+                    <div>
+                        <button>Invite</button>
+                    </div>
+                </div>
+
+                <div class="group-members">
+                    <div class="card-member card-shape">
+                        <div class="card-title">
+                            <h5>You</h5>
+                            <div class="badge-secondary">Admin</div>
+                        </div>
+                        <div>you@company.com</div>
+                    </div>
+                    <div class="card-member card-shape">
+                        <div class="card-title">
+                            <h5>Alice Johnson</h5>
+                            <div class="badge-secondary">Editor</div>
+                        </div>
+                        <div>you@company.com</div>
+                    </div>
+                    <div class="card-member card-shape">
+                        <div class="card-title">
+                            <h5>You</h5>
+                            <div class="badge-secondary">Manager</div>
+                        </div>
+                        <div>you@company.com</div>
+                    </div>
+                </div>
+
+                <span class="justify-center">+1 More members</span>
+
+                <hr>
+
+                <div class="group-footer">
+                    <p>Created at 1-1-2024</p>
+                    <div class="group-end-btn">
+                        <button>View Details</button>
+                        <button>Manage</button>
+                    </div>
+                </div>
+
+
+            </div>
 
         </div>
-    </div>
-<div>
-<script>
 
-    const selectedUsers = document.querySelector('#selectedUsers');
-    const addUserBtn = document.querySelector('#addUserBtn');
-    const userToAdd = document.querySelector('#invite-user');
 
-    addUserBtn.addEventListener('click', function (e) {
-        e.preventDefault();
+        <div class="modal-overlay-groups" id="modal-overlay-groups">
+            <div class="modal-box-groups">
+                <span class="close-btn" id="close-btn">&times;</span>
 
-        const userText = userToAdd.value;
-        const newDiv = document.createElement('div');
+                <form method="post" action="/create-group" class="form-modal-groups">
+                    <div class="flex-column">
+                        <h3>Create Group</h3>
+                        <p>Create a new group and invite members to collaborate.</p>
+                    </div>
+                    <div  class="flex-column">
+                        <label for="group-title">Group Name</label>
+                        <input type="text" name="group-title" id="group-title" placeholder="Enter group name" required>
+                    </div>
+                    <div  class="flex-column">
+                        <label for="group-description">Description</label>
+                        <textarea id="group-description" name="group-description" rows="3" cols="33"
+                            placeholder="What is this about?"></textarea>
+                    </div>
+                    <div  class="flex-column">
+                        <label for="tag-name">Tag Name</label>
+                        <input type="text" name="tag-name" id="tag-name"
+                            placeholder="e.g. Development, Groceries, Household chores.">
+                    </div>
+                    <div  class="flex-column">
+                        <label for='invite-user'>Invite Members</label>
+                        <input type="text" placeholder="email@example.com / username" name="invite-user"
+                            id="invite-user">
+                        <button type="button" class="addUserBtn" id="addUserBtn">Add User</button>
+                    </div>
+                    <div class="flex-column">
+                        <label>Invited Members</label>
+                        <div class="selectedUsers" id="selectedUsers">
+                            <!--Show the users selected by the user-->
+                        </div>
+                    </div>
 
-        newDiv.innerText = userText;
-        newDiv.classList.add("badge-secondary");
+                    <button type="submit">Add Group</button>
+                </form>
+            </div>
+        </div>
+        <div>
 
-        selectedUsers.appendChild(newDiv);
-
-        userText.value = '';
-
-    });
-
-    
-</script>
-<%- include('partials/footer.ejs') %>
+            <script src="js/groups.js"></script>
+            <%- include('partials/footer.ejs') %>
