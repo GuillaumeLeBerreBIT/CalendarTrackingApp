@@ -94,38 +94,39 @@
                 <span class="close-btn" id="close-btn">&times;</span>
 
                 <form method="post" action="/create-group" class="form-modal-groups">
-                    <div class="flex-column">
+                    <div class="flex-column gap-0">
                         <h3>Create Group</h3>
                         <p>Create a new group and invite members to collaborate.</p>
                     </div>
-                    <div  class="flex-column">
+                    <div class="flex-column">
                         <label for="group-title">Group Name</label>
                         <input type="text" name="group-title" id="group-title" placeholder="Enter group name" required>
                     </div>
-                    <div  class="flex-column">
+                    <div class="flex-column">
                         <label for="group-description">Description</label>
                         <textarea id="group-description" name="group-description" rows="3" cols="33"
                             placeholder="What is this about?"></textarea>
                     </div>
-                    <div  class="flex-column">
+                    <div class="flex-column">
                         <label for="tag-name">Tag Name</label>
                         <input type="text" name="tag-name" id="tag-name"
                             placeholder="e.g. Development, Groceries, Household chores.">
                     </div>
-                    <div  class="flex-column">
-                        <label for='invite-user'>Invite Members</label>
-                        <input type="text" placeholder="email@example.com / username" name="invite-user"
-                            id="invite-user">
-                        <button type="button" class="addUserBtn" id="addUserBtn">Add User</button>
-                    </div>
                     <div class="flex-column">
-                        <label>Invited Members</label>
-                        <div class="selectedUsers" id="selectedUsers">
-                            <!--Show the users selected by the user-->
+                        <label for='invite-user'>Invite Members</label>
+                        <div class="justify-row-between">
+                            <input type="text" placeholder="email@example.com / username" name="invite-user"
+                                id="invite-user">
+                            <button type="button" class="addUserBtn" id="addUserBtn">Add User</button>
                         </div>
-                    </div>
+                        <div class="flex-column">
+                            <label>Invited Members</label>
+                            <div class="selectedUsers" id="selectedUsers">
+                                <!--Show the users selected by the user-->
+                            </div>
+                        </div>
 
-                    <button type="submit">Add Group</button>
+                        <button type="submit">Add Group</button>
                 </form>
             </div>
         </div>
