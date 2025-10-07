@@ -26,8 +26,8 @@
 .group-card {
   display: flex;
   flex-direction: column;
-  width: 60vw;
-  max-width: 800px;
+  width: 90%;
+  max-width: 1100px;  
 
   gap: 20px;
 }
