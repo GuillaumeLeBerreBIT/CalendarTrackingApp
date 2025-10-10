@@ -3,7 +3,7 @@ hr {
   border: 0.5px solid oklch(83.843% 0.00778 16.639);
 }
 
-.groups-header-container {
+.wrapper-container {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -16,7 +16,18 @@ hr {
   height: fit-content;
 }
 
+.wrapper-cards {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+
 .group-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
   width: 90%;
   margin: auto;
 }
@@ -25,8 +36,9 @@ hr {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  align-self: center;
 
-  width: 90%;
+  width: 95%;
   max-width: 1142px;
 }
 
@@ -34,6 +46,18 @@ hr {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  align-self: center;
+
+  width: 95%;
+  max-width: 1142px;
+}
+
+.groups-summary-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  gap: 20px;
 }
 
 .summary-card {
