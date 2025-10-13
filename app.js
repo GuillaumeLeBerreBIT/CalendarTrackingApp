@@ -68,21 +68,33 @@ app.get("/todo", authRequire, (req, res) => {
 });
 
 app.get("/groups", authRequire, async (req, res) => {
-  const { data: groups, error } = await supabase.from("groups").select(`
+  const { data: groups, error } = await supabase
+    .from("groups")
+    .select(
+      `
         *,
         profiles_groups (
         *,
         profiles (
-        *)
+        username,
+        email)
         )
-        `);
+        `
+    )
+    .eq("profiles_groups.user_id", req.user.id);
 
+  let userGroups;
   if (groups && groups.length > 0) {
-    console.log(groups[0].user_groups);
+    userGroups = (groups || []).map((g) => ({
+      ...g,
+      profiles_groups: g.profiles_groups || [],
+      users: g.profiles_groups.profiles || [],
+    }));
   } else {
     console.log("No user groups found.");
   }
-  res.render("groups.ejs");
+
+  res.render("groups.ejs", { userGroups });
 });
 
 app.post("/create-group", authRequire, async (req, res) => {
@@ -118,10 +130,10 @@ app.post("/create-group", authRequire, async (req, res) => {
       .select();
 
     if (profileError) {
-      await supabase
+      const { error } = await supabase
         .from("groups")
         .delete()
-        .eq(groups_id, newGroup[0].groups_id);
+        .eq("groups_id", newGroup[0].groups_id);
       return res.status(400).render("groups.ejs", {
         success: false,
         message: "Failed to add the creator as admin.",
@@ -142,21 +154,24 @@ app.post("/create-group", authRequire, async (req, res) => {
             {
               user_id: profileMatches[0].user_id,
               groups_id: newGroup.groups_id,
-              role: 'member',
-              invite_status: 'pending',
+              role: "member",
+              invite_status: "pending",
             },
           ]);
 
         if (inviteError) {
-            console.log('groups.ejs', {success: false, message: 'Group created, but unable to add user to the group.'})
+          console.log("groups.ejs", {
+            success: false,
+            message: "Group created, but unable to add user to the group.",
+          });
         }
       }
     }
 
-    console.log(req.body);
-
-    res.render("groups.ejs", {success: true, message: 'Group created succesfully.'});
-
+    res.render("groups.ejs", {
+      success: true,
+      message: "Group created succesfully.",
+    });
   } catch (error) {
     res
       .status(500)
