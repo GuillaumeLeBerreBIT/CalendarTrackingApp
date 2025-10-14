@@ -85,11 +85,24 @@ app.get("/groups", authRequire, async (req, res) => {
 
   let userGroups;
   if (groups && groups.length > 0) {
-    userGroups = (groups || []).map((g) => ({
-      ...g,
-      profiles_groups: g.profiles_groups || [],
-      users: g.profiles_groups.profiles || [],
-    }));
+    
+    userGroups = groups.map(group => {
+      
+      const members = group.profiles_groups?.map(pg => {  return {
+        profile: pg.profiles,
+        role: pg.role
+      } }) || [];
+
+      return {  
+        groupInfo: {
+          title: group.groups_title,
+          description: group.groups_description,
+          tag: group.tag_name
+        },
+        members,
+      }
+    })
+
   } else {
     console.log("No user groups found.");
   }

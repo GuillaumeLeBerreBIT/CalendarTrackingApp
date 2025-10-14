@@ -34,75 +34,79 @@
                 <button class="create-group-btn" id="create-group-btn">+ Create Group</button>
             </div>
             <div class="wrapper-cards">
-                <div class="group-card card-shape">
-                    <div class="group-header">
-                        <h3>Development Team</h3>
-                        <div class="badge-secondary">Study Group</div>
-                    </div>
-
-                    <p>Core development team working on product features</p>
-
-                    <div class="group-header-stat">
-                        <div class="group-stat">
-                            <i></i>
-                            <span>3</span>
-                            <p>Todo lists</p>
+                <% if (userGroups) { userGroups.forEach((group) => {%>
+                    <div class="group-card card-shape">
+                        <div class="group-header">
+                            <h3><%= group.groupInfo.title %></h3>
+                            <div class="badge-secondary"><%= group.groupInfo.tag %></div>
                         </div>
-                        <div class="group-stat">
-                            <i></i>
-                            <span>3</span>
-                            <p>Events</p>
-                        </div>
-                        <div class="group-stat">
-                            <i></i>
-                            <span>3</span>
-                            <p>Timers</p>
-                        </div>
-                    </div>
 
-                    <div class="groups-card-header">
-                        <h4>Members (4)</h4>
-                        <div>
-                            <button>Invite</button>
-                        </div>
-                    </div>
+                        <p><%= group.groupInfo.description %></p>
 
-                    <div class="group-members">
-                        <div class="card-member card-shape">
-                            <div class="card-title">
-                                <h5>You</h5>
-                                <div class="badge-secondary">Admin</div>
+                        <div class="group-header-stat">
+                            <div class="group-stat">
+                                <i></i>
+                                <span>3</span>
+                                <p>Todo lists</p>
                             </div>
-                            <div>you@company.com</div>
-                        </div>
-                        <div class="card-member card-shape">
-                            <div class="card-title">
-                                <h5>Alice Johnson</h5>
-                                <div class="badge-secondary">Editor</div>
+                            <div class="group-stat">
+                                <i></i>
+                                <span>3</span>
+                                <p>Events</p>
                             </div>
-                            <div>you@company.com</div>
-                        </div>
-                        <div class="card-member card-shape">
-                            <div class="card-title">
-                                <h5>You</h5>
-                                <div class="badge-secondary">Manager</div>
+                            <div class="group-stat">
+                                <i></i>
+                                <span>3</span>
+                                <p>Timers</p>
                             </div>
-                            <div>you@company.com</div>
+                        </div>
+
+                        <div class="groups-card-header">
+                            <h4>Members (4)</h4>
+                            <div>
+                                <button>Invite</button>
+                            </div>
+                        </div>
+
+                        <div class="group-members">
+                            <% group.members.forEach(member => { %>
+                            <div class="card-member card-shape">
+                                <div class="card-title">
+                                    <h5><%= member.profile.username %></h5>
+                                    <div class="badge-secondary"><%= member.role %></div>
+                                </div>
+                                <div><%= member.profile.email %></div>
+                            </div>
+                            <% }); %>
+                            <div class="card-member card-shape">
+                                <div class="card-title">
+                                    <h5>Alice Johnson</h5>
+                                    <div class="badge-secondary">Editor</div>
+                                </div>
+                                <div>you@company.com</div>
+                            </div>
+                            <div class="card-member card-shape">
+                                <div class="card-title">
+                                    <h5>You</h5>
+                                    <div class="badge-secondary">Manager</div>
+                                </div>
+                                <div>you@company.com</div>
+                            </div>
+                        </div>
+
+                        <span class="justify-center">+1 More members</span>
+
+                        <hr>
+
+                        <div class="group-footer">
+                            <p>Created at 1-1-2024</p>
+                            <div class="group-end-btn">
+                                <button>View Details</button>
+                                <button>Manage</button>
+                            </div>
                         </div>
                     </div>
-
-                    <span class="justify-center">+1 More members</span>
-
-                    <hr>
-
-                    <div class="group-footer">
-                        <p>Created at 1-1-2024</p>
-                        <div class="group-end-btn">
-                            <button>View Details</button>
-                            <button>Manage</button>
-                        </div>
-                    </div>
-                </div>
+                <% })} %>
             </div>
         </div>
     </div>
