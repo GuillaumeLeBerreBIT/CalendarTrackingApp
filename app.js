@@ -10,6 +10,7 @@ import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
 import validatePassword from "./utils/utils.js";
 import { stat } from "fs";
+import { group } from "console";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -63,8 +64,46 @@ app.get("/calendar", authRequire, (req, res) => {
   res.render("calendar.ejs");
 });
 
-app.get("/todo", authRequire, (req, res) => {
-  res.render("todo.ejs");
+app.get("/todo", authRequire, async (req, res) => {
+  const { data: groupObj, error: profileError } = await supabase
+    .from("profiles")
+    .select(
+      `
+      profiles_groups(
+      groups_id
+      )`
+    )
+    .eq("profiles_groups.user_id", req.user.id);
+
+  const groupIDs = groupObj[0]?.profiles_groups.map((pg) => {
+    return pg.groups_id;
+  });
+
+  const { data: task_list, error: taskListError } = await supabase
+    .from("task_list")
+    .select(
+      `
+    *,
+    groups(
+    *
+    )
+    `
+    )
+    .in("groups.groups_id", groupIDs);
+
+  const yourTaskLists = task_list.map((tl) => {
+    return {
+      taskListInfo: {
+        title: tl.task_list_title,
+        desc: tl.task_list_description,
+        tag_group: tl.groups.tag_name
+      },
+    };
+  });
+
+  res.render("todo.ejs", {
+    yourTaskLists
+  });
 });
 
 app.get("/groups", authRequire, async (req, res) => {
@@ -83,31 +122,27 @@ app.get("/groups", authRequire, async (req, res) => {
     )
     .eq("profiles_groups.user_id", req.user.id);
 
-  let userGroups;
-  if (groups && groups.length > 0) {
-    
-    userGroups = groups.map(group => {
-      
-      const members = group.profiles_groups?.map(pg => {  return {
-        profile: pg.profiles,
-        role: pg.role
-      } }) || [];
+  const userGroups =
+    groups.map((group) => {
+      const members =
+        group.profiles_groups?.map((pg) => {
+          return {
+            profile: pg.profiles,
+            role: pg.role,
+          };
+        }) || [];
 
-      return {  
+      return {
         groupInfo: {
           title: group.groups_title,
           description: group.groups_description,
-          tag: group.tag_name
+          tag: group.tag_name,
         },
         members,
-      }
-    })
+      };
+    }) || [];
 
-  } else {
-    console.log("No user groups found.");
-  }
-
-  res.render("groups.ejs", { userGroups });
+  res.render("groups.ejs", { userGroups, yourGroups: groups.length });
 });
 
 app.post("/create-group", authRequire, async (req, res) => {
