@@ -20,64 +20,122 @@
 
     <!--Show Groups with list items-->
     <div class="group-container">
-        <div class="group-card card-shape">
-            <div class="group-header">
-                <div class="justify-start">
-                    <h3>Study Tasks</h3>
-                    <div class="badge-secondary">Study Group</div>
-                </div>
+        <% yourTaskLists.forEach(taskList=> { %>
 
-                <div class="header-item">
-                    <button class="btn btn-soft">Add Task</button>
-                    <button class="btn btn-soft">...</button>
-                </div>
-            </div>
-
-            <p>Tasks for upcoming exams and assignments.</p>
-
-            <div class="justify-between">
-                <span class="progress-bar">Progress</span>
-                <span class="progress-bar">1 of 2 completed</span>
-            </div>
-
-            <div class="task-container">
-                <div class="task-card card-shape">
-                    <div class="radio-box">
-                        <input type="checkbox" name="task-completion" id="task-completion">
+            <div class="group-card card-shape">
+                <div class="group-header">
+                    <div class="justify-start">
+                        <h3>
+                            <%= taskList.taskListInfo.title %>
+                        </h3>
+                        <div class="badge-secondary">
+                            <%= taskList.taskListInfo.tag_group %>
+                        </div>
                     </div>
-                    <div class="task-content">
-                        <div class="justify-between">
-                            <h4>Review Chapter 5 - Data Structures</h4>
-                            <span>High</span>
-                        </div>
-                        <p>
-                            Read and summarize key concepts from the data structures chapter.
-                        </p>
-                        <div>
-                            <span>John Doe</span>
-                            <span>Due Sep 4</span>
-                        </div>
+
+                    <div class="header-item">
+                        <button class="btn btn-soft" id="add-task-btn">Add Task</button>
+                        <button class="btn btn-soft">...</button>
                     </div>
                 </div>
-                <div class="task-card card-shape">
-                    <div class="radio-box">
-                        <input type="checkbox" name="task-completion" id="task-completion">
-                    </div>
-                    <div class="task-content">
-                        <div class="justify-between">
-                            <h4>Complete Practice Problems</h4>
-                            <span>Medium</span>
+
+                <p>
+                    <%= taskList.taskListInfo.task_list_description %>
+                </p>
+
+                <div class="justify-between">
+                    <span class="progress-bar">Progress</span>
+                    <span class="progress-bar">1 of <%= taskList.totalTasks %> completed</span>
+                </div>
+
+                <div class="task-container">
+                    <% taskList.taskItems.forEach(t => { %>
+                        <div class="task-card card-shape">
+                            <div class="radio-box">
+                                <input type="checkbox" name="task-completion" id="task-completion">
+                            </div>
+                            <div class="task-content">
+                                <div class="justify-between">
+                                    <h4><%= t.task_title %></h4>
+                                    <span><%= t.priority %></span>
+                                </div>
+                                <p>
+                                    <%= t.task_description %>
+                                </p>
+                                <div>
+                                    <span>John Doe</span>
+                                    <% if (t?.due_date) {%>
+                                        <span>Due Sep 4</span>
+                                    <%} else {%>
+                                        <span>No deadline</span>
+                                    <%} %>
+                                </div>
+                            </div>
                         </div>
-                        <p>
-                            Solve problems 1-15 from the textbook.
-                        </p>
-                        <div>
-                            <span>Jane Smith</span>
-                            <span>Completed Sep 2</span>
-                        </div>
-                    </div>
+                        <%}); %>
                 </div>
             </div>
-        </div>
+            <%}); %>
+                <div class="group-card card-shape">
+                    <div class="group-header">
+                        <div class="justify-start">
+                            <h3>Study Tasks</h3>
+                            <div class="badge-secondary">Study Group</div>
+                        </div>
+
+                        <div class="header-item">
+                            <button class="btn btn-soft">Add Task</button>
+                            <button class="btn btn-soft">...</button>
+                        </div>
+                    </div>
+
+                    <p>Tasks for upcoming exams and assignments.</p>
+
+                    <div class="justify-between">
+                        <span class="progress-bar">Progress</span>
+                        <span class="progress-bar">1 of 2 completed</span>
+                    </div>
+
+                    <div class="task-container">
+                        <div class="task-card card-shape">
+                            <div class="radio-box">
+                                <input type="checkbox" name="task-completion" id="task-completion">
+                            </div>
+                            <div class="task-content">
+                                <div class="justify-between">
+                                    <h4>Review Chapter 5 - Data Structures</h4>
+                                    <span>High</span>
+                                </div>
+                                <p>
+                                    Read and summarize key concepts from the data structures chapter.
+                                </p>
+                                <div>
+                                    <span>John Doe</span>
+                                    <span>Due Sep 4</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="task-card card-shape">
+                            <div class="radio-box">
+                                <input type="checkbox" name="task-completion" id="task-completion">
+                            </div>
+                            <div class="task-content">
+                                <div class="justify-between">
+                                    <h4>Complete Practice Problems</h4>
+                                    <span>Medium</span>
+                                </div>
+                                <p>
+                                    Solve problems 1-15 from the textbook.
+                                </p>
+                                <div>
+                                    <span>Jane Smith</span>
+                                    <span>Completed Sep 2</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
     </div>
+
+    <script src="js/todo.js"></script>
     <%- include('partials/footer.ejs') %>

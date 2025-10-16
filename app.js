@@ -91,18 +91,39 @@ app.get("/todo", authRequire, async (req, res) => {
     )
     .in("groups.groups_id", groupIDs);
 
-  const yourTaskLists = task_list.map((tl) => {
+  const yourTaskListsPromises = task_list.map(async (tl) => {
+    const { data: tasks, error: errorTasks } = await supabase
+      .from("task")
+      .select("*")
+      .eq("task_list_id", tl.task_list_id);
+
+    if (errorTasks) {
+      return {
+        taskListInfo: {
+          title: tl.task_list_title,
+          desc: tl.task_list_description,
+          tag_group: tl.groups.tag_name,
+        },
+        taskItems: [],
+        totalTasks: 0,
+      };
+    }
+
     return {
       taskListInfo: {
         title: tl.task_list_title,
         desc: tl.task_list_description,
-        tag_group: tl.groups.tag_name
+        tag_group: tl.groups.tag_name,
       },
+      taskItems: tasks || [],
+      totalTasks: tasks.length || 0,
     };
   });
 
+  const yourTaskLists = await Promise.all(yourTaskListsPromises);
+
   res.render("todo.ejs", {
-    yourTaskLists
+    yourTaskLists,
   });
 });
 

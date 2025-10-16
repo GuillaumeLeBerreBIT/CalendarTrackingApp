@@ -1,0 +1,44 @@
+.container {
+    height: auto;
+    width: 95vw;
+}
+
+.card-shape {
+    padding: 20px;
+    background-color: oklch(0.97 0 0);
+    border-radius: 0.75rem;
+    border: 1px solid oklch(0.922 0 0);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+    gap: 10px;
+}
+
+.justify-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.justify-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.justify-start {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 20px;
+}
+
+.gap-0 {
+    gap: 0 !important;
+}

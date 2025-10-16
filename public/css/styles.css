@@ -14,3 +14,13 @@ body {
     margin: auto;
 }
 
+p {
+    font-size: 14px;
+    color: oklch(0.35 0 0);
+    margin: 5px 0;
+}
+
+span {
+    font-size: 12px;
+    color: oklch(0.35 0 0);
+}
