@@ -42,3 +42,11 @@
 .gap-0 {
     gap: 0 !important;
 }
+
+.set-display-flex {
+    display: flex;
+}
+
+.set-display-none {
+    display: none;
+}

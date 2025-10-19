@@ -14,7 +14,7 @@
                 <option value="active">Completed</option>
                 <option value="to-me">Assigned to Me</option>
             </select>
-            <button>Add New List</button>
+            <button class="btn-new-list" id="btn-new-list">Add New List</button>
         </div>
     </div>
 
@@ -49,15 +49,19 @@
                 </div>
 
                 <div class="task-container">
-                    <% taskList.taskItems.forEach(t => { %>
+                    <% taskList.taskItems.forEach(t=> { %>
                         <div class="task-card card-shape">
                             <div class="radio-box">
                                 <input type="checkbox" name="task-completion" id="task-completion">
                             </div>
                             <div class="task-content">
                                 <div class="justify-between">
-                                    <h4><%= t.task_title %></h4>
-                                    <span><%= t.priority %></span>
+                                    <h4>
+                                        <%= t.task_title %>
+                                    </h4>
+                                    <span>
+                                        <%= t.priority %>
+                                    </span>
                                 </div>
                                 <p>
                                     <%= t.task_description %>
@@ -66,9 +70,9 @@
                                     <span>John Doe</span>
                                     <% if (t?.due_date) {%>
                                         <span>Due Sep 4</span>
-                                    <%} else {%>
-                                        <span>No deadline</span>
-                                    <%} %>
+                                        <%} else {%>
+                                            <span>No deadline</span>
+                                            <%} %>
                                 </div>
                             </div>
                         </div>
@@ -135,6 +139,25 @@
                         </div>
                     </div>
                 </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-overlay-new-list">
+        <div class="modal-box">
+            <span class="close-btn" id="close-btn">&times;</span>
+
+            <form method="post" action="/create-task-list" class="form-modal">
+
+                <div class="flex-column">
+                    <label>Title</label>
+                    <input type="text" placeholder="Title" required>
+                </div>
+                <div class="flex-column">
+                    <label>Description</label>
+                    <textarea rows="5" cols="33" placeholder="Context about the tasks entered in this list."></textarea>
+                </div>
+
+            </form>
+        </div>
     </div>
 
     <script src="js/todo.js"></script>

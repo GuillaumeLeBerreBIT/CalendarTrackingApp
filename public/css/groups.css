@@ -70,7 +70,6 @@ hr {
   }
 }
 
-
 .group-footer {
   display: flex;
   justify-content: space-between;
@@ -267,17 +266,17 @@ button,
 }
 
 .justify-row-between input {
-    width: 80%;
+  width: 80%;
 }
 
 .form-modal-groups .addUserBtn {
-    white-space: nowrap;
-    font-size: 20px;
+  white-space: nowrap;
+  font-size: 20px;
 }
 
 #addGroup {
-    display: flex;
-    align-self: flex-end;
+  display: flex;
+  align-self: flex-end;
 }
 
 /* CSS */
