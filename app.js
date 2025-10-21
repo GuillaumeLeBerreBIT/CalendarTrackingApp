@@ -365,12 +365,14 @@ app.post("/addEvent", async (req, res) => {
 });
 
 app.post("/createTaskList", async (req, res) => {
-  const { data, error } = await supabase
+
+  const { data: createTaskList, error: createTaskListError } = await supabase
     .from("task_list")
     .insert([
       {
         task_list_title: req.body.title,
         task_list_description: req.body.description,
+        groups_id: req.body.groups_id
       },
     ])
     .select();
@@ -379,5 +381,9 @@ app.post("/createTaskList", async (req, res) => {
     res
       .status(400)
       .json({ succes: false, error: "Unable to create Task List" });
+  } else {
+    // Send data back to the frontend >> Need to customize the submit of form
+    res.json({succes: true, data})
   }
+
 });
