@@ -70,7 +70,10 @@ app.get("/todo", authRequire, async (req, res) => {
     .select(
       `
       profiles_groups(
-      groups_id
+        groups_id,
+        groups(
+          tag_name
+        )
       )`
     )
     .eq("profiles_groups.user_id", req.user.id);
@@ -78,6 +81,11 @@ app.get("/todo", authRequire, async (req, res) => {
   const groupIDs = groupObj[0]?.profiles_groups.map((pg) => {
     return pg.groups_id;
   });
+
+  const tagNameObj =
+    groupObj[0]?.profiles_groups
+      .filter(pg => pg.groups.tag_name !== null)
+      .map(pg =>  ({gid: pg.groups_id, tag: pg.groups.tag_name})) || {};
 
   const { data: task_list, error: taskListError } = await supabase
     .from("task_list")
@@ -89,7 +97,7 @@ app.get("/todo", authRequire, async (req, res) => {
     )
     `
     )
-    .in("groups.groups_id", groupIDs);
+    .in("groups_id", groupIDs);
 
   const yourTaskListsPromises = task_list.map(async (tl) => {
     const { data: tasks, error: errorTasks } = await supabase
@@ -124,6 +132,7 @@ app.get("/todo", authRequire, async (req, res) => {
 
   res.render("todo.ejs", {
     yourTaskLists,
+    groupTagObj: tagNameObj,
   });
 });
 
@@ -237,10 +246,11 @@ app.post("/create-group", authRequire, async (req, res) => {
       }
     }
 
-    res.render("groups.ejs", {
-      success: true,
-      message: "Group created succesfully.",
-    });
+    res.redirect("/groups");
+    // res.render("groups.ejs", {
+    //   success: true,
+    //   message: "Group created succesfully.",
+    // });
   } catch (error) {
     res
       .status(500)
@@ -351,5 +361,23 @@ app.post("/addEvent", async (req, res) => {
     res.status(400).json({ succes: false, error: error.message });
   } else {
     res.json({ succes: true, data });
+  }
+});
+
+app.post("/createTaskList", async (req, res) => {
+  const { data, error } = await supabase
+    .from("task_list")
+    .insert([
+      {
+        task_list_title: req.body.title,
+        task_list_description: req.body.description,
+      },
+    ])
+    .select();
+
+  if (error) {
+    res
+      .status(400)
+      .json({ succes: false, error: "Unable to create Task List" });
   }
 });

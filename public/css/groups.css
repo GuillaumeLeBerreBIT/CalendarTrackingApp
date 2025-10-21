@@ -171,6 +171,7 @@ hr {
   padding: 20px 0px;
 
   width: 60%;
+  max-width: 700px;;
   border-radius: 15px;
   background-color: white;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);

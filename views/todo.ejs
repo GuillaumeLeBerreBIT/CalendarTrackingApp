@@ -145,16 +145,26 @@
         <div class="modal-box">
             <span class="close-btn" id="close-btn">&times;</span>
 
-            <form method="post" action="/create-task-list" class="form-modal">
+            <form method="post" action="/createTaskList" class="form-modal">
 
                 <div class="flex-column">
-                    <label>Title</label>
-                    <input type="text" placeholder="Title" required>
+                    <label for="task_list_title">Title</label>
+                    <input name="title" id="task_list_title" type="text" placeholder="Title" required>
                 </div>
                 <div class="flex-column">
-                    <label>Description</label>
-                    <textarea rows="5" cols="33" placeholder="Context about the tasks entered in this list."></textarea>
+                    <label for=tag_name>Tag</label>
+                    <select name="group-tags" id="tag_name">
+                        <% groupTagObj.forEach((t) => {%>
+                        <option value="<%= t.gid %>"><%= t.tag %></option>
+                        <% })%>
+                    </select>
                 </div>
+                <div class="flex-column">
+                    <label for="task_list_descr">Description</label>
+                    <textarea name="description" id="task_list_descr" rows="5" cols="33" placeholder="Context about the tasks entered in this list."></textarea>
+                </div>
+
+                <input type="hidden" name="groups_id" id="groups_id" value="">
 
             </form>
         </div>
