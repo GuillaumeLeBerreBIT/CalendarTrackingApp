@@ -37,7 +37,7 @@
                     </div>
 
                     <div class="header-item">
-                        <button class="btn btn-soft" id="add-task-btn">Add Task</button>
+                        <button class="btn btn-soft add-task-btn">Add Task</button>
                         <button class="btn btn-soft">...</button>
                     </div>
                 </div>
@@ -91,7 +91,7 @@
                         </div>
 
                         <div class="header-item">
-                            <button class="btn btn-soft">Add Task</button>
+                            <button class="btn btn-soft add-task-btn">Add Task</button>
                             <button class="btn btn-soft">...</button>
                         </div>
                     </div>
@@ -173,6 +173,40 @@
                 <input type="hidden" name="groups_id" id="groups_id" value="">
 
                 <input type="submit" class="task-list-submit" id="task-list-submit">
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-overlay-new-task">
+        <div class="modal-box">
+            <span class="close-btn" id="close-btn-task">&times;</span>
+
+            <form action="/createTask" method="post" class="form-modal" id="task-form">
+
+                <div class="flex-column">
+                    <label for="">Title</label>
+                    <input type="text" name="task_title" class="" id="" placeholder="">
+                </div>
+                <div class="flex-column">
+                    <label for="">Task Description</label>
+                    <input type="text" name="task_description" class="" id="" placeholder="">
+                </div>
+                <div class="flex-column">
+                    <label for="">Priority</label>
+                    <select type="text" name="priority" class="" id="">
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+                <div class="flex-column">
+                    <label for="">Due Date</label>
+                    <input type="date" name="due_date" class="" id="">
+                </div>
+                <div class="flex-column">
+                    <label for="">Assigned To</label>
+                    <input type="text" name="assigned_to" class="" id="" placeholder="Need to be select of all users in the group">
+                </div>
             </form>
         </div>
     </div>
