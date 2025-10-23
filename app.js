@@ -111,6 +111,8 @@ app.get("/todo", authRequire, async (req, res) => {
           title: tl.task_list_title,
           desc: tl.task_list_description,
           tag_group: tl.groups.tag_name,
+          idTl: tl.task_list_id,
+          idG: tl.groups_id
         },
         taskItems: [],
         totalTasks: 0,
@@ -122,6 +124,8 @@ app.get("/todo", authRequire, async (req, res) => {
         title: tl.task_list_title,
         desc: tl.task_list_description,
         tag_group: tl.groups.tag_name,
+        idTl: tl.task_list_id,
+        idG: tl.groups_id
       },
       taskItems: tasks || [],
       totalTasks: tasks.length || 0,
@@ -377,13 +381,18 @@ app.post("/createTaskList", async (req, res) => {
     ])
     .select();
 
-  if (error) {
+  const {data: tagName, error: tagNameError } = await supabase
+  .from('groups')
+  .select('tag_name')
+  .eq('groups_id', req.body.groups_id); 
+
+  if (createTaskListError) {
     res
       .status(400)
-      .json({ succes: false, error: "Unable to create Task List" });
+      .json({succes: false, error: "Unable to create Task List" });
   } else {
     // Send data back to the frontend >> Need to customize the submit of form
-    res.json({succes: true, data})
+    res.json({succes: true, createTaskList: createTaskList, tagName: tagName?.[0].tag_name || null})
   }
 
 });

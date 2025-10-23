@@ -22,10 +22,13 @@
     <div class="group-container">
         <% yourTaskLists.forEach(taskList=> { %>
 
-            <div class="group-card card-shape">
+            <div class="group-card card-shape" 
+            data-task-list-id="<%= taskList.taskListInfo.idTl %>"
+            data-group-id="<%= taskList.taskListInfo.idG %>">
                 <div class="group-header">
+                    <input type="hidden">
                     <div class="justify-start">
-                        <h3>
+                        <h3 id="task-list-title">
                             <%= taskList.taskListInfo.title %>
                         </h3>
                         <div class="badge-secondary">
@@ -45,7 +48,7 @@
 
                 <div class="justify-between">
                     <span class="progress-bar">Progress</span>
-                    <span class="progress-bar">1 of <%= taskList.totalTasks %> completed</span>
+                    <span class="progress-bar">0 of <%= taskList.totalTasks %> completed</span>
                 </div>
 
                 <div class="task-container">
@@ -145,7 +148,7 @@
         <div class="modal-box">
             <span class="close-btn" id="close-btn">&times;</span>
 
-            <form method="post" action="/createTaskList" class="form-modal">
+            <form method="post" action="/createTaskList" class="form-modal" id="task-list-form">
 
                 <div class="flex-column">
                     <label for="task_list_title">Title</label>
@@ -154,22 +157,52 @@
                 <div class="flex-column">
                     <label for=tag_name>Tag</label>
                     <select name="group-tags" id="tag_name">
-                        <% groupTagObj.forEach((t) => {%>
-                        <option value="<%= t.gid %>"><%= t.tag %></option>
-                        <% })%>
+                        <% groupTagObj.forEach((t)=> {%>
+                            <option value="<%= t.gid %>">
+                                <%= t.tag %>
+                            </option>
+                            <% })%>
                     </select>
                 </div>
                 <div class="flex-column">
                     <label for="task_list_descr">Description</label>
-                    <textarea name="description" id="task_list_descr" rows="5" cols="33" placeholder="Context about the tasks entered in this list."></textarea>
+                    <textarea name="description" id="task_list_descr" rows="5" cols="33"
+                        placeholder="Context about the tasks entered in this list."></textarea>
                 </div>
 
                 <input type="hidden" name="groups_id" id="groups_id" value="">
-                
-                <input type="submit">
+
+                <input type="submit" class="task-list-submit" id="task-list-submit">
             </form>
         </div>
     </div>
 
+    <template id="task-list-template">
+        <div class="group-card card-shape">
+            <div class="group-header">
+                <div class="justify-start">
+                    <h3 class="task-list-title"></h3>
+                    <div class="badge-secondary task-list-tag"></div>
+                </div>
+                <div class="header-item">
+                    <button class="btn btn-soft add-task-btn">Add Task</button>
+                    <button class="btn btn-soft">...</button>
+                </div>
+            </div>
+            <p class="task-list-description"></p>
+            <div class="justify-between">
+                <span class="progress-bar">Progress</span>
+                <span class="progress-bar task-list-progress">0 of 0 completed</span>
+            </div>
+            <div class="task-container">
+                <p class="empty-state" style="text-align: center; color: #999; padding: 20px;">
+                    No tasks yet. Click "Add Task" to get started.
+                </p>
+            </div>
+        </div>
+    </template>
+
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.18/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="js/todo.js"></script>
     <%- include('partials/footer.ejs') %>

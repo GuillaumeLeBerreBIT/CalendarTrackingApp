@@ -67,7 +67,6 @@ document.addEventListener("DOMContentLoaded", function () {
     //Send data to the backend
     let response = await axios.post("/addEvent", data);
 
-    console.log(response.data);
     // Handle response to add event to the calendar
     if (response.data.succes) {
       let event = response.data.data[0];
