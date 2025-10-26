@@ -258,7 +258,7 @@ app.post("/create-group", authRequire, async (req, res) => {
   } catch (error) {
     res
       .status(500)
-      .render("groups.ejs", { succes: false, message: error.message });
+      .render("groups.ejs", { success: false, message: error.message });
   }
 });
 
@@ -283,7 +283,7 @@ app.post("/login", async (req, res) => {
   if (error) {
     return res
       .status(400)
-      .render("login.ejs", { succes: false, message: error.message });
+      .render("login.ejs", { success: false, message: error.message });
   } else {
     res.cookie("authCookie", data.session.access_token, {
       maxAge: 3 * 60 * 60 * 1000,
@@ -300,7 +300,7 @@ app.post("/register", async (req, res) => {
 
   if (req.body["password"] != req.body["passwordConfirm"]) {
     return res.status(422).render("register.ejs", {
-      succes: false,
+      success: false,
       error: "Make sure the passwords entered are identical to each other.",
     });
   }
@@ -310,7 +310,7 @@ app.post("/register", async (req, res) => {
   if (!isValid) {
     return res
       .status(422)
-      .render("register.ejs", { succes: false, error: messageSuccess });
+      .render("register.ejs", { success: false, error: messageSuccess });
   }
 
   // let hash_pass = await bcrypt.hash(req.body['password'], SALT_ROUNDS)
@@ -329,7 +329,7 @@ app.post("/register", async (req, res) => {
   if (error) {
     return res
       .status(400)
-      .render("register.ejs", { succes: false, error: error.message });
+      .render("register.ejs", { success: false, error: error.message });
   } else {
     res.cookie("authCookie", data.session.access_token, {
       maxAge: 3 * 60 * 60 * 1000,
@@ -362,9 +362,9 @@ app.post("/addEvent", async (req, res) => {
   console.log(data, error);
 
   if (error) {
-    res.status(400).json({ succes: false, error: error.message });
+    res.status(400).json({ success: false, error: error.message });
   } else {
-    res.json({ succes: true, data });
+    res.json({ success: true, data });
   }
 });
 
@@ -389,10 +389,32 @@ app.post("/createTaskList", async (req, res) => {
   if (createTaskListError) {
     res
       .status(400)
-      .json({succes: false, error: "Unable to create Task List" });
+      .json({success: false, error: "Unable to create Task List" });
   } else {
     // Send data back to the frontend >> Need to customize the submit of form
-    res.json({succes: true, createTaskList: createTaskList, tagName: tagName?.[0].tag_name || null})
+    res.json({success: true, createTaskList: createTaskList, tagName: tagName?.[0].tag_name || null})
   }
 
 });
+
+app.post('/createTask', async (req, res) => {
+
+  const { data: insertTask, error: insertTaskError } = await supabase
+  .from('task')
+  .insert([
+    {
+      task_title: req.body.task_title,
+      task_description: req.body.task_description,
+      priority: req.body.priority,
+      due_date: req.body?.due_date || null,
+      task_list_id: req.body.task_list_id
+    }
+  ])
+  .select()
+
+  if (insertTaskError) {
+    res.json({success: false, message: "Unable to create a Task."})
+  } else {
+    res.json({success: true, insertTask})
+  }
+})

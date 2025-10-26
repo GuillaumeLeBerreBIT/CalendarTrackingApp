@@ -1,4 +1,3 @@
-const addTaskBtn = document.querySelector('#add-task-button');
 const btnNewList = document.querySelector('#btn-new-list');
 
 const modalNewList = document.querySelector('#modal-overlay-new-list')
@@ -20,13 +19,12 @@ btnNewList.addEventListener('click', function (e) {
     updateGroupID();
 });
 
-const testing = document.querySelectorAll('.group-card.card-shape');
 // Need to add the Event Listener to all the Buttons
 document.querySelectorAll('.group-card.card-shape').forEach(c => {
-    let addTaskBtn = c.querySelector('.add-task-btn');
 
-    addTaskBtn.addEventListener('click', function (e) {
+    btnAddTask.addEventListener('click', function (e) {
         modalNewTask.classList.add('set-display-flex');
+        modalNewTask.querySelector('#task_list_id').value = this.dataset.taskListId; // Need to check why this
     })
 })
 
@@ -65,6 +63,19 @@ formTaskList.addEventListener('submit', async (e) => {
         console.log(`Unable to create a task list: ${e}`)
     }
 
+})
+
+formTask.addEventListener('submit', async (e) => {
+    e.preventDefault()
+
+    const form = new FormData(formTask)
+
+    payload = {}
+    for (let [key, val] of form.entries()) {
+        payload[key] = val;
+    }
+
+    const response = await axios.post('/createTask', payload);
 })
 
 function updateGroupID () {

@@ -37,7 +37,10 @@
                     </div>
 
                     <div class="header-item">
-                        <button class="btn btn-soft add-task-btn">Add Task</button>
+                        <button class="btn btn-soft add-task-btn" id="add-task-btn"
+                        data-task-list-id="<%= taskList.taskListInfo.idTl %>">
+                        Add Task
+                    </button>
                         <button class="btn btn-soft">...</button>
                     </div>
                 </div>
@@ -207,6 +210,8 @@
                     <label for="">Assigned To</label>
                     <input type="text" name="assigned_to" class="" id="" placeholder="Need to be select of all users in the group">
                 </div>
+                <input type="hidden" name="task_list_id" id="task_list_id" value="">
+                <input type="submit" class="btn-task-submit" id="btn-task-submit">
             </form>
         </div>
     </div>
