@@ -1,6 +1,7 @@
 const btnNewList = document.querySelector("#btn-new-list");
 
 const modalNewList = document.querySelector("#modal-overlay-new-list");
+const modalNewTask = document.querySelector("#modal-overlay-new-task");
 
 const tagNameList = document.querySelector("#tag_name");
 const hiddenGroups = document.querySelector("#groups_id");
@@ -8,11 +9,10 @@ const hiddenGroups = document.querySelector("#groups_id");
 const submitTaskList = document.querySelector("#task-list-submit");
 const formTaskList = document.querySelector("#task-list-form");
 
-const modalNewTask = document.querySelector("#modal-overlay-new-task");
 const formTask = document.querySelector("#task-form");
 // const btnAddTask = document.querySelector("#add-task-btn");
-const closeBtnTask = document.querySelector(".close-btn-task");
-const closeNewList = document.querySelector(".close-btn");
+const closeBtnTask = document.querySelector("#close-btn-task");
+const closeNewList = document.querySelector("#close-btn");
 
 btnNewList.addEventListener("click", function (e) {
   modalNewList.classList.add("set-display-flex");
@@ -22,7 +22,7 @@ btnNewList.addEventListener("click", function (e) {
 // Need to add the Event Listener to all the Buttons
 document.querySelectorAll(".group-card.card-shape").forEach((c) => {
 
-    const btnAddTask = c.querySelector("#add-task-btn");
+    const btnAddTask = c.querySelector(".add-task-btn");
 
     btnAddTask.addEventListener("click", function (e) {
         modalNewTask.classList.add("set-display-flex");
@@ -142,9 +142,16 @@ function createDivTask(data) {
     const emptyState = taskCont.querySelector('#empty-state');
         if (emptyState) {
             emptyState.remove();
-        }
-    taskCont.appendChild(cloneTaskTemp)
+        };
 
-    
+    taskCont.appendChild(cloneTaskTemp)
+    modalNewTask.classList.remove('set-display-flex');
+    formTask.reset();
+       
+  } else {
+
+    modalNewTask.classList.remove('set-display-flex');
+    formTask.reset();
+    alert('Unable to create task.');
   }
 }
