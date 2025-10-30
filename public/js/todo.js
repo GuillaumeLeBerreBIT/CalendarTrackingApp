@@ -10,7 +10,6 @@ const submitTaskList = document.querySelector("#task-list-submit");
 const formTaskList = document.querySelector("#task-list-form");
 
 const formTask = document.querySelector("#task-form");
-// const btnAddTask = document.querySelector("#add-task-btn");
 const closeBtnTask = document.querySelector("#close-btn-task");
 const closeNewList = document.querySelector("#close-btn");
 
@@ -21,14 +20,57 @@ btnNewList.addEventListener("click", function (e) {
 
 // Need to add the Event Listener to all the Buttons
 document.querySelectorAll(".group-card.card-shape").forEach((c) => {
+  const btnAddTask = c.querySelector(".add-task-btn");
 
-    const btnAddTask = c.querySelector(".add-task-btn");
+  btnAddTask.addEventListener("click", function (e) {
+    modalNewTask.classList.add("set-display-flex");
+    modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId; // Need to check why this
+  });
+});
 
-    btnAddTask.addEventListener("click", function (e) {
-        modalNewTask.classList.add("set-display-flex");
-        modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId; // Need to check why this
+function debounce(func, delay) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      func.apply(this, args);
+    }, delay);
+  };
+}
 
+async function TaskUpdate(taskId, isCompleted) {
+  try {
+    const response = await axios.patch("/updateTask", {
+      taskId: taskId,
+      isCompleted: isCompleted,
     });
+
+    if (!response.data.success) {
+      alert("Something went wrong updating the task.");
+    }
+  } catch (e) {
+    alert("Unable to update the selected task. Try again later.");
+  }
+}
+
+function updateTaskUI(taskId, isChecked) {
+  //Count the tasks
+  //Update the text
+  //Update the progress bar
+  //Update the ARIA values progress bar
+  //Cross line the task text.
+}
+
+const debouncedTaskUpdate = debounce(TaskUpdate, 500);
+
+document.querySelectorAll(".task-card.card-shape").forEach((t) => {
+  t.querySelectorAll("input[type=checkbox]").forEach((c) => {
+    c.addEventListener("change", async function () {
+      updateTaskUI(this.dataset.taskId, this.checked);
+
+      debouncedTaskUpdate(this.dataset.taskId, this.checked);
+    });
+  });
 });
 
 closeNewList.addEventListener("click", function (e) {
@@ -138,20 +180,18 @@ function createDivTask(data) {
 
   if (taskListCard) {
     const taskCont = taskListCard.querySelector("#task-container");
-    
-    const emptyState = taskCont.querySelector('#empty-state');
-        if (emptyState) {
-            emptyState.remove();
-        };
 
-    taskCont.appendChild(cloneTaskTemp)
-    modalNewTask.classList.remove('set-display-flex');
+    const emptyState = taskCont.querySelector("#empty-state");
+    if (emptyState) {
+      emptyState.remove();
+    }
+
+    taskCont.appendChild(cloneTaskTemp);
+    modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
-       
   } else {
-
-    modalNewTask.classList.remove('set-display-flex');
+    modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
-    alert('Unable to create task.');
+    alert("Unable to create task.");
   }
 }

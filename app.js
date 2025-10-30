@@ -345,7 +345,7 @@ app.post("/logout", async (req, res) => {
 });
 
 //API Endpoints
-app.post("/addEvent", async (req, res) => {
+app.post("/addEvent", authRequire, async (req, res) => {
   console.log(req.body);
 
   const { data, error } = await supabase
@@ -368,7 +368,7 @@ app.post("/addEvent", async (req, res) => {
   }
 });
 
-app.post("/createTaskList", async (req, res) => {
+app.post("/createTaskList", authRequire, async (req, res) => {
 
   const { data: createTaskList, error: createTaskListError } = await supabase
     .from("task_list")
@@ -397,7 +397,7 @@ app.post("/createTaskList", async (req, res) => {
 
 });
 
-app.post('/createTask', async (req, res) => {
+app.post('/createTask', authRequire, async (req, res) => {
 
   const { data: insertTask, error: insertTaskError } = await supabase
   .from('task')
@@ -416,5 +416,20 @@ app.post('/createTask', async (req, res) => {
     res.json({success: false, message: "Unable to create a Task."})
   } else {
     res.json({success: true, insertTask})
+  }
+})
+
+app.patch('/updateTask', authRequire, async(req, res) => {
+  
+  const {data: taskUpdate, error: taskUpdateError} = await supabase
+  .from('task')
+  .update({is_completed: req.body.isCompleted})
+  .eq('task_id', req.body.taskId)
+  .select();
+
+  if (taskUpdate) {
+    res.json({success: true, taskUpdate})
+  } else {
+    res.json({success: false, message: 'Unable to update the task.'})
   }
 })
