@@ -53,10 +53,21 @@ async function TaskUpdate(taskId, isCompleted) {
   }
 }
 
-function updateTaskUI(taskId, isChecked) {
+function updateTaskUI(taskId, isChecked, taskCard) {
   //Count the tasks
+  let [completedTasks, allTasks] = [0, 0];
+  if (!taskCard.querySelector('#empty-state')) {
+  completedTasks = taskCard.querySelectorAll('input[type="checkbox"]:checked').length;
+  allTasks = taskCard.querySelectorAll('input[type="checkbox"]').length;
+  } 
   //Update the text
+  const progresssSection = taskCard.closest('.progress-section')
+  const progressBarProg = progresssSection.querySelector('.progress-bar-prog')
+  progressBarProg.textContent = `${completedTasks} of ${allTasks}`
   //Update the progress bar
+  const progressBar = progresssSection.querySelector('.progress')
+
+
   //Update the ARIA values progress bar
   //Cross line the task text.
 }
@@ -66,7 +77,7 @@ const debouncedTaskUpdate = debounce(TaskUpdate, 500);
 document.querySelectorAll(".task-card.card-shape").forEach((t) => {
   t.querySelectorAll("input[type=checkbox]").forEach((c) => {
     c.addEventListener("change", async function () {
-      updateTaskUI(this.dataset.taskId, this.checked);
+      updateTaskUI(this.dataset.taskId, this.checked, t);
 
       debouncedTaskUpdate(this.dataset.taskId, this.checked);
     });
@@ -125,8 +136,6 @@ formTask.addEventListener("submit", async (e) => {
   } else {
     alert(`Unable to create a task for this Task List: ${e}`);
   }
-
-  console.log("Hel");
 });
 
 function updateGroupID() {
@@ -189,6 +198,8 @@ function createDivTask(data) {
     taskCont.appendChild(cloneTaskTemp);
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
+
+    //Uppdate UI Tasks
   } else {
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();

@@ -129,6 +129,12 @@ app.get("/todo", authRequire, async (req, res) => {
       },
       taskItems: tasks || [],
       totalTasks: tasks.length || 0,
+      totalCompletedTasks: tasks.filter(t => t.is_completed === true).length || 0,
+      progressWidth: (() => {
+        const total = tasks.length;
+        const completedTasks = tasks.filter(t => t.is_completed === true).length;
+        return total > 0 ? (completedTasks / total * 100) : 0
+    })()
     };
   });
 
