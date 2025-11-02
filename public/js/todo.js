@@ -13,20 +13,53 @@ const formTask = document.querySelector("#task-form");
 const closeBtnTask = document.querySelector("#close-btn-task");
 const closeNewList = document.querySelector("#close-btn");
 
+function updateGroupID() {
+  const tags = document.querySelector("#tag_name");
+  const selectedOption = tags.options[tags.selectedIndex];
+  hiddenGroups.value = selectedOption.value;
+}
+
+closeNewList.addEventListener("click", function (e) {
+  modalNewList.classList.remove("set-display-flex");
+});
+
+closeBtnTask.addEventListener("click", function () {
+  modalNewTask.classList.remove("set-display-flex");
+});
+
+tagNameList.addEventListener("change", updateGroupID);
+
 btnNewList.addEventListener("click", function (e) {
   modalNewList.classList.add("set-display-flex");
   updateGroupID();
 });
 
-// Need to add the Event Listener to all the Buttons
+// ADD EVENT LISTENER TO ALL ADD TASK BUTTONS
 document.querySelectorAll(".group-card.card-shape").forEach((c) => {
   const btnAddTask = c.querySelector(".add-task-btn");
+  c.querySelectorAll('.task-container').forEach(tc => {checkCompletedTasks(tc)});
 
   btnAddTask.addEventListener("click", function (e) {
     modalNewTask.classList.add("set-display-flex");
     modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId; // Need to check why this
   });
+
 });
+
+// TASKS HANDLING
+function checkCompletedTasks(taskContainer) {
+
+  const allTasks = taskContainer.querySelectorAll('.task-card.card-shape') || [];
+  allTasks.forEach((t) => {
+    const isChecked = t.querySelector('input[type=checkbox]:checked') || false;
+
+    if (isChecked) {
+      t.classList.add('task-completion');
+    } else {
+      t.classList.remove('task-completion');
+    }
+  })
+}
 
 function debounce(func, delay) {
   let timeout;
@@ -53,7 +86,7 @@ async function TaskUpdate(taskId, isCompleted) {
   }
 }
 
-function updateTaskUI(taskId, isChecked, taskCard) {
+function updateTaskUI(isChecked, taskCard) {
   //Count the tasks
   let [completedTasks, allTasks] = [0, 0];
   if (!taskCard.querySelector('#empty-state')) {
@@ -61,15 +94,23 @@ function updateTaskUI(taskId, isChecked, taskCard) {
   allTasks = taskCard.querySelectorAll('input[type="checkbox"]').length;
   } 
   //Update the text
-  const progresssSection = taskCard.closest('.progress-section')
-  const progressBarProg = progresssSection.querySelector('.progress-bar-prog')
-  progressBarProg.textContent = `${completedTasks} of ${allTasks}`
+  const groupCard = taskCard.closest('.group-card.card-shape');
+  const progressSection = groupCard.querySelector('.progress-section')
+  const progressBarProg = progressSection.querySelector('.progress-bar-prog');
+  progressBarProg.textContent = `${completedTasks} of ${allTasks}`;
   //Update the progress bar
-  const progressBar = progresssSection.querySelector('.progress')
-
-
+  const progressBar = progressSection.querySelector('.progress');
+  progressBar.setAttribute('style', `width: ${(completedTasks / allTasks) * 100}%;`)
   //Update the ARIA values progress bar
+  const progressCont = progressSection.querySelector('.progress-container');
+  progressCont.setAttribute('aria-valuenow', completedTasks);
+  progressCont.setAttribute('aria-valuemax', allTasks);
   //Cross line the task text.
+  if (isChecked) {
+    taskCard.classList.add('task-completion');
+  } else {
+    taskCard.classList.remove('task-completion');
+  }
 }
 
 const debouncedTaskUpdate = debounce(TaskUpdate, 500);
@@ -77,23 +118,14 @@ const debouncedTaskUpdate = debounce(TaskUpdate, 500);
 document.querySelectorAll(".task-card.card-shape").forEach((t) => {
   t.querySelectorAll("input[type=checkbox]").forEach((c) => {
     c.addEventListener("change", async function () {
-      updateTaskUI(this.dataset.taskId, this.checked, t);
+      updateTaskUI(this.checked, t);
 
       debouncedTaskUpdate(this.dataset.taskId, this.checked);
     });
   });
 });
 
-closeNewList.addEventListener("click", function (e) {
-  modalNewList.classList.remove("set-display-flex");
-});
-
-closeBtnTask.addEventListener("click", function () {
-  modalNewTask.classList.remove("set-display-flex");
-});
-
-tagNameList.addEventListener("change", updateGroupID);
-
+// TASKLIST FORM HANDLING TO CREATE A NEW ONE
 formTaskList.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -111,6 +143,7 @@ formTaskList.addEventListener("submit", async (e) => {
       let createdTaskList = response.data?.createTaskList[0];
 
       createDivTaskList(createdTaskList, payload, response.data.tagName);
+      // NEED TO ADD EVENT HANDLIGN ON BUTTON?
     }
   } catch (e) {
     alert(`Unable to create a task list: ${e}`);
@@ -138,11 +171,6 @@ formTask.addEventListener("submit", async (e) => {
   }
 });
 
-function updateGroupID() {
-  const tags = document.querySelector("#tag_name");
-  const selectedOption = tags.options[tags.selectedIndex];
-  hiddenGroups.value = selectedOption.value;
-}
 function createDivTaskList(data, payload, tagName) {
   const taskListCont = document.querySelector(".group-container");
 
@@ -155,9 +183,17 @@ function createDivTaskList(data, payload, tagName) {
   cloneTaskList.querySelector(".task-list-description").textContent =
     data.task_list_description;
 
-  const cardCont = cloneTaskList.querySelector(".group-card.card-shape");
-  cardCont.setAttribute("data-task-list-id", String(data.task_list_id));
-  cardCont.setAttribute("data-group-id", String(data.groups_id));
+  const cardContTemp = cloneTaskList.querySelector(".group-card.card-shape");
+  cardContTemp.setAttribute("data-task-list-id", String(data.task_list_id)); // Convert to string to accept in HTML content
+  cardContTemp.setAttribute("data-group-id", String(data.groups_id));
+
+  const addTaskBtnTemp = cloneTaskList.querySelector('.add-task-btn')
+  addTaskBtnTemp.setAttribute('data-task-list-id', String(data.task_list_id))
+  // ADD DYNAMIC CONTENT SO BUTTONS CAN BE ADDED.
+  addTaskBtnTemp.addEventListener('click', () => {
+    modalNewTask.classList.add("set-display-flex");
+    modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId;
+  })
 
   // Insert before the first Task List that was already loaded in.
   taskListCont.insertBefore(cloneTaskList, taskListCont.firstChild);
@@ -195,11 +231,17 @@ function createDivTask(data) {
       emptyState.remove();
     }
 
+    // ADD DYNAMIC INTERACTION
+    cloneTaskTemp.querySelector('input[type=checkbox]')
+    .addEventListener('change', function() {
+        updateTaskUI(this.checked, taskCardTemp);
+        debouncedTaskUpdate(taskCardTemp.dataset.taskId, this.checked);
+      })
+
     taskCont.appendChild(cloneTaskTemp);
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
 
-    //Uppdate UI Tasks
   } else {
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();

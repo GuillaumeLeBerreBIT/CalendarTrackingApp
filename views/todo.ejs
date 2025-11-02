@@ -54,8 +54,9 @@
                         <span class="progress-bar-prog"><%= taskList.totalCompletedTasks %> of <%= taskList.totalTasks %> completed</span>
                     </div>
                     <div class="progress-container" role="progressbar" aria-valuenow="<%= taskList.totalCompletedTasks %>" aria-valuemax="<%= taskList.totalTasks %>">
-                        <!--Fake error thrown.-->
-                        <div class="progress" style="width: <%= taskList.progressWidth %>%"></div>
+                        <div class="progress" 
+                        <% /* eslint-disable css-propertyvalueexpected */ %>
+                        style="width: <%= taskList.progressWidth %>%"></div>
                     </div>
                 </div>
 
@@ -85,7 +86,7 @@
                                         <span>Due Sep 4</span>
                                         <%} else {%>
                                             <span>No deadline</span>
-                                            <%} %>
+                                        <%} %>
                                 </div>
                             </div>
                         </div>
