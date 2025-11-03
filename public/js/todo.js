@@ -89,12 +89,13 @@ async function TaskUpdate(taskId, isCompleted) {
 function updateTaskUI(isChecked, taskCard) {
   //Count the tasks
   let [completedTasks, allTasks] = [0, 0];
+  const taskContainer = taskCard.closest('.task-container');
   if (!taskCard.querySelector('#empty-state')) {
-  completedTasks = taskCard.querySelectorAll('input[type="checkbox"]:checked').length;
-  allTasks = taskCard.querySelectorAll('input[type="checkbox"]').length;
+  completedTasks = taskContainer.querySelectorAll('input[type="checkbox"]:checked').length;
+  allTasks = taskContainer.querySelectorAll('input[type="checkbox"]').length;
   } 
   //Update the text
-  const groupCard = taskCard.closest('.group-card.card-shape');
+  const groupCard = taskContainer.closest('.group-card.card-shape');
   const progressSection = groupCard.querySelector('.progress-section')
   const progressBarProg = progressSection.querySelector('.progress-bar-prog');
   progressBarProg.textContent = `${completedTasks} of ${allTasks}`;
