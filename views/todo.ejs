@@ -43,12 +43,11 @@
                         <button class="btn btn-soft">...</button>
                     </div>
                 </div>
-
                 <p>
-                    <%= taskList.taskListInfo.task_list_description %>
+                    <%= taskList.taskListInfo.desc %>
                 </p>
-
                 <div class="progress-section">
+                    <% if (taskList.taskItems.length !== 0) {%>
                     <div class="justify-between">
                         <span class="progress-bar-text">Progress</span>
                         <span class="progress-bar-prog"><%= taskList.totalCompletedTasks %> of <%= taskList.totalTasks %> completed</span>
@@ -58,6 +57,7 @@
                         <% /* eslint-disable css-propertyvalueexpected */ %>
                         style="width: <%= taskList.progressWidth %>%"></div>
                     </div>
+                    <% }%>
                 </div>
 
                 <div class="task-container" id="task-container">
@@ -91,20 +91,9 @@
                             </div>
                         </div>
                     <%})} else { %>
-                        <div class="task-card card-shape" id="empty-state">
-                            <div class="radio-box"></div>
-                            <div class="task-content">
-                                <div class="justify-between">
-                                    <h4 id="task-title">No Tasks added yet?</h4>
-                                    <span id="task-priority"></span>
-                                </div>
-                                <p id="task-description">Let's add some tasks in here</p>
-                                <div>
-                                    <span id="task-users"></span>
-                                    <span id="task-deadline"></span>
-                                </div>
-                            </div>
-                        </div>
+                        <p class="empty-state" style="text-align: center; color: #999; padding: 20px;">
+                            No tasks yet. Click "Add Task" to get started.
+                        </p>
                     <%}; %>
                 </div>
             </div>
@@ -194,10 +183,7 @@
                 </div>
             </div>
             <p class="task-list-description"></p>
-            <div class="justify-between">
-                <span class="progress-bar">Progress</span>
-                <span class="progress-bar task-list-progress">0 of 0 completed</span>
-            </div>
+            <div class="progress-section"></div>
             <div class="task-container">
                 <p class="empty-state" style="text-align: center; color: #999; padding: 20px;">
                     No tasks yet. Click "Add Task" to get started.
@@ -221,6 +207,18 @@
                     <span id="task-users">John Doe</span>
                     <span id="task-deadline">No deadline</span>
                 </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="progress-template">
+        <div class="justify-between">
+            <span class="progress-bar-text">Progress</span>
+            <span class="progress-bar-prog"></span>
+        </div>
+        <div class="progress-container" role="progressbar">
+            <div class="progress"
+            <% /* eslint-disable css-propertyvalueexpected */ %>
             </div>
         </div>
     </template>

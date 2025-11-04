@@ -91,7 +91,7 @@ function updateTaskUI(isChecked, taskCard) {
   let [completedTasks, allTasks] = [0, 0];
   const taskContainer = taskCard.closest('.task-container');
   if (!taskCard.querySelector('#empty-state')) {
-  completedTasks = taskContainer.querySelectorAll('input[type="checkbox"]:checked').length;
+  completedTasks = taskContainer.querySelectorAll('input[type="checkbox"]:checked').length || 0;
   allTasks = taskContainer.querySelectorAll('input[type="checkbox"]').length;
   } 
   //Update the text
@@ -190,8 +190,9 @@ function createDivTaskList(data, payload, tagName) {
 
   const addTaskBtnTemp = cloneTaskList.querySelector('.add-task-btn')
   addTaskBtnTemp.setAttribute('data-task-list-id', String(data.task_list_id))
-  // ADD DYNAMIC CONTENT SO BUTTONS CAN BE ADDED.
-  addTaskBtnTemp.addEventListener('click', () => {
+  // ADD DYNAMIC CONTENT SO BUTTONS CAN BE ADDED
+  // NEED TO USE A ANONYMOUS FUNCTION SINCE """THIS""" IN A ARROW FUNCTION DOESNT REFER TO TEH ELEMENT THAT IS CLICKED BUT THE LEXICAL SCOPE
+  addTaskBtnTemp.addEventListener('click', function () {
     modalNewTask.classList.add("set-display-flex");
     modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId;
   })
@@ -225,11 +226,13 @@ function createDivTask(data) {
   );
 
   if (taskListCard) {
-    const taskCont = taskListCard.querySelector("#task-container");
+    const taskCont = taskListCard.querySelector(".task-container");
 
-    const emptyState = taskCont.querySelector("#empty-state");
+    const emptyState = taskCont.querySelector(".empty-state");
     if (emptyState) {
       emptyState.remove();
+      // Add the progression contents in here. 
+      addProgressionContent(taskListCard)
     }
 
     // ADD DYNAMIC INTERACTION
@@ -240,6 +243,7 @@ function createDivTask(data) {
       })
 
     taskCont.appendChild(cloneTaskTemp);
+    updateTaskUI(cloneTaskTemp.querySelector('input[type=checkbox]'), taskCardTemp)
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
 
@@ -248,4 +252,12 @@ function createDivTask(data) {
     formTask.reset();
     alert("Unable to create task.");
   }
+}
+
+function addProgressionContent (taskListCard) {
+  const progressionTemp = document.querySelector('#progress-template');
+  const progressionTempClone = progressionTemp.content.cloneNode(true);
+  const progressionSection = taskListCard.querySelector('.progress-section');
+
+  progressionSection.append(progressionTempClone);
 }
