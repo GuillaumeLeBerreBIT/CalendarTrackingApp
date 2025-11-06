@@ -243,6 +243,7 @@ function createDivTask(data) {
       })
 
     taskCont.appendChild(cloneTaskTemp);
+    // UPDATE UI AFTER ADDING TEMP TASK CARD TO TASKLIST ITSEFL (Need to go in depth here)
     updateTaskUI(cloneTaskTemp.querySelector('input[type=checkbox]'), taskCardTemp)
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
