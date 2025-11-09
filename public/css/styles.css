@@ -8,12 +8,6 @@ body {
     width: 95vw;
 }
 
-.container-calendar {
-    width: 80vw;
-    height: auto;
-    margin: auto;
-}
-
 p {
     font-size: 14px;
     color: oklch(0.35 0 0);

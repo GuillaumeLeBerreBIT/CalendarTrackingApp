@@ -2,6 +2,36 @@
   margin-top: 30px;
 }
 
+.container-calendar {
+  width: 80vw;
+  height: auto;
+  margin: auto;
+}
+
+.upcoming-container {
+  display: flex;
+  flex-direction: column;
+  width: 80vw;
+
+  justify-content: center;
+  align-items: center;
+
+  margin: 20px 0;
+}
+
+.upcoming-header {
+  width: 100%;
+}
+
+.upcoming-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+
+  width: 100%;
+}
+
 .fc-toolbar {
   gap: 10px;
 }
@@ -64,11 +94,10 @@
 }
 
 @media (max-width: 540px) {
-
   .fc-toolbar-chunk {
     display: flex;
     justify-content: center !important;
-  } 
+  }
 
   .fc-prev-button {
     order: 5;
@@ -93,62 +122,60 @@
 }
 
 .calendar-form {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 15px;
 
-    padding: 25px;
-    width: fit-content;
+  padding: 25px;
+  width: fit-content;
 }
 
 .modal-overlay {
-    /* Start from top left */
-    top: 0;
-    left: 0;
-    /* Take full screen size*/
-    width: 100%;
-    height: 100vh;
+  /* Start from top left */
+  top: 0;
+  left: 0;
+  /* Take full screen size*/
+  width: 100%;
+  height: 100vh;
 
-    background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.6);
 
-    position: fixed;
-    display: none;
-    align-items: center;
-    justify-content: center;
+  position: fixed;
+  display: none;
+  align-items: center;
+  justify-content: center;
 
-    z-index: 100;
+  z-index: 100;
 }
 
 .modal-box {
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 
-    background-color: white;
-    border-radius: 5%;
+  background-color: white;
+  border-radius: 5%;
 
-    width: 40%;
-    padding: 20px 0px 20px 0px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  width: 40%;
+  padding: 20px 0px 20px 0px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
-
 .close-btn {
-    position: absolute; /*Need to set position relative onto parent*/
-    top: 10px;
-    right: 15px;
-    cursor: pointer;
-    font-size: 1.5rem;
+  position: absolute; /*Need to set position relative onto parent*/
+  top: 10px;
+  right: 15px;
+  cursor: pointer;
+  font-size: 1.5rem;
 }
 
 /*The CSS classes to overwrite the Calendar CSS*/
 
 .fc-header-toolbar {
-  
-  font-family: 'Inter', sans-serif !important; 
+  font-family: "Inter", sans-serif !important;
 
   .fc-button {
     border-radius: 10px;
@@ -165,19 +192,90 @@
 }
 
 .fc-view {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+
+  .fc-daygrid-day-number {
+    font-weight: 700;
     font-size: 14px;
-    font-weight: 500;
-    line-height: 20px;
+    padding: 8px;
 
-    td.fc-day > div {
-      border: 1px solid rgb(224, 224, 230);
-      min-height: 100px;
-      padding: 8px;
-      position: relative;
-      transition: all 0.2s ease;
-    };
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-    td.fc-day > div:hover {
-      background-color: lightgray;;
-    }
+  .fc-day-today > div{
+    background-color: #e8f5e9;
+
+  }
+
+  .fc-day-today .fc-daygrid-day-number {
+    background-color: #4A9D5F;
+    color: white;
+    font-weight: bold;
+
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  td.fc-day > div{
+    /* border: 1px solid rgb(224, 224, 230); */
+    min-height: 100px;
+    padding: 4px;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+
+  td.fc-day > div:hover {
+    background-color: lightgray;
+  }
 }
+
+.fc-theme-standard table {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.fc-theme-standard .fc-scrollgrid {
+  border: none;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: white;
+}
+
+.fc-col-header-cell {
+  background-color: #f9fafb;
+  padding: 12px 8px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #6b7280;
+  border-bottom: 2px solid #e5e7eb !important;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: #e5e7eb;
+}
+
+.fc-col-header-cell {
+  background-color: #f9fafb;
+  padding: 12px 8px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #6b7280;
+  border-bottom: 2px solid #e5e7eb !important;
+}
+
+
