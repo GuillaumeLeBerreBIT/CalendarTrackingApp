@@ -69,7 +69,8 @@ button {
 }
 
 .form-modal input[type="text"],
-.form-modal textarea {
+.form-modal textarea,
+.form-modal input[type="date"] {
   width: 100%;
   padding: 12px 16px;
   border: 2px solid #e5e7eb;

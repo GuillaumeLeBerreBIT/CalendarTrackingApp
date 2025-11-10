@@ -2,7 +2,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const calendarEl = document.querySelector("#calendar");
   const modalOverlayForm = document.querySelector("#modal-overlay");
   const closeBtn = document.querySelector("#close-btn");
-  const form = document.querySelector("form");
+  const form = document.querySelector("#form-calendar");
+  const checkWholeDay = document.querySelector('.all-day');
 
   let calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
@@ -54,7 +55,12 @@ document.addEventListener("DOMContentLoaded", function () {
   // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    createEvent();
 
+  });
+
+  async function createEvent() {
+    
     const formData = new FormData(form);
 
     const data = {};
@@ -62,28 +68,32 @@ document.addEventListener("DOMContentLoaded", function () {
       data[key] = val;
     }
 
-    let title = formData.get("title");
-
-    //Send data to the backend
     let response = await axios.post("/addEvent", data);
 
     // Handle response to add event to the calendar
     if (response.data.succes) {
-      let event = response.data.data[0];
       calendar.addEvent({
         // start: response.data['title'],
         // end: info.dateStr, // T12:30:00
-        title: event["title"],
-        start: event["startDate"],
-        end: event["endDate"],
+        title: response.data.data[0]["title"],
+        start: response.data.data[0]["description"],
+        start: response.data.data[0]["startDate"],
+        end: response.data.data[0]["endDate"],
         allDay: true,
       });
 
       modalOverlayForm.style.setProperty("display", "none");
     } else {
       modalOverlayForm.style.setProperty("display", "none");
-
       alert("Something went wrong, could not be able to create an event ...");
     }
-  });
+  }
+
+  checkWholeDay.addEventListener('change', function () {  
+    const timeFields = document.querySelectorAll('input[type=time]');
+    timeFields.forEach(t => {
+      t.style.display = this.checked ? 'none' : 'block'
+    })
+
+  })
 });

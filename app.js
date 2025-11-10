@@ -295,6 +295,7 @@ app.post("/login", async (req, res) => {
       maxAge: 3 * 60 * 60 * 1000,
       httpOnly: true,
     });
+    res.cookie('userId', data.user.id,  { httpOnly: true });
 
     res.redirect("/groups");
   }
@@ -341,6 +342,8 @@ app.post("/register", async (req, res) => {
       maxAge: 3 * 60 * 60 * 1000,
       httpOnly: true,
     });
+    res.cookie('userId', data.user.id,  { httpOnly: true });
+
     res.redirect("/groups");
   }
 });
@@ -352,13 +355,13 @@ app.post("/logout", async (req, res) => {
 
 //API Endpoints
 app.post("/addEvent", authRequire, async (req, res) => {
-  console.log(req.body);
 
   const { data, error } = await supabase
     .from("CalendarEvents")
     .insert([
       {
         title: req.body["title"],
+        description: req.body["description"],
         startDate: req.body["startDate"],
         endDate: req.body["endDate"],
       },
@@ -372,6 +375,10 @@ app.post("/addEvent", authRequire, async (req, res) => {
   } else {
     res.json({ success: true, data });
   }
+
+  // After adding Event need to update the profiles_event table
+
+
 });
 
 app.post("/createTaskList", authRequire, async (req, res) => {

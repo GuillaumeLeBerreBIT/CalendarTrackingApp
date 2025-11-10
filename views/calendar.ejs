@@ -18,14 +18,31 @@
         <div class="modal-box"> 
             <span class="close-btn" id="close-btn">&times;</span>
             <!-- <div class="modal-header">Enter an event.</div> -->
-            <form class="calendar-form" id="calendar-form">
-                <input type="text" name="title" id="title" placeholder="Title" required>
-                <label for="allDay">Whole day? </label>
-                <input type="checkbox" name="allDay" id="allDay">
-                <label for="startDate">From:</label>
-                <input type="date" name="startDate" id="startDate">
-                <label for="startDate">To:</label>
-                <input type="date" name="endDate" id="endDate">
+            <form class="form-modal" id="form-calendar">
+                <div class="flex-column">
+                    <label for="calendar-title">Title</label>
+                    <input type="text" name="calendar-title" id="calendar-title" placeholder="Title" required>
+                </div>
+                <div class="flex-column">
+                    <label for="calendar-title">Description</label>
+                    <textarea id="calendar-description" name="calendar-description" rows="3" cols="33"
+                        placeholder="What is this about?"></textarea>
+                </div>
+                <div class="justify-start">
+                    <label for="allDay">Whole day?</label>
+                    <input type="checkbox" name="allDay"  class="all-day" id="allDay">
+                </div>
+                <div class="flex-column">
+                    <label for="startDate">From:</label>
+                    <input type="date" name="startDate" id="startDate">
+                    <input type="time" name="startTime" id="startTime">
+                </div>
+                <div class="flex-column">
+                    <label for="startDate">To:</label>
+                    <input type="date" name="endDate" id="endDate">
+                    <input type="time" name="endTime" id="endTime">
+                </div>
+                <input type="hidden" value="">
                 <button type="submit">Add Event</button>
             </form>
         </div>
