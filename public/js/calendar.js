@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     headerToolbar: {
       left: "prev title next",
-      right: "today listWeek,timeGridWeek,dayGridMonth addEventBtn",
+      right: "today timeGridWeek,dayGridMonth addEventBtn", /*listWeek*/ 
       },
     buttonText: {
       today: "Today",
@@ -68,18 +68,23 @@ document.addEventListener("DOMContentLoaded", function () {
       data[key] = val;
     }
 
+    if (!data.hasOwnProperty('allDay') || (!data['startTime'] && !data['endTime'])) {
+      data['allDay'] = false
+    }
+
     let response = await axios.post("/addEvent", data);
 
     // Handle response to add event to the calendar
-    if (response.data.succes) {
+    if (response.data.success) {
       calendar.addEvent({
-        // start: response.data['title'],
-        // end: info.dateStr, // T12:30:00
-        title: response.data.data[0]["title"],
-        start: response.data.data[0]["description"],
-        start: response.data.data[0]["startDate"],
-        end: response.data.data[0]["endDate"],
-        allDay: true,
+        id: response.data.eventData[0]["event_id"],
+        title: response.data.eventData[0]["event_title"],
+        start: response.data.eventData[0]["start_date"],
+        end: response.data.eventData[0]["end_date"],
+        startTime: response.data.eventData[0]["start_time"],
+        endTime: response.data.eventData[0]["end_time"],
+        allDay: response.data.eventData[0]["all_day"],
+        description: response.data.eventData[0]["description"]
       });
 
       modalOverlayForm.style.setProperty("display", "none");
@@ -92,7 +97,7 @@ document.addEventListener("DOMContentLoaded", function () {
   checkWholeDay.addEventListener('change', function () {  
     const timeFields = document.querySelectorAll('input[type=time]');
     timeFields.forEach(t => {
-      t.style.display = this.checked ? 'none' : 'block'
+      t.style.display = this.checked ? 'none' : 'block' /*Show time when clicked else only show date*/
     })
 
   })

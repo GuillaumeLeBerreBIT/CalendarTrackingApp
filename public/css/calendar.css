@@ -253,6 +253,10 @@
   border-color: white;
 }
 
+.fc .fc-scrollgrid {
+  border-radius: 0.5rem;;
+}
+
 .fc-col-header-cell {
   background-color: #f9fafb;
   padding: 12px 8px;

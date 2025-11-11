@@ -60,7 +60,12 @@ app.get("/", authRequire, (req, res) => {
   res.render("index.ejs");
 });
 
-app.get("/calendar", authRequire, (req, res) => {
+app.get("/calendar", authRequire, async (req, res) => {
+
+  const {data: events, error: errorEvents} = await supabase
+  .from('events')
+  .select('*')
+
   res.render("calendar.ejs");
 });
 
@@ -355,30 +360,49 @@ app.post("/logout", async (req, res) => {
 
 //API Endpoints
 app.post("/addEvent", authRequire, async (req, res) => {
+  const insertEventObj = {};
 
-  const { data, error } = await supabase
-    .from("CalendarEvents")
+  for (let [key, val] of Object.entries(req.body)) {
+    insertEventObj[key] = val;
+  }
+  
+  if (!insertEventObj.allDay) {
+    insertEventObj['startTime'] = null,
+    insertEventObj['endTime'] = null
+    }
+
+  const { data: eventData, error: eventDataError } = await supabase
+    .from("events")
     .insert([
       {
-        title: req.body["title"],
-        description: req.body["description"],
-        startDate: req.body["startDate"],
-        endDate: req.body["endDate"],
+        event_title: insertEventObj["calendar-title"],
+        event_description: insertEventObj["calendar-description"],
+        all_day: insertEventObj["allDay"],
+        start_date: insertEventObj["startDate"],
+        end_date: insertEventObj["endDate"],
+        start_time: insertEventObj["startTime"],
+        end_time: insertEventObj["endTime"],
       },
     ])
     .select();
 
-  console.log(data, error);
-
-  if (error) {
+  if (eventDataError) {
     res.status(400).json({ success: false, error: error.message });
-  } else {
-    res.json({ success: true, data });
   }
 
   // After adding Event need to update the profiles_event table
+  const {data: eventProfile, error: eventProfileError} = await supabase
+  .from('profiles_events')
+  .insert([
+    {user_id: req.cookies.userId, event_id: eventData[0].event_id}
+  ])
+  .select()
 
-
+  if (eventProfileError) {
+    res.status(400).json({ success: false, error: error.message });
+  } else {
+    res.json({ success: true, eventData });
+  } 
 });
 
 app.post("/createTaskList", authRequire, async (req, res) => {
