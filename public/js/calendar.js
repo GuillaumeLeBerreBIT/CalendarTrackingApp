@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
+    firstDay: 1,
     customButtons: {
       addEventBtn: {
         text: "+ Add Event",
@@ -35,6 +36,8 @@ document.addEventListener("DOMContentLoaded", function () {
     multiMonthMaxColumns: 1,
     contentHeight: "auto",
     nowIndicator: true,
+    eventOrderStrict: true,
+    events: [],
 
     // Cick on calander field to add an event.
     dateClick: function (info) {

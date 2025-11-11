@@ -61,12 +61,26 @@ app.get("/", authRequire, (req, res) => {
 });
 
 app.get("/calendar", authRequire, async (req, res) => {
+  //Later need to also make sure there is filtering done on Groups as well to find matching tasks
+  const {data: profileEvents, error: profileEventsError} = await supabase
+  .from('profiles_events')
+  .select(`
+    event_id
+    `)
+  .eq('user_id', req.cookies.userId)
+
+  if (profileEventsError) {
+    res.status(400).json({success: false, error: profileEventsError.message})
+  }
+
+  const taskIdsArray = profileEvents.map( e => e.event_id);
 
   const {data: events, error: errorEvents} = await supabase
   .from('events')
   .select('*')
+  .in('event_id', taskIdsArray);
 
-  res.render("calendar.ejs");
+  res.render("calendar.ejs", events);
 });
 
 app.get("/todo", authRequire, async (req, res) => {
