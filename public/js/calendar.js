@@ -1,9 +1,11 @@
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
   const calendarEl = document.querySelector("#calendar");
   const modalOverlayForm = document.querySelector("#modal-overlay");
   const closeBtn = document.querySelector("#close-btn");
   const form = document.querySelector("#form-calendar");
   const checkWholeDay = document.querySelector('.all-day');
+
+  const modalOverlayEvent = document.querySelector('#modal-overlay-event')
 
   let calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
@@ -37,12 +39,18 @@ document.addEventListener("DOMContentLoaded", function () {
     contentHeight: "auto",
     nowIndicator: true,
     eventOrderStrict: true,
-    events: [],
+    displayEventTime: true,
+    events: await loadInEvents(), // Its async need to make sure use async as well
 
     // Cick on calander field to add an event.
     dateClick: function (info) {
       modalOverlayForm.style.setProperty("display", "flex");
     },
+    eventClick: function (info) {
+      console.log('Event' + info.event.title)
+
+
+    }
 
     // Click on button to add an event onto the calander
 
@@ -104,4 +112,18 @@ document.addEventListener("DOMContentLoaded", function () {
     })
 
   })
+
+  async function loadInEvents () {
+
+      try {
+        const response = await axios.get('/renderEvents');
+
+      if (!response.data.success) {
+        console.log('Start filtering data.')
+      } else {
+        return response.data.events
+      }} catch (error) {
+        console.log(e);
+      }
+  }
 });

@@ -62,25 +62,8 @@ app.get("/", authRequire, (req, res) => {
 
 app.get("/calendar", authRequire, async (req, res) => {
   //Later need to also make sure there is filtering done on Groups as well to find matching tasks
-  const {data: profileEvents, error: profileEventsError} = await supabase
-  .from('profiles_events')
-  .select(`
-    event_id
-    `)
-  .eq('user_id', req.cookies.userId)
 
-  if (profileEventsError) {
-    res.status(400).json({success: false, error: profileEventsError.message})
-  }
-
-  const taskIdsArray = profileEvents.map( e => e.event_id);
-
-  const {data: events, error: errorEvents} = await supabase
-  .from('events')
-  .select('*')
-  .in('event_id', taskIdsArray);
-
-  res.render("calendar.ejs", events);
+  res.render("calendar.ejs");
 });
 
 app.get("/todo", authRequire, async (req, res) => {
@@ -417,6 +400,47 @@ app.post("/addEvent", authRequire, async (req, res) => {
   } else {
     res.json({ success: true, eventData });
   } 
+});
+
+app.get('/renderEvents', authRequire, async (req, res) => {
+  const {data: profileEvents, error: profileEventsError} = await supabase
+  .from('profiles_events')
+  .select(`
+    event_id
+    `)
+  .eq('user_id', req.cookies.userId)
+
+  if (profileEventsError) {
+    res.status(400).json({success: false, error: profileEventsError.message})
+  }
+
+  const taskIdsArray = profileEvents.map( e => e.event_id);
+
+  const {data: events, error: errorEvents} = await supabase
+  .from('events')
+  .select('*')
+  .in('event_id', taskIdsArray);
+
+  if (errorEvents) {
+    res.status(400).json({success: false, error: errorEvents.message})
+  } else {
+
+    const filteredEvents = events.map((e) => {
+      return {
+        id: e.event_id,
+        title: e.event_title,
+        start: e.start_date,
+        end: e.end_date,
+        backgroundColor: '#009432', // Need to make it custom
+        borderColor: 'black', // Also needs to change
+        extendedProps : {
+          description: e.event_description,
+        }
+      }
+    })
+    res.json({success: true, events: filteredEvents})
+  }
+
 });
 
 app.post("/createTaskList", authRequire, async (req, res) => {
