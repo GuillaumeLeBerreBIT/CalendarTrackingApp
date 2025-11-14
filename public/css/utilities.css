@@ -11,6 +11,14 @@
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
+.card-shape-2 {
+    padding: 4%;;
+    background-color: oklch(0.97 0 0);
+    border-radius: 0.75rem;
+    border: 1px solid oklch(0.922 0 0);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
 .flex-column {
     display: flex;
     flex-direction: column;
@@ -41,6 +49,10 @@
 
 .gap-0 {
     gap: 0 !important;
+}
+
+.gap-10 {
+    gap: 20px;
 }
 
 .set-display-flex {

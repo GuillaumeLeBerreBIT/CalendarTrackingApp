@@ -86,3 +86,44 @@ button {
 .form-modal textarea {
   resize: vertical;
 }
+
+.modal-event {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 15px;
+  margin: 0 6% 0 6%;
+  width: 80%;
+  box-sizing: border-box;
+
+  h3 {
+    margin: 5px 0;
+  }
+
+}
+
+.modal-box-event {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+
+    max-width: 700px;
+    width: 60%;
+    padding: 20px 0px;
+}
+
+.event-header {
+  margin: 5px 0;
+}
+
+.left-border {
+  border-left: 4px solid oklch(57.81% 0.1776 147.5);
+  padding: 0 0 0 8px;
+  border-radius: 0.25rem;;
+}

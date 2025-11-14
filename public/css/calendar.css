@@ -206,8 +206,8 @@
     justify-content: center;
   }
 
-  .fc-day-today > div{
-    background-color: #e8f5e9;
+   td.fc-day-today.fc-daygrid-day {
+    background-color: #e1f3e3;
 
   }
 
@@ -218,6 +218,7 @@
 
     width: 28px;
     height: 28px;
+    margin: 4px 0;
     border-radius: 50%;
 
     display: flex;
@@ -233,7 +234,7 @@
     transition: all 0.2s ease;
   }
 
-  td.fc-day > div:hover {
+  td.fc-day:hover {
     background-color: lightgray;
   }
 }
