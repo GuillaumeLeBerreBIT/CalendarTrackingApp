@@ -363,7 +363,7 @@ app.post("/addEvent", authRequire, async (req, res) => {
     insertEventObj[key] = val;
   }
   
-  if (!insertEventObj.allDay) {
+  if (insertEventObj.allDay) {
     insertEventObj['startTime'] = null,
     insertEventObj['endTime'] = null
     }
@@ -398,6 +398,9 @@ app.post("/addEvent", authRequire, async (req, res) => {
   if (eventProfileError) {
     res.status(400).json({ success: false, error: error.message });
   } else {
+
+    eventData["start_time"] = eventData['start_time'].slice(0,-3)
+    eventData["end_time"] = eventData['end_time'].slice(0,-3)
     res.json({ success: true, eventData });
   } 
 });
@@ -424,15 +427,24 @@ app.get('/renderEvents', authRequire, async (req, res) => {
   if (errorEvents) {
     res.status(400).json({success: false, error: errorEvents.message})
   } else {
-
     const filteredEvents = events.map((e) => {
+      let start_date, end_date;
+      if (!e.all_day && (e.start_time && e.end_time)) {
+        start_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
+        end_date = `${e.end_date}T${e.end_time.substring(0, 5)}`;
+
+      } else {
+        start_date = e.start_date 
+        end_date = e.start_date 
+      }
+
       return {
         id: e.event_id,
         title: e.event_title,
-        start: e.start_date,
-        end: e.end_date,
-        backgroundColor: '#009432', // Need to make it custom
-        borderColor: 'black', // Also needs to change
+        start: start_date,
+        end: end_date,
+        backgroundColor: '#4A9D5F', // Need to make it custom
+        borderColor: '#4A9D5F',
         extendedProps : {
           description: e.event_description,
         }

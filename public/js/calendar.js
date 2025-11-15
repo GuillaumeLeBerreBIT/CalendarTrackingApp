@@ -41,25 +41,36 @@ document.addEventListener("DOMContentLoaded", async function () {
     nowIndicator: true,
     eventOrderStrict: true,
     displayEventTime: true,
+    displayEventEnd: true,
+    eventTimeFormat: {
+      hour: 'numeric',
+      minute: '2-digit',
+      meridiem: false,
+      hour12: false,
+    },
+    multiMonthMaxColumns: 1,
+    contentHeight: "auto",
+    nowIndicator: true,
     events: await loadInEvents(), // Its async need to make sure use async as well
-
+    
     // Cick on calander field to add an event.
     dateClick: function (info) {
+      //Need to prefill form with current dates
       modalOverlayForm.style.setProperty("display", "flex");
     },
     eventClick: function (info) {
-      console.log('Event' + info.event.title)
+      updateShowModalEvent(info.event);
       document.querySelector('#modal-overlay-event').style.display = 'flex';
-
-
     }
-
-    // Click on button to add an event onto the calander
-
     // Remove Event from the calander
   });
 
   calendar.render();
+
+  document.querySelectorAll('a.fc-event.fc-event-today').forEach(e => {
+    e.style.backgroundColor = '#4A9D5F';
+    e.style.color = 'white';
+  })
 
   closeBtn.addEventListener("click", () => {
     modalOverlayForm.style.setProperty("display", "none");
@@ -73,7 +84,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     createEvent();
-
   });
 
   async function createEvent() {
@@ -96,8 +106,8 @@ document.addEventListener("DOMContentLoaded", async function () {
       calendar.addEvent({
         id: response.data.eventData[0]["event_id"],
         title: response.data.eventData[0]["event_title"],
-        start: response.data.eventData[0]["start_date"],
-        end: response.data.eventData[0]["end_date"],
+        start: `${response.data.eventData[0]["start_date"]}`,
+        end: `${response.data.eventData[0]["end_date"]}`,
         startTime: response.data.eventData[0]["start_time"],
         endTime: response.data.eventData[0]["end_time"],
         allDay: response.data.eventData[0]["all_day"],
@@ -129,7 +139,38 @@ document.addEventListener("DOMContentLoaded", async function () {
       } else {
         return response.data.events
       }} catch (error) {
-        console.log(e);
+        console.log(error);
       }
+  }
+
+  function updateShowModalEvent (event) {
+    let startDate, startTime, endDate, endTime
+    const modalOverlayEvent = document.querySelector('#modal-overlay-event');
+    
+    modalOverlayEvent.querySelector('#event-title').textContent = event.title;
+    modalOverlayEvent.querySelector('#event-description').textContent = event?.extendedProps.description || 'No description given.';
+  
+    if (event.start) {
+      startDate = event.start.toLocaleDateString('nl-BE', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+      });
+
+      startTime = event.start.toLocaleTimeString('nl-BE')
+    }
+    
+    if (event.end) {
+      endDate = event.end.toLocaleDateString('nl-BE', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+      });
+      endTime = event.end.toLocaleTimeString('nl-BE')
+    }
+    modalOverlayEvent.querySelector('#event-start-date').textContent = `${startDate} - ${startTime}`;
+    modalOverlayEvent.querySelector('#event-end-date').textContent = `${endDate} - ${endTime}`;
   }
 });

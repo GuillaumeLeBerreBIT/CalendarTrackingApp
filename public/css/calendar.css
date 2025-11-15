@@ -283,4 +283,56 @@
   border-bottom: 2px solid #e5e7eb !important;
 }
 
+.fc-daygrid-event-dot {
+  display: none;
+}
+
+div.fc-event-time {
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /*font-size: 0.75em;*/ /* Make time smaller on mobile */
+}
+
+/* .fc-daygrid-event-harness {
+  overflow: hidden !important;
+} */
+
+/*THIS FIXES THE OVERFLOW OF TIME ON SMALLER SCREENS*/
+.fc-daygrid-event {
+  overflow: hidden !important;
+  white-space: nowrap;
+}
+
+a.fc-event {
+  padding: 0 4px;
+}
+
+/* Make events smaller on mobile */
+@media (max-width: 768px) {
+  .fc-event {
+    font-size: 0.7em;
+    padding: 1px 2px;
+  }
+  
+  .fc-event-time {
+    font-size: 0.7em;
+  }
+  
+  a.fc-event {
+    padding: 0 2px;
+  }
+}
+
+/* For very small screens */
+@media (max-width: 540px) {
+  .fc-event {
+    font-size: 0.6em;
+  }
+  
+  td.fc-day > div {
+    min-height: 80px; /* Reduce min-height on small screens */
+  }
+}
 
