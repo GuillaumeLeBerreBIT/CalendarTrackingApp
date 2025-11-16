@@ -362,11 +362,15 @@ app.post("/addEvent", authRequire, async (req, res) => {
   for (let [key, val] of Object.entries(req.body)) {
     insertEventObj[key] = val;
   }
-  
+
+  if (!insertEventObj["startTime"] || !insertEventObj["startTime"]) {
+    insertEventObj.allDay = true
+  }
+
   if (insertEventObj.allDay) {
     insertEventObj['startTime'] = null,
     insertEventObj['endTime'] = null
-    }
+  }
 
   const { data: eventData, error: eventDataError } = await supabase
     .from("events")
@@ -399,8 +403,8 @@ app.post("/addEvent", authRequire, async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   } else {
 
-    eventData["start_time"] = eventData['start_time'].slice(0,-3)
-    eventData["end_time"] = eventData['end_time'].slice(0,-3)
+    eventData["start_time"] = eventData['start_time'] ? eventData['start_time'].slice(0,-3) : '';
+    eventData["end_time"] = eventData['end_time'] ? eventData['end_time'].slice(0,-3) : '';
     res.json({ success: true, eventData });
   } 
 });
@@ -421,7 +425,15 @@ app.get('/renderEvents', authRequire, async (req, res) => {
 
   const {data: events, error: errorEvents} = await supabase
   .from('events')
-  .select('*')
+  .select(`
+    *,
+    profiles_events(
+    user_id,
+    profiles(
+    username
+    )
+    )
+    `)
   .in('event_id', taskIdsArray);
 
   if (errorEvents) {
@@ -438,6 +450,10 @@ app.get('/renderEvents', authRequire, async (req, res) => {
         end_date = e.start_date 
       }
 
+      const participants = e.profiles_events.map((p) => {
+        return p.profiles.username
+      });
+
       return {
         id: e.event_id,
         title: e.event_title,
@@ -447,6 +463,7 @@ app.get('/renderEvents', authRequire, async (req, res) => {
         borderColor: '#4A9D5F',
         extendedProps : {
           description: e.event_description,
+          participants: participants
         }
       }
     })

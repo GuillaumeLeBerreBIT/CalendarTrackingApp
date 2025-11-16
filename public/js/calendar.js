@@ -1,12 +1,26 @@
+async function showUpcomingEvents(events) {
+  const now = new Date();
+
+  const upcomingEvents = events.filter( e => new Date(e.start) > now)
+
+  upcomingEvents.forEach(e => {
+
+  })
+
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
   const calendarEl = document.querySelector("#calendar");
   const modalOverlayForm = document.querySelector("#modal-overlay");
   const closeBtn = document.querySelector("#close-btn");
   const closeBtnEvent = document.querySelector("#close-btn-event");
   const form = document.querySelector("#form-calendar");
-  const checkWholeDay = document.querySelector('.all-day');
+  const checkWholeDay = document.querySelector(".all-day");
 
-  const modalOverlayEvent = document.querySelector('#modal-overlay-event')
+  const modalOverlayEvent = document.querySelector("#modal-overlay-event");
+
+  const loadedEvents = await loadInEvents();
+  showUpcomingEvents(loadedEvents)
 
   let calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
@@ -27,8 +41,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     },
     headerToolbar: {
       left: "prev title next",
-      right: "today timeGridWeek,dayGridMonth addEventBtn", /*listWeek*/ 
-      },
+      right: "today timeGridWeek,dayGridMonth addEventBtn" /*listWeek*/,
+    },
     buttonText: {
       today: "Today",
       month: "Month",
@@ -43,16 +57,16 @@ document.addEventListener("DOMContentLoaded", async function () {
     displayEventTime: true,
     displayEventEnd: true,
     eventTimeFormat: {
-      hour: 'numeric',
-      minute: '2-digit',
+      hour: "numeric",
+      minute: "2-digit",
       meridiem: false,
       hour12: false,
     },
     multiMonthMaxColumns: 1,
     contentHeight: "auto",
     nowIndicator: true,
-    events: await loadInEvents(), // Its async need to make sure use async as well
-    
+    events: loadedEvents, // Its async need to make sure use async as well
+
     // Cick on calander field to add an event.
     dateClick: function (info) {
       //Need to prefill form with current dates
@@ -60,24 +74,26 @@ document.addEventListener("DOMContentLoaded", async function () {
     },
     eventClick: function (info) {
       updateShowModalEvent(info.event);
-      document.querySelector('#modal-overlay-event').style.display = 'flex';
-    }
+      document.querySelector("#modal-overlay-event").style.display = "flex";
+    },
     // Remove Event from the calander
   });
 
   calendar.render();
 
-  document.querySelectorAll('a.fc-event.fc-event-today').forEach(e => {
-    e.style.backgroundColor = '#4A9D5F';
-    e.style.color = 'white';
-  })
+  document.querySelectorAll("a.fc-event").forEach((e) => {
+    e.style.backgroundColor = "#4A9D5F";
+    e.style.color = "white";
+  });
 
   closeBtn.addEventListener("click", () => {
     modalOverlayForm.style.setProperty("display", "none");
   });
 
-  closeBtnEvent.addEventListener('click', () => {
-    document.querySelector('#modal-overlay-event').style.setProperty('display', 'none')
+  closeBtnEvent.addEventListener("click", () => {
+    document
+      .querySelector("#modal-overlay-event")
+      .style.setProperty("display", "none");
   });
 
   // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event
@@ -87,7 +103,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
 
   async function createEvent() {
-    
     const formData = new FormData(form);
 
     const data = {};
@@ -95,8 +110,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       data[key] = val;
     }
 
-    if (!data.hasOwnProperty('allDay') || (!data['startTime'] && !data['endTime'])) {
-      data['allDay'] = false
+    if (
+      !data.hasOwnProperty("allDay") ||
+      (!data["startTime"] && !data["endTime"])
+    ) {
+      data["allDay"] = false;
     }
 
     let response = await axios.post("/addEvent", data);
@@ -111,7 +129,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         startTime: response.data.eventData[0]["start_time"],
         endTime: response.data.eventData[0]["end_time"],
         allDay: response.data.eventData[0]["all_day"],
-        description: response.data.eventData[0]["description"]
+        description: response.data.eventData[0]["description"],
       });
 
       modalOverlayForm.style.setProperty("display", "none");
@@ -121,56 +139,78 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }
 
-  checkWholeDay.addEventListener('change', function () {  
-    const timeFields = document.querySelectorAll('input[type=time]');
-    timeFields.forEach(t => {
-      t.style.display = this.checked ? 'none' : 'block' /*Show time when clicked else only show date*/
-    })
+  checkWholeDay.addEventListener("change", function () {
+    const timeFields = document.querySelectorAll("input[type=time]");
+    timeFields.forEach((t) => {
+      t.style.display = this.checked
+        ? "none"
+        : "block"; /*Show time when clicked else only show date*/
+    });
+  });
 
-  })
-
-  async function loadInEvents () {
-
-      try {
-        const response = await axios.get('/renderEvents');
+  async function loadInEvents() {
+    try {
+      const response = await axios.get("/renderEvents");
 
       if (!response.data.success) {
-        console.log('Start filtering data.')
+        console.log("Start filtering data.");
       } else {
-        return response.data.events
-      }} catch (error) {
-        console.log(error);
+        return response.data.events;
       }
+    } catch (error) {
+      console.log(error);
+    }
   }
 
-  function updateShowModalEvent (event) {
-    let startDate, startTime, endDate, endTime
-    const modalOverlayEvent = document.querySelector('#modal-overlay-event');
-    
-    modalOverlayEvent.querySelector('#event-title').textContent = event.title;
-    modalOverlayEvent.querySelector('#event-description').textContent = event?.extendedProps.description || 'No description given.';
-  
+  function updateShowModalEvent(event) {
+    let startDate, startTime, endDate, endTime;
+    const modalOverlayEvent = document.querySelector("#modal-overlay-event");
+
+    modalOverlayEvent.querySelector("#event-start-date").textContent = "";
+    modalOverlayEvent.querySelector("#event-end-date").textContent = "";
+    modalOverlayEvent.querySelector("#event-title").textContent = event.title;
+    modalOverlayEvent.querySelector("#event-description").textContent =
+      event?.extendedProps.description || "No description given.";
+
+    if (event.end) {
+      endDate = event.end.toLocaleDateString("nl-BE", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      endTime = event.end.toLocaleTimeString("nl-BE", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      modalOverlayEvent.querySelector("#event-end-date").textContent = endTime
+        ? `${endTime} - ${endDate}`
+        : `${endDate}`;
+    }
+
     if (event.start) {
-      startDate = event.start.toLocaleDateString('nl-BE', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      startDate = event.start.toLocaleDateString("nl-BE", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       });
 
-      startTime = event.start.toLocaleTimeString('nl-BE')
-    }
-    
-    if (event.end) {
-      endDate = event.end.toLocaleDateString('nl-BE', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      startTime = event.start.toLocaleTimeString("nl-BE", {
+        hour: "2-digit",
+        minute: "2-digit",
       });
-      endTime = event.end.toLocaleTimeString('nl-BE')
+      //Use endTime to see wether there was a ending timestamp filled in
+      modalOverlayEvent.querySelector("#event-start-date").textContent = endTime
+        ? `${startTime} - ${startDate}`
+        : `${startDate}`;
     }
-    modalOverlayEvent.querySelector('#event-start-date').textContent = `${startDate} - ${startTime}`;
-    modalOverlayEvent.querySelector('#event-end-date').textContent = `${endDate} - ${endTime}`;
+
+    try {
+      modalOverlayEvent.querySelector("#event-participants").textContent =
+      event.extendedProps.participants.join("-");
+    } catch (e) {
+      modalOverlayEvent.querySelector("#event-participants").textContent = 'No participants'
+    }
   }
 });
