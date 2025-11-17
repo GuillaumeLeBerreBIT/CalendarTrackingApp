@@ -30,6 +30,10 @@
   align-items: center;
 
   width: 100%;
+
+  h3 {
+    margin: 0;
+  }
 }
 
 .fc-toolbar {

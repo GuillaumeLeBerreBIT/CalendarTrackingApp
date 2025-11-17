@@ -5,6 +5,37 @@ async function showUpcomingEvents(events) {
 
   upcomingEvents.forEach(e => {
 
+    const upcomingTaskTemp = document.querySelector('#template-upcoming');
+    const upcomingClone = upcomingTaskTemp.content.cloneNode(true);
+
+    upcomingClone.querySelector('#event-title').textContent = e.title;
+    upcomingClone.querySelector('#event-description').textContent = e.extendedProps.description;
+    upcomingClone.querySelector('#startDate').textContent = e.start;
+
+    if (e.extendedProps.groupName) {
+      upcomingClone.querySelector('#group-name').textContent = e.extendedProps.groupName;
+    } else {
+      upcomingClone.querySelector('#group-name').remove();
+    }
+
+    if (e.start != e.end) {
+      upcomingClone.querySelector('#endDate') = e.end;
+    } else {
+      upcomingClone.querySelector('#endDate').remove();
+    }
+
+    if (e.extendedProps.participants) {
+      const divPart = upcomingClone.querySelector('#event-participants')
+      e.extendedProps.participants.forEach(p => {
+        const participantsDiv = document.createElement('div');
+        participantsDiv.classList.add('card-shape', 'group-card')
+        participantsDiv.innerHTML = `<div class="badge-secondary">${p}</div>`;
+
+       divPart.appendChild(participantsDiv);
+      }) 
+    }
+    
+    document.querySelector('div.upcoming-list.card-shape').appendChild(upcomingClone);
   })
 
 }

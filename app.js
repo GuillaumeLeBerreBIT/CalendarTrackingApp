@@ -463,7 +463,8 @@ app.get('/renderEvents', authRequire, async (req, res) => {
         borderColor: '#4A9D5F',
         extendedProps : {
           description: e.event_description,
-          participants: participants
+          participants: participants,
+          groupName: ''
         }
       }
     })
