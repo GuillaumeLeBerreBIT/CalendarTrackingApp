@@ -23,6 +23,10 @@
   width: 100%;
 }
 
+.overflow-cont {
+  overflow: hidden;
+}
+
 .upcoming-list {
   display: flex;
   flex-direction: column;
@@ -30,11 +34,15 @@
   align-items: center;
 
   width: 100%;
+  gap:10px;
+  max-height: 500px;
+  overflow-y: auto;
 
   h3 {
     margin: 0;
   }
 }
+
 
 .fc-toolbar {
   gap: 10px;

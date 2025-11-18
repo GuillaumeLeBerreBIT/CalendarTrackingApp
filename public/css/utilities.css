@@ -62,3 +62,7 @@
 .set-display-none {
     display: none;
 }
+
+.fw-bold {
+    font-weight: bold;
+}

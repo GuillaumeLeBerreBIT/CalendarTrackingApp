@@ -9,9 +9,12 @@
             <h2>Upcoming Events</h2>
             <button>Add Event</button>
         </div>
-        <div class="upcoming-list card-shape">
-            <!--Insert the Upcoming tasks-->
-        </div>
+        <!-- <div class="overflow-cont"> -->
+            <div class="upcoming-list card-shape">
+                <!--Insert the Upcoming tasks-->
+            </div>   
+        <!-- </div> -->
+        
     </div>
 
     <div class="modal-overlay" id="modal-overlay">
@@ -89,20 +92,21 @@
         </div>
     </div>
 
-    <div id="template-upcoming">
-        <div class="justify-between">
-            <h3 id="event-title">Event Title</h3>
-            <div class="badge-secondary" id="group-name">Group</div>
+    <template id="template-upcoming">
+        <div class="card-shape group-card">
+            <div class="justify-between">
+                <h3 id="event-title">Event Title</h3>
+                <div class="badge-secondary" id="group-name">Group</div>
+            </div>
+            <div class="justify-start" id="event-participants">
+            </div>
+            <span id="event-description">Description</span>
+            <div class="justify-start">
+                <span id="startDate" class="fw-bold">Start Time</span>
+                <span id="endDate" class="fw-bold">End Date</span>    
+            </div>
         </div>
-        <div class="justify-start" id="event-participants">
-            <div class="badge-secondary">Participants</div>   
-        </div>
-        <span id="event-description">Description</span>
-        <div class="justify-start">
-            <span id="startDate">Start Time</span>
-            <span id="endDate">End Date</span>    
-        </div>
-    </div>
+    </template>
 
 </div>
 

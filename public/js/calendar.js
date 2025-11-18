@@ -25,13 +25,12 @@ async function showUpcomingEvents(events) {
     }
 
     if (e.extendedProps.participants) {
-      const divPart = upcomingClone.querySelector('#event-participants')
+      const eventParts = upcomingClone.querySelector('#event-participants')
       e.extendedProps.participants.forEach(p => {
-        const participantsDiv = document.createElement('div');
-        participantsDiv.classList.add('card-shape', 'group-card')
-        participantsDiv.innerHTML = `<div class="badge-secondary">${p}</div>`;
-
-       divPart.appendChild(participantsDiv);
+        const divPart = document.createElement('div');
+        divPart.classList.add('badge-secondary');
+        divPart.textContent = p
+        eventParts.appendChild(divPart);
       }) 
     }
     
