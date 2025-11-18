@@ -46,17 +46,17 @@
                         <div class="group-header-stat">
                             <div class="group-stat">
                                 <i></i>
-                                <span>3</span>
+                                <span class="fw-bold">3</span>
                                 <p>Todo lists</p>
                             </div>
                             <div class="group-stat">
                                 <i></i>
-                                <span>3</span>
+                                <span class="fw-bold">3</span>
                                 <p>Events</p>
                             </div>
                             <div class="group-stat">
                                 <i></i>
-                                <span>3</span>
+                                <span class="fw-bold">3</span>
                                 <p>Timers</p>
                             </div>
                         </div>
@@ -64,7 +64,7 @@
                         <div class="groups-card-header">
                             <h4>Members (4)</h4>
                             <div>
-                                <button>Invite</button>
+                                <button id="invite-user-btn">Invite</button>
                             </div>
                         </div>
 
@@ -149,6 +149,31 @@
                     </div>
 
                     <button type="submit" id="addGroup">Add Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay-groups" id="invite-user-modal">
+        <div class="modal-box-groups">
+            <span class="close-btn" id="close-btn">&times;</span>
+
+            <form method="post" class="form-modal">
+                <div class="flex-column">
+                    <label for='invite-user-modal'>Invite Members</label>
+                    <div class="justify-row-between">
+                        <input type="text" placeholder="email@example.com / username" name="invite-user-modal"
+                            id="invite-user-modal">
+                        <button type="button" class="addUserBtn" id="addUserBtnModal">&#43;</button>
+                    </div>
+                    <div class="flex-column">
+                        <label>Invited Members</label>
+                        <div class="selectedUsers" id="selectedUsersModal">
+                            <!--Show the users selected by the user-->
+                        </div>
+                    </div>
+
+                    <button type="submit" id="addUsers">Add Group</button>
                 </div>
             </form>
         </div>

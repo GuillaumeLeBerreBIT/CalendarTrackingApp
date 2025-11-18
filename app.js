@@ -355,6 +355,27 @@ app.post("/logout", async (req, res) => {
   res.redirect("/login");
 });
 
+app.post('checkUser', authRequire ,async (req, res) => {
+
+  try {
+    const {data: isUserFound, error: noUser} = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('username', req.body.isUser)
+    .eq('email', req.body.isUser)
+
+    if (noUser) {
+      res.status(400).json({success: false, error: noUser.message})
+    } else {
+      res.json({success: true, user: isUserFound})
+    }
+
+  } catch (error) {
+    res.status(500).json({success: false, error: `Internal server error occurred.${error.message}`})
+  }
+  
+});
+
 //API Endpoints
 app.post("/addEvent", authRequire, async (req, res) => {
   const insertEventObj = {};
