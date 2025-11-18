@@ -1,9 +1,9 @@
 async function showUpcomingEvents(events) {
   const now = new Date();
 
-  const upcomingEvents = events.filter( e => new Date(e.start) > now)
-
-  upcomingEvents.forEach(e => {
+  let upcomingEvents = events.filter( e => new Date(e.start) > now)
+  upcomingEvents = upcomingEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+  upcomingEvents.slice(0,10).forEach(e => {
 
     const upcomingTaskTemp = document.querySelector('#template-upcoming');
     const upcomingClone = upcomingTaskTemp.content.cloneNode(true);

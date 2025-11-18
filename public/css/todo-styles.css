@@ -62,13 +62,17 @@
   justify-content: flex-start;
 
   gap: 20px;
+
+  max-height: 800px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .task-card {
   display: flex;
   flex-direction: row;
 
-  width: 95%;
+  width: 90%;
 }
 
 .radio-box {
