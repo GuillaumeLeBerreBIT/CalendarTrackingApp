@@ -149,12 +149,14 @@ app.get("/todo", authRequire, async (req, res) => {
 });
 
 app.get("/groups", authRequire, async (req, res) => {
+  //Need to use the INNNER join to filter on nested tables and only return the
+  // data if there is a match in the lower table.
   const { data: groups, error } = await supabase
     .from("groups")
     .select(
       `
         *,
-        profiles_groups (
+        profiles_groups!inner (
         *,
         profiles (
         username,
@@ -162,7 +164,7 @@ app.get("/groups", authRequire, async (req, res) => {
         )
         `
     )
-    .eq("profiles_groups.user_id", req.user.id);
+    .eq("profiles_groups.user_id", req.cookies.userId);
 
   const userGroups =
     groups.map((group) => {
@@ -355,19 +357,20 @@ app.post("/logout", async (req, res) => {
   res.redirect("/login");
 });
 
-app.post('checkUser', authRequire ,async (req, res) => {
+app.post('/checkUser', authRequire ,async (req, res) => {
 
   try {
     const {data: isUserFound, error: noUser} = await supabase
     .from('profiles')
     .select('username')
-    .eq('username', req.body.isUser)
-    .eq('email', req.body.isUser)
+    .or(`username.ilike.${req.body.isUser},email.ilike.${req.body.isUser}`)
 
     if (noUser) {
       res.status(400).json({success: false, error: noUser.message})
+    } else if (isUserFound.length === 0) {
+      res.json({success: true, match: false})
     } else {
-      res.json({success: true, user: isUserFound})
+      res.json({success: true, match: true, user: isUserFound[0].username})
     }
 
   } catch (error) {

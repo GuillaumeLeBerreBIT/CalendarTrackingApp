@@ -3,6 +3,11 @@ hr {
   border: 0.5px solid oklch(83.843% 0.00778 16.639);
 }
 
+.selected-users {
+  flex-wrap: wrap;
+  width: 90%;
+}
+
 .wrapper-container {
   display: flex;
   flex-direction: column;

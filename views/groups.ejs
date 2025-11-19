@@ -160,24 +160,26 @@
 
             <form method="post" class="form-modal">
                 <div class="flex-column">
-                    <label for='invite-user-modal'>Invite Members</label>
+                    <h3>Invite Members</h3>
                     <div class="justify-row-between">
-                        <input type="text" placeholder="email@example.com / username" name="invite-user-modal"
-                            id="invite-user-modal">
+                        <input type="text" placeholder="email@example.com / username" name="invite-user-input"
+                            id="invite-user-input">
                         <button type="button" class="addUserBtn" id="addUserBtnModal">&#43;</button>
                     </div>
                     <div class="flex-column">
-                        <label>Invited Members</label>
-                        <div class="selectedUsers" id="selectedUsersModal">
+                        <p>Invited Members</p>
+                        <div class="justify-start gap-5 selected-users" id="selectedUsersModal">
                             <!--Show the users selected by the user-->
                         </div>
                     </div>
 
-                    <button type="submit" id="addUsers">Add Group</button>
+                    <button type="submit" id="sendInviteUsers">Add Users</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.18/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="js/groups.js"></script>
     <%- include('partials/footer.ejs') %>

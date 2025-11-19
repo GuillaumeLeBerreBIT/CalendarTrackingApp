@@ -1,4 +1,5 @@
 const selectedUsers = document.querySelector('#selectedUsers');
+const selectedUsersModal = document.querySelector('#selectedUsersModal');
 const addUserBtn = document.querySelector('#addUserBtn');
 const addUserBtnModal = document.querySelector('#addUserBtnModal');
 const userToAdd = document.querySelector('#invite-user');
@@ -8,6 +9,8 @@ const inviteUserModal = document.querySelector('#invite-user-modal')
 
 const modalOverlayGroups = document.querySelector('#modal-overlay-groups');
 const createGroupBtn = document.querySelector('#create-group-btn');
+
+const sendInviteUsers = document.querySelector('#sendInviteUsers');
 
 addUserBtn.addEventListener('click', function (e) {
     e.preventDefault();
@@ -40,11 +43,34 @@ inviteUserBtn.forEach(i => i.addEventListener('click', function () {
 addUserBtnModal.addEventListener('click', async function (e) {
     e.preventDefault()
     const isUser = document.querySelector('#invite-user-input').value;
-try {
-    const response = axios.post('/checkUser', {isUser: isuser})
-} catch (error) {
-    
-}
+    const usersIsAdded = selectedUsersModal.getElementsByTagName('*') || [];
+
+    if (usersIsAdded.length > 0) {
+        const usersList = [...usersIsAdded].map(u => u.textContent.toLowerCase())
+        // userList.forEach(u => {return u.textContent.toLowerCase()});
+        if (usersList.includes(isUser.toLowerCase())) return true;
+    }
+
+    try {
+        const response = await axios.post('/checkUser', {isUser: isUser})
+
+        if (response.data.success) {
+            if (response.data.match) {
+
+                const span = document.createElement('span');
+                span.classList.add('badge-secondary');
+                span.textContent = response.data.user;
+
+                selectedUsersModal.appendChild(span);
+                document.querySelector('#invite-user-input').value = '';
+                
+            } else {
+                alert('User does not exist in the application.')
+            }
+        }
+    } catch (e) {
+        console.log(e);
+    }
 })
 
 async function checkUserExist (isUser) {
