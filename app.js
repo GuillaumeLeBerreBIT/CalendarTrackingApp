@@ -10,7 +10,7 @@ import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
 import validatePassword from "./utils/utils.js";
 import { stat } from "fs";
-import { group } from "console";
+import { error, group } from "console";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -181,6 +181,7 @@ app.get("/groups", authRequire, async (req, res) => {
           title: group.groups_title,
           description: group.groups_description,
           tag: group.tag_name,
+          groupId: group.groups_id
         },
         members,
       };
@@ -362,21 +363,66 @@ app.post('/checkUser', authRequire ,async (req, res) => {
   try {
     const {data: isUserFound, error: noUser} = await supabase
     .from('profiles')
-    .select('username')
+    .select('username, user_id')
     .or(`username.ilike.${req.body.isUser},email.ilike.${req.body.isUser}`)
+    .limit(1)
 
     if (noUser) {
       res.status(400).json({success: false, error: noUser.message})
     } else if (isUserFound.length === 0) {
       res.json({success: true, match: false})
     } else {
-      res.json({success: true, match: true, user: isUserFound[0].username})
+      res.json({success: true, match: true, user: {username: isUserFound[0].username,
+        user_id: isUserFound[0].user_id
+      }})
     }
 
   } catch (error) {
     res.status(500).json({success: false, error: `Internal server error occurred.${error.message}`})
   }
   
+});
+
+app.post('/InviteUsers', authRequire, async (req, res) => {
+
+  try {
+    const invitePromises = req.body.userList.map(async (u) => {
+      const {data: inviteUser, error: inviteUserError} = await supabase
+      .from('profiles_groups')
+      .upsert({
+        invite_status: 'pending',
+        user_id: u.user_id,
+        groups_id: req.body.groupId,
+        role: 'member'
+      })
+      .select()
+
+      const {data: userMail, error: userMailError} = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('user_id', u.user_id)
+      .limit(1)
+
+      if (userMailError) throw userMailError;
+
+      if (inviteUserError) throw inviteUserError;
+
+      inviteUser[0]['email'] = userMail[0]?.email
+      return inviteUser;
+    });
+
+    const result = await Promise.all(invitePromises) // ForEach doesnt work well with Async, won't wait.
+
+    if (result) {
+      res.json({success: true, message: `You invited ${result.length}`,
+      invitedUsers: result})
+    } else {
+      res.status(400).json({success: false, error: "Couldn't send invite to the selected users."})
+    }
+    
+  } catch (e) {
+    res.status(500).json({success: false, error: e})
+  }
 });
 
 //API Endpoints

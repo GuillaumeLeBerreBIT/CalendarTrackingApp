@@ -64,7 +64,7 @@
                         <div class="groups-card-header">
                             <h4>Members (4)</h4>
                             <div>
-                                <button id="invite-user-btn">Invite</button>
+                                <button id="invite-user-btn" data-group-id="<%=group.groupInfo.groupId%>">Invite</button>
                             </div>
                         </div>
 
@@ -156,9 +156,9 @@
 
     <div class="modal-overlay-groups" id="invite-user-modal">
         <div class="modal-box-groups">
-            <span class="close-btn" id="close-btn">&times;</span>
+            <span class="close-btn" id="close-btn-invite">&times;</span>
 
-            <form method="post" class="form-modal">
+            <form method="post" class="form-modal" id="form-modal-invite">
                 <div class="flex-column">
                     <h3>Invite Members</h3>
                     <div class="justify-row-between">
