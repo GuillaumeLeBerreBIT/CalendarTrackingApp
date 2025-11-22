@@ -64,7 +64,7 @@
                         <div class="groups-card-header">
                             <h4>Members (4)</h4>
                             <div>
-                                <button id="invite-user-btn" data-group-id="<%=group.groupInfo.groupId%>">Invite</button>
+                                <button class="invite-user-btn" data-group-id="<%=group.groupInfo.groupId%>">Invite</button>
                             </div>
                         </div>
 
@@ -115,7 +115,7 @@
         <div class="modal-box-groups">
             <span class="close-btn" id="close-btn">&times;</span>
 
-            <form method="post" action="/create-group" class="form-modal-groups">
+            <form method="post" action="/create-group" class="form-modal-groups" id="form-modal-groups">
                 <div class="flex-column gap-0">
                     <h3>Create Group</h3>
                     <p>Create a new group and invite members to collaborate.</p>
@@ -137,13 +137,13 @@
                 <div class="flex-column">
                     <label for='invite-user'>Invite Members</label>
                     <div class="justify-row-between">
-                        <input type="text" placeholder="email@example.com / username" name="invite-user"
+                        <input type="text" placeholder="email@example.com / username" name="invite-users"
                             id="invite-user">
                         <button type="button" class="addUserBtn" id="addUserBtn">&#43;</button>
                     </div>
                     <div class="flex-column">
-                        <label>Invited Members</label>
-                        <div class="selectedUsers" id="selectedUsers">
+                        <div>Invited Members</div>
+                        <div class="justify-start gap-5 selected-users" id="selectedUsers">
                             <!--Show the users selected by the user-->
                         </div>
                     </div>

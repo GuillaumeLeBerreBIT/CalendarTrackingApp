@@ -425,6 +425,63 @@ app.post('/InviteUsers', authRequire, async (req, res) => {
   }
 });
 
+app.post('/createGroup', authRequire, async (req, res) => {
+
+  const {data: newGroup, error: newGroupError} = await supabase
+  .from('groups')
+  .insert({
+      groups_title: req.body['group-title'],
+      groups_description: req.body['group-description'],
+      tag_name: req.body['tag-name'],
+    })
+  .select()
+
+  if (newGroup) {
+    res.status(400).json({success: false, error: `Could not create Group ${newGroup}`})
+  }
+
+  const {data: newProfilesGroup, error: newProfilesGroupError} = await supabase
+  .from('profiles_groups')
+  .insert([{
+    groups_id: newGroup[0].groups_id,
+    user_id: req.cookies.userId,
+    role: 'admin',
+    invite_status: 'accepted'
+  }])
+  .select()
+
+  if (newProfilesGroupError) {
+    const {error: deleteGroupError} = await supabase
+    .from('groups')
+    .delete()
+    .eq('groups_id', newGroup[0].groups_id) 
+
+    res.status(500).json({success: false, error: `Something went wrong after creating the groups: ${newProfilesGroupError}`})
+  }
+
+  // Now need to ahndle sending invites to other users
+  if (req.body.usersInvite) {
+    
+    req.body.usersInvite.map( async (user) => {
+      const {data: inviteUser, error: inviteUserError} = await supabase
+      .from('profiles_groups')
+      .upsert([{
+        groups_id: newGroup[0].groups_id,
+        user_id: user.user_id,
+        role: 'member',
+        invite_status: 'pending'
+      }])
+    
+      if (inviteUserError) {
+        res.status(400).json({success: false, error: `Could not invite the user(s): ${inviteUserError}`})
+      }
+
+    });
+  }
+
+  res.json({success: true, newGroup: newGroup})
+})
+
 //API Endpoints
 app.post("/addEvent", authRequire, async (req, res) => {
   const insertEventObj = {};

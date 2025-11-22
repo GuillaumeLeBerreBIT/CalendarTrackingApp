@@ -164,7 +164,7 @@ hr {
   background: rgba(0, 0, 0, 0.6);
 }
 
-.modal-overlay-groups.active {
+.active {
   display: flex;
 }
 
