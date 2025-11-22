@@ -436,7 +436,7 @@ app.post('/createGroup', authRequire, async (req, res) => {
     })
   .select()
 
-  if (newGroup) {
+  if (newGroupError) {
     res.status(400).json({success: false, error: `Could not create Group ${newGroup}`})
   }
 
@@ -460,9 +460,10 @@ app.post('/createGroup', authRequire, async (req, res) => {
   }
 
   // Now need to ahndle sending invites to other users
+  let promiseInviteResults
   if (req.body.usersInvite) {
     
-    req.body.usersInvite.map( async (user) => {
+    promiseInviteResults = await Promise.all(req.body.usersInvite.map( async (user) => {
       const {data: inviteUser, error: inviteUserError} = await supabase
       .from('profiles_groups')
       .upsert([{
@@ -471,12 +472,14 @@ app.post('/createGroup', authRequire, async (req, res) => {
         role: 'member',
         invite_status: 'pending'
       }])
+      .select()
     
       if (inviteUserError) {
-        res.status(400).json({success: false, error: `Could not invite the user(s): ${inviteUserError}`})
+        return { success: false, user: user.username, error: inviteUserError.message };
       }
-
-    });
+      
+      return { success: true, data: inviteUser };
+    }));
   }
 
   res.json({success: true, newGroup: newGroup})
