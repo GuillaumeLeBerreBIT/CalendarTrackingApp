@@ -18,21 +18,6 @@ const inviteUserModal = document.querySelector('#invite-user-modal');
 const formInviteUsers = document.querySelector('#form-modal-invite');
 const sendInviteUsers = document.querySelector('#sendInviteUsers');
 
-// addUserBtn.addEventListener('click', function (e) {
-//     e.preventDefault();
-
-//     const userText = userToAdd.value;
-//     const newDiv = document.createElement('div');
-
-//     newDiv.innerText = userText;
-//     newDiv.classList.add("badge-secondary");
-
-//     selectedUsers.appendChild(newDiv);
-
-//     userToAdd.value = '';
-
-// });
-
 closeBtnModal.forEach(c => c.addEventListener('click', function() {
     modalOverlayGroups.classList.remove('active');
     inviteUserModal.classList.remove('active');

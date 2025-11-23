@@ -579,13 +579,21 @@ app.get('/renderEvents', authRequire, async (req, res) => {
   } else {
     const filteredEvents = events.map((e) => {
       let start_date, end_date;
-      if (!e.all_day && (e.start_time && e.end_time)) {
+      if (!e.all_day && (e.start_date === e.end_date)) {
         start_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
-        end_date = `${e.end_date}T${e.end_time.substring(0, 5)}`;
+        end_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
+
+      } else if (e.all_day && (e.start_date === e.end_date)) {
+        start_date = `${e.start_date}`;
+        end_date = `${e.start_date}`;
+
+      } else if (e.all_day && (e.start_date && e.end_date)) {
+        start_date = `${e.start_date}`;
+        end_date = `${e.end_date}`;
 
       } else {
-        start_date = e.start_date 
-        end_date = e.start_date 
+        start_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
+        end_date = `${e.end_date}T${e.end_time.substring(0, 5)}`;
       }
 
       const participants = e.profiles_events.map((p) => {
@@ -606,7 +614,7 @@ app.get('/renderEvents', authRequire, async (req, res) => {
         }
       }
     })
-    res.json({success: true, events: filteredEvents})
+    res.  json({success: true, events: filteredEvents})
   }
 
 });

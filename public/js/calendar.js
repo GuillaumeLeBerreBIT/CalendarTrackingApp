@@ -216,6 +216,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       modalOverlayEvent.querySelector("#event-end-date").textContent = endTime
         ? `${endTime} - ${endDate}`
         : `${endDate}`;
+      document.querySelector('#event-end-wrapper').style.display = 'flex';
+    } else {
+      document.querySelector('#event-end-wrapper').style.display = 'none';
     }
 
     if (event.start) {
