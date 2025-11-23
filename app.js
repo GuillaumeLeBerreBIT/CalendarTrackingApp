@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import validatePassword from "./utils/utils.js";
 import { stat } from "fs";
 import { error, group } from "console";
+import { format } from 'date-fns';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -181,7 +182,8 @@ app.get("/groups", authRequire, async (req, res) => {
           title: group.groups_title,
           description: group.groups_description,
           tag: group.tag_name,
-          groupId: group.groups_id
+          groupId: group.groups_id,
+          created_at: format(new Date(group.created_at), 'dd-MM-yyyy')
         },
         members,
       };
