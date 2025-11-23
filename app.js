@@ -363,7 +363,7 @@ app.post('/checkUser', authRequire ,async (req, res) => {
   try {
     const {data: isUserFound, error: noUser} = await supabase
     .from('profiles')
-    .select('username, user_id')
+    .select('username, user_id, email')
     .or(`username.ilike.${req.body.isUser},email.ilike.${req.body.isUser}`)
     .limit(1)
 
@@ -372,8 +372,10 @@ app.post('/checkUser', authRequire ,async (req, res) => {
     } else if (isUserFound.length === 0) {
       res.json({success: true, match: false})
     } else {
-      res.json({success: true, match: true, user: {username: isUserFound[0].username,
-        user_id: isUserFound[0].user_id
+      res.json({success: true, match: true, user: {
+        username: isUserFound[0].username,
+        user_id: isUserFound[0].user_id,
+        email: isUserFound[0].email
       }})
     }
 
@@ -462,9 +464,9 @@ app.post('/createGroup', authRequire, async (req, res) => {
   // Now need to ahndle sending invites to other users
   let promiseInviteResults
   if (req.body.usersInvite) {
-    
+    // Need to use map to catch alle results and do async programming with it.
     promiseInviteResults = await Promise.all(req.body.usersInvite.map( async (user) => {
-      const {data: inviteUser, error: inviteUserError} = await supabase
+      let {data: inviteUser, error: inviteUserError} = await supabase
       .from('profiles_groups')
       .upsert([{
         groups_id: newGroup[0].groups_id,
@@ -473,16 +475,20 @@ app.post('/createGroup', authRequire, async (req, res) => {
         invite_status: 'pending'
       }])
       .select()
+      .limit(1)
     
       if (inviteUserError) {
         return { success: false, user: user.username, error: inviteUserError.message };
       }
       
-      return { success: true, data: inviteUser };
+      inviteUser[0]['username'] = user.username;
+      inviteUser[0]['email'] = user.email;
+
+      return inviteUser[0];
     }));
   }
 
-  res.json({success: true, newGroup: newGroup})
+  res.json({success: true, newGroup: newGroup, newUsers: promiseInviteResults || []})
 })
 
 //API Endpoints

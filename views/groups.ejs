@@ -24,8 +24,8 @@
                 </div>
                 <div class="card-shape flex-column summary-card">
                     <h4>Running Timers</h4>
-                    <h2>1</h2>
-                    <p>2 total timers</p>
+                    <h2>...</h2>
+                    <p>... total timers</p>
                 </div>
             </div>
 
@@ -33,7 +33,7 @@
                 <h2>All Groups</h2>
                 <button class="create-group-btn" id="create-group-btn">+ Create Group</button>
             </div>
-            <div class="wrapper-cards">
+            <div class="wrapper-cards" id="wrapper-cards">
                 <% if (userGroups) { userGroups.forEach((group) => {%>
                     <div class="group-card card-shape">
                         <div class="group-header">
@@ -78,20 +78,6 @@
                                 <div><%= member.profile.email %></div>
                             </div>
                             <% }); %>
-                            <div class="card-member card-shape">
-                                <div class="card-title">
-                                    <h5>Alice Johnson</h5>
-                                    <div class="badge-secondary">Editor</div>
-                                </div>
-                                <div>you@company.com</div>
-                            </div>
-                            <div class="card-member card-shape">
-                                <div class="card-title">
-                                    <h5>You</h5>
-                                    <div class="badge-secondary">Manager</div>
-                                </div>
-                                <div>you@company.com</div>
-                            </div>
                         </div>
 
                         <span class="justify-center">+1 More members</span>
@@ -178,6 +164,67 @@
             </form>
         </div>
     </div>
+
+    <template id="template-new-group">
+        <div class="group-card card-shape">
+            <div class="group-header">
+                <h3 id="group-title"></h3>
+                <div class="badge-secondary" id="group-tag"></div>
+            </div>
+
+            <p id="group-description"><</p>
+
+            <div class="group-header-stat">
+                <div class="group-stat">
+                    <i></i>
+                    <span class="fw-bold">0</span>
+                    <p>Todo lists</p>
+                </div>
+                <div class="group-stat">
+                    <i></i>
+                    <span class="fw-bold">0</span>
+                    <p>Events</p>
+                </div>
+                <div class="group-stat">
+                    <i></i>
+                    <span class="fw-bold">...</span>
+                    <p>Timers</p>
+                </div>
+            </div>
+
+            <div class="groups-card-header">
+                <h4 id="members-title">Members (4)</h4>
+                <div>
+                    <button class="invite-user-btn">Invite</button>
+                </div>
+            </div>
+
+            <div class="group-members">
+            </div>
+
+            <span class="justify-center">+1 More members</span>
+
+            <hr>
+
+            <div class="group-footer">
+                <p>Created at 1-1-2024</p>
+                <div class="group-end-btn">
+                    <button>View Details</button>
+                    <button>Manage</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="group-member-template">
+        <div class="card-member card-shape">
+            <div class="card-title">
+                <h5 id="user-username"></h5>
+                <div class="badge-secondary" id="user-role"></div>
+            </div>
+            <div id="user-mail"></div>
+        </div>
+    </template>
 
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.18/index.global.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
