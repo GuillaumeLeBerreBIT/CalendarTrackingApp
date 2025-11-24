@@ -37,15 +37,28 @@ button {
 .modal-box {
     position: relative;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     background-color: white;
     border-radius: 15px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 
-    max-width: 700px;
+    max-width: 720px;
+    min-width: 320px;
     width: 60%;
-    padding: 20px 0px;
+    max-height: calc(100vh - 120px);
+    padding: 15px 20px 20px 20px;
+    overflow-y: auto;
+}
+
+.hide-scrollbar {
+  overflow-y: scroll; /* Or auto */
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .close-btn {
@@ -71,7 +84,8 @@ button {
 .form-modal input[type="text"],
 .form-modal textarea,
 .form-modal input[type="date"],
-.form-modal input[type="time"]
+.form-modal input[type="time"],
+.form-modal input[type="submit"]
  {
   width: 100%;
   padding: 12px 16px;
@@ -81,6 +95,10 @@ button {
   font-family: inherit;
   transition: all 0.2s ease;
   box-sizing: border-box;
+}
+
+.form-modal input[type="submit"]:hover {
+  background-color: oklch(76.811% 0.20038 149.171);
 }
 
 input[type="search"],

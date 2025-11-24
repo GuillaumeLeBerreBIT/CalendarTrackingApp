@@ -162,7 +162,7 @@
   z-index: 100;
 }
 
-.modal-box {
+/* .modal-box {
   position: relative;
   display: flex;
   justify-content: center;
@@ -174,7 +174,7 @@
   width: 40%;
   padding: 20px 0px 20px 0px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
+} */
 
 .close-btn {
   position: absolute; /*Need to set position relative onto parent*/

@@ -72,14 +72,14 @@ app.get("/todo", authRequire, async (req, res) => {
     .from("profiles")
     .select(
       `
-      profiles_groups(
+      profiles_groups!inner(
         groups_id,
         groups(
           tag_name
         )
       )`
     )
-    .eq("profiles_groups.user_id", req.user.id);
+    .eq("profiles_groups.user_id", req.cookies.userId);
 
   const groupIDs = groupObj[0]?.profiles_groups.map((pg) => {
     return pg.groups_id;
@@ -121,6 +121,8 @@ app.get("/todo", authRequire, async (req, res) => {
         totalTasks: 0,
       };
     }
+
+    // Need to find all tags that a user can use.
 
     return {
       taskListInfo: {
@@ -168,7 +170,7 @@ app.get("/groups", authRequire, async (req, res) => {
     .eq("profiles_groups.user_id", req.cookies.userId);
 
   const userGroups =
-    groups.map((group) => {
+    await Promise.all(groups.map(async (group) => {
       const members =
         group.profiles_groups?.map((pg) => {
           return {
@@ -176,6 +178,11 @@ app.get("/groups", authRequire, async (req, res) => {
             role: pg.role,
           };
         }) || [];
+
+      // Need to retrieve all events
+      const events = await retrieveEvents(group.groups_id);
+      //Need to retrieve all ToDo Lists
+      const todoLists = await retrieveTodoLists(group.groups_id);
 
       return {
         groupInfo: {
@@ -186,94 +193,104 @@ app.get("/groups", authRequire, async (req, res) => {
           created_at: format(new Date(group.created_at), 'dd-MM-yyyy')
         },
         members,
+        events,
+        todoLists
       };
-    }) || [];
+    }) || []);
 
-  res.render("groups.ejs", { userGroups, yourGroups: groups.length });
-});
-
-app.post("/create-group", authRequire, async (req, res) => {
-  try {
-    // Handle the creation of the User who creates the group.
-    const { data: newGroup, error: groupError } = await supabase
-      .from("groups")
-      .insert([
-        {
-          groups_title: req.body["group-title"],
-          groups_description: req.body["group-description"] || null,
-          tag_name: req.body["tag-name"] || null,
-        },
-      ])
-      .select();
-
-    if (groupError) {
-      return res
-        .status(400)
-        .render("groups.ejs", { success: false, message: groupError.message });
-    }
-
-    const { data: newProfile, error: profileError } = await supabase
-      .from("profiles_groups")
-      .insert([
-        {
-          groups_id: newGroup[0].groups_id,
-          user_id: req.user.id,
-          role: "admin",
-          invite_status: "accepted",
-        },
-      ])
-      .select();
-
-    if (profileError) {
-      const { error } = await supabase
-        .from("groups")
-        .delete()
-        .eq("groups_id", newGroup[0].groups_id);
-      return res.status(400).render("groups.ejs", {
-        success: false,
-        message: "Failed to add the creator as admin.",
-      });
-    }
-
-    // Handle the invitation of ONE member. (Will implement multiple later.)
-    if (req.body["invite-user"]) {
-      const { data: profileMatches, error: noMatches } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("username", req.body["invite-user"]);
-
-      if (profileMatches && profileMatches.length > 0) {
-        const { data: userInvite, error: inviteError } = await supabase
-          .from("profile_groups")
-          .insert([
-            {
-              user_id: profileMatches[0].user_id,
-              groups_id: newGroup.groups_id,
-              role: "member",
-              invite_status: "pending",
-            },
-          ]);
-
-        if (inviteError) {
-          console.log("groups.ejs", {
-            success: false,
-            message: "Group created, but unable to add user to the group.",
-          });
-        }
-      }
-    }
-
-    res.redirect("/groups");
-    // res.render("groups.ejs", {
-    //   success: true,
-    //   message: "Group created succesfully.",
-    // });
-  } catch (error) {
-    res
-      .status(500)
-      .render("groups.ejs", { success: false, message: error.message });
+  const {data: todayEvents, error: todayEventsError} = await supabase
+  .from('profiles_events')
+  .select('*')
+  .eq('user_id', req.cookies.userId)
+  .eq('rsvp_status', 'accepted');
+  
+  let totalEvents;
+  if (todayEventsError) {
+    totalEvents = 0;
   }
+  totalEvents = todayEvents.length;
+
+  res.render("groups.ejs", { userGroups, yourGroups: groups.length, totalEvents });
 });
+
+// app.post("/create-group", authRequire, async (req, res) => {
+//   try {
+//     // Handle the creation of the User who creates the group.
+//     const { data: newGroup, error: groupError } = await supabase
+//       .from("groups")
+//       .insert([
+//         {
+//           groups_title: req.body["group-title"],
+//           groups_description: req.body["group-description"] || null,
+//           tag_name: req.body["tag-name"] || null,
+//         },
+//       ])
+//       .select();
+
+//     if (groupError) {
+//       return res
+//         .status(400)
+//         .render("groups.ejs", { success: false, message: groupError.message });
+//     }
+
+//     const { data: newProfile, error: profileError } = await supabase
+//       .from("profiles_groups")
+//       .insert([
+//         {
+//           groups_id: newGroup[0].groups_id,
+//           user_id: req.user.id,
+//           role: "admin",
+//           invite_status: "accepted",
+//         },
+//       ])
+//       .select();
+
+//     if (profileError) {
+//       const { error } = await supabase
+//         .from("groups")
+//         .delete()
+//         .eq("groups_id", newGroup[0].groups_id);
+//       return res.status(400).render("groups.ejs", {
+//         success: false,
+//         message: "Failed to add the creator as admin.",
+//       });
+//     }
+
+//     // Handle the invitation of ONE member. (Will implement multiple later.)
+//     if (req.body["invite-user"]) {
+//       const { data: profileMatches, error: noMatches } = await supabase
+//         .from("profiles")
+//         .select("username")
+//         .eq("username", req.body["invite-user"]);
+
+//       if (profileMatches && profileMatches.length > 0) {
+//         const { data: userInvite, error: inviteError } = await supabase
+//           .from("profile_groups")
+//           .insert([
+//             {
+//               user_id: profileMatches[0].user_id,
+//               groups_id: newGroup.groups_id,
+//               role: "member",
+//               invite_status: "pending",
+//             },
+//           ]);
+
+//         if (inviteError) {
+//           console.log("groups.ejs", {
+//             success: false,
+//             message: "Group created, but unable to add user to the group.",
+//           });
+//         }
+//       }
+//     }
+
+//     res.redirect("/groups");
+//   } catch (error) {
+//     res
+//       .status(500)
+//       .render("groups.ejs", { success: false, message: error.message });
+//   }
+// });
 
 //Load the User login pages
 app.get("/login", (req, res) => {
@@ -285,7 +302,6 @@ app.get("/register", (req, res) => {
 });
 // Processing the user login form.
 app.post("/login", async (req, res) => {
-  console.log(req.body);
   //Now need to login the user
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -309,7 +325,6 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/register", async (req, res) => {
-  console.log(req.body);
   // Need to register a user and then also log in direclty.
 
   if (req.body["password"] != req.body["passwordConfirm"]) {
@@ -579,21 +594,32 @@ app.get('/renderEvents', authRequire, async (req, res) => {
   } else {
     const filteredEvents = events.map((e) => {
       let start_date, end_date;
-      if (!e.all_day && (e.start_date === e.end_date)) {
-        start_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
-        end_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
+      if (
+        !e.all_day &&
+        e.start_date === e.end_date &&
+        e.start_time.substring(0,5) !== e.end_time.substring(0,5)
+      ) {
+        start_date = `${e.start_date}T${e.start_time.substring(0,5)}`;
+        end_date   = `${e.end_date}T${e.end_time.substring(0,5)}`;
 
-      } else if (e.all_day && (e.start_date === e.end_date)) {
+      } else if (e.all_day && e.start_date === e.end_date) {
         start_date = `${e.start_date}`;
-        end_date = `${e.start_date}`;
+        end_date   = `${e.end_date}`;
 
-      } else if (e.all_day && (e.start_date && e.end_date)) {
+      } else if (e.all_day) {
         start_date = `${e.start_date}`;
-        end_date = `${e.end_date}`;
+        end_date   = `${e.end_date}`;
+
+      } else if (
+        e.start_time.substring(0,5) === '00:00' &&
+        e.end_time.substring(0,5) === '00:00') {
+        start_date = `${e.start_date}`;
+        end_date   = `${e.end_date}`;
 
       } else {
-        start_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
-        end_date = `${e.end_date}T${e.end_time.substring(0, 5)}`;
+        // Normal timed multi-day or single-day
+        start_date = `${e.start_date}T${e.start_time.substring(0,5)}`;
+        end_date   = `${e.end_date}T${e.end_time.substring(0,5)}`;
       }
 
       const participants = e.profiles_events.map((p) => {
@@ -614,7 +640,7 @@ app.get('/renderEvents', authRequire, async (req, res) => {
         }
       }
     })
-    res.  json({success: true, events: filteredEvents})
+    res.json({success: true, events: filteredEvents})
   }
 
 });
@@ -684,3 +710,48 @@ app.patch('/updateTask', authRequire, async(req, res) => {
     res.json({success: false, message: 'Unable to update the task.'})
   }
 })
+
+async function retrieveTodoLists(groupId) {
+
+  try {
+    const {data: todoLists, error: todoListsError} = await supabase
+    .from('task_list')
+    .select('*')
+    .eq('groups_id', groupId);
+
+    if (todoListsError) {
+      console.log(`Couldn't retrieve any ToDo lists for groups Id: ${groupId}`)
+      return [];
+    }
+
+    return todoLists
+  } catch (error) {
+    console.log(`Couldn't retrieve any ToDo lists for groups Id: ${groupId}`)
+    return []
+  }
+}
+
+async function retrieveEvents(groupId) {
+
+  try {
+    const {data: events, error: eventsError} = await supabase
+    .from('events')
+    .select(`
+      event_title, event_description, all_day, 
+      groups_id, start_date, 
+      end_date, start_time, end_time
+      `)
+    .eq('groups_id', groupId);
+
+    if (eventsError) {
+      console.log(`Couldn't retrieve any Events for groups Id: ${groupId}`)
+      return [];  
+    }
+
+    return events
+  } catch (error) {
+    console.log(`Couldn't retrieve any Events for groups Id: ${groupId}`)
+    return []
+  }
+
+}

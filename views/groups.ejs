@@ -19,7 +19,7 @@
                 </div>
                 <div class="card-shape flex-column summary-card">
                     <h4>Today's Events</h4>
-                    <h2>3</h2>
+                    <h2><%= totalEvents %></h2>
                     <p>Upcoming activities</p>
                 </div>
                 <div class="card-shape flex-column summary-card">
@@ -46,12 +46,12 @@
                         <div class="group-header-stat">
                             <div class="group-stat">
                                 <i></i>
-                                <span class="fw-bold">3</span>
+                                <span class="fw-bold"><%= group.todoLists.length %></span>
                                 <p>Todo lists</p>
                             </div>
                             <div class="group-stat">
                                 <i></i>
-                                <span class="fw-bold">3</span>
+                                <span class="fw-bold"><%= group.events.length %></span>
                                 <p>Events</p>
                             </div>
                             <div class="group-stat">
@@ -62,14 +62,17 @@
                         </div>
 
                         <div class="groups-card-header">
-                            <h4>Members (4)</h4>
+                            <h4>Members (<%= group.members.length.toString() %>)</h4>
                             <div>
                                 <button class="invite-user-btn" data-group-id="<%=group.groupInfo.groupId%>">Invite</button>
                             </div>
                         </div>
-
+                        <% 
+                            const visible = (group.members || []).slice(0, 3);
+                            const remaining = Math.max(0, (group.members || []).length - visible.length);
+                        %>
                         <div class="group-members">
-                            <% group.members.forEach(member => { %>
+                            <% visible.forEach(member => { %>
                             <div class="card-member card-shape">
                                 <div class="card-title">
                                     <h5><%= member.profile.username %></h5>
@@ -79,9 +82,9 @@
                             </div>
                             <% }); %>
                         </div>
-
-                        <span class="justify-center">+1 More members</span>
-
+                        <% if (remaining > 0) {%>
+                        <span class="justify-center">+<%= remaining %> More members</span>
+                        <% } %>
                         <hr>
 
                         <div class="group-footer">
