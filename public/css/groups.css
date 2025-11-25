@@ -12,6 +12,7 @@ hr {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  align-items: center;
   flex-wrap: wrap;
 
   gap: 1rem;
@@ -19,6 +20,11 @@ hr {
   margin: 20px auto;
   padding: 10px;
   height: fit-content;
+  max-width: 1142px;
+}
+
+.wrapper-container > div {
+  width: 90%;
 }
 
 .wrapper-cards {
@@ -27,6 +33,8 @@ hr {
   justify-content: flex-start;
   align-items: center;
   gap: 20px;
+  max-height: 800px;
+  overflow-y: auto;
 }
 
 .group-container {
@@ -43,9 +51,6 @@ hr {
   justify-content: space-between;
   align-items: center;
   align-self: center;
-
-  width: 95%;
-  max-width: 1142px;
 }
 
 .groups-header-nav {
@@ -53,9 +58,6 @@ hr {
   justify-content: space-between;
   align-items: center;
   align-self: center;
-
-  width: 95%;
-  max-width: 1142px;
 }
 
 .groups-summary-box {
@@ -284,6 +286,11 @@ button,
 #addGroup {
   display: flex;
   align-self: flex-end;
+}
+
+.container-invites {
+  overflow-y: scroll;
+  max-height: 400px;
 }
 
 /* CSS */

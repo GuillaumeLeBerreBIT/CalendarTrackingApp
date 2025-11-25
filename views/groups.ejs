@@ -29,11 +29,34 @@
                 </div>
             </div>
 
+            <div>
+                <h2>Invites</h2>
+                <div class="container-invites hide-scrollbar card-shape" id="container-invites">
+                    <div class="flex-column" id="wrapper-invites">
+                        <% userInvites.forEach((i) => {%>
+                            <div class="card-shape group-card">
+                                <div class="justify-start">
+                                    <h4><%= i.groups.groups_title%></h5>
+                                    <span class="badge-secondary"><%= i.groups.tag_name%></span>
+                                </div>
+                                <div class="justify-between">
+                                    <p><%= i.groups.groups_description%></p>  
+                                    <div>
+                                        <button id="invite-accepted" data-group-id="<%=i.groups_id%>">Accept</button>
+                                        <button id="invite-declined" data-group-id="<%=i.groups_id%>">Decline</button>
+                                    </div>
+                                </div>
+                            </div>
+                        <% })%>
+                    </div>
+                </div>
+            </div>
+
             <div class="group-list-title">
                 <h2>All Groups</h2>
                 <button class="create-group-btn" id="create-group-btn">+ Create Group</button>
             </div>
-            <div class="wrapper-cards" id="wrapper-cards">
+            <div class="wrapper-cards card-shape hide-scrollbar" id="wrapper-cards">
                 <% if (userGroups) { userGroups.forEach((group) => {%>
                     <div class="group-card card-shape">
                         <div class="group-header">

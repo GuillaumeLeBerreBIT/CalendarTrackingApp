@@ -210,7 +210,19 @@ app.get("/groups", authRequire, async (req, res) => {
   }
   totalEvents = todayEvents.length;
 
-  res.render("groups.ejs", { userGroups, yourGroups: groups.length, totalEvents });
+  const {data: userInvites, error: UserInvitesError } = await supabase
+  .from('profiles_groups')
+  .select(
+    `*,
+    groups(
+      groups_title,
+      groups_description,
+      tag_name
+    )`)
+    .eq('user_id', req.cookies.userId)
+    .eq('invite_status', 'pending');
+
+  res.render("groups.ejs", { userGroups, yourGroups: groups.length, totalEvents, userInvites : userInvites || [] });
 });
 
 // app.post("/create-group", authRequire, async (req, res) => {

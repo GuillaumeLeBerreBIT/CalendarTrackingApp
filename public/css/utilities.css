@@ -40,12 +40,6 @@
     align-items: center;
 }
 
-.justify-between-stretch {
-    display: flex;
-    justify-content: space-between;
-    align-items: stretch;
-}
-
 .justify-start {
     display: flex;
     justify-content: flex-start;
@@ -85,4 +79,8 @@
 
 .h-100 {
     height: 100%;
+}
+
+#invite-declined {
+    background-color: rgb(179, 24, 24);
 }
