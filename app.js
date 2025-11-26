@@ -123,7 +123,6 @@ app.get("/todo", authRequire, async (req, res) => {
     }
 
     // Need to find all tags that a user can use.
-
     return {
       taskListInfo: {
         title: tl.task_list_title,
@@ -152,9 +151,31 @@ app.get("/todo", authRequire, async (req, res) => {
 });
 
 app.get("/groups", authRequire, async (req, res) => {
+
+  const {data: userMemberships, error: userMembershipsError} = await supabase
+  .from('profiles_groups')
+  .select('groups_id')
+  .eq('user_id', req.cookies.userId)
+  .neq('invite_status', 'declined');
+
+  if (userMembershipsError) {
+    return res.status(400).json({success: false, error: membershipsError.message});
+  }
+
+  const groupIds = userMemberships.map(pg => pg.groups_id)
+
+  if (groupIds.length === 0) {
+    return res.render("groups.ejs", { 
+      userGroups: [], 
+      yourGroups: 0, 
+      totalEvents: 0, 
+      userInvites: [] 
+    });
+  } 
+
   //Need to use the INNNER join to filter on nested tables and only return the
   // data if there is a match in the lower table.
-  const { data: groups, error } = await supabase
+  const { data: groups, error: groupsError } = await supabase
     .from("groups")
     .select(
       `
@@ -167,7 +188,11 @@ app.get("/groups", authRequire, async (req, res) => {
         )
         `
     )
-    .eq("profiles_groups.user_id", req.cookies.userId);
+    .in("groups_id", groupIds)
+
+  if (groupsError) {
+    res.status(400).json({success: false, error: groupsError.message});
+  }
 
   const userGroups =
     await Promise.all(groups.map(async (group) => {
@@ -224,85 +249,6 @@ app.get("/groups", authRequire, async (req, res) => {
 
   res.render("groups.ejs", { userGroups, yourGroups: groups.length, totalEvents, userInvites : userInvites || [] });
 });
-
-// app.post("/create-group", authRequire, async (req, res) => {
-//   try {
-//     // Handle the creation of the User who creates the group.
-//     const { data: newGroup, error: groupError } = await supabase
-//       .from("groups")
-//       .insert([
-//         {
-//           groups_title: req.body["group-title"],
-//           groups_description: req.body["group-description"] || null,
-//           tag_name: req.body["tag-name"] || null,
-//         },
-//       ])
-//       .select();
-
-//     if (groupError) {
-//       return res
-//         .status(400)
-//         .render("groups.ejs", { success: false, message: groupError.message });
-//     }
-
-//     const { data: newProfile, error: profileError } = await supabase
-//       .from("profiles_groups")
-//       .insert([
-//         {
-//           groups_id: newGroup[0].groups_id,
-//           user_id: req.user.id,
-//           role: "admin",
-//           invite_status: "accepted",
-//         },
-//       ])
-//       .select();
-
-//     if (profileError) {
-//       const { error } = await supabase
-//         .from("groups")
-//         .delete()
-//         .eq("groups_id", newGroup[0].groups_id);
-//       return res.status(400).render("groups.ejs", {
-//         success: false,
-//         message: "Failed to add the creator as admin.",
-//       });
-//     }
-
-//     // Handle the invitation of ONE member. (Will implement multiple later.)
-//     if (req.body["invite-user"]) {
-//       const { data: profileMatches, error: noMatches } = await supabase
-//         .from("profiles")
-//         .select("username")
-//         .eq("username", req.body["invite-user"]);
-
-//       if (profileMatches && profileMatches.length > 0) {
-//         const { data: userInvite, error: inviteError } = await supabase
-//           .from("profile_groups")
-//           .insert([
-//             {
-//               user_id: profileMatches[0].user_id,
-//               groups_id: newGroup.groups_id,
-//               role: "member",
-//               invite_status: "pending",
-//             },
-//           ]);
-
-//         if (inviteError) {
-//           console.log("groups.ejs", {
-//             success: false,
-//             message: "Group created, but unable to add user to the group.",
-//           });
-//         }
-//       }
-//     }
-
-//     res.redirect("/groups");
-//   } catch (error) {
-//     res
-//       .status(500)
-//       .render("groups.ejs", { success: false, message: error.message });
-//   }
-// });
 
 //Load the User login pages
 app.get("/login", (req, res) => {
@@ -518,6 +464,95 @@ app.post('/createGroup', authRequire, async (req, res) => {
   }
 
   res.json({success: true, newGroup: newGroup, newUsers: promiseInviteResults || []})
+})
+
+app.post('/acceptInviteGroup', authRequire, async (req, res) => {
+
+  const {data: inviteAccepted, error: InviteAcceptedError} = await supabase
+  .from('profiles_groups')
+  .update({invite_status: 'accepted'})
+  .eq('groups_id', req.body.groupId)
+  .eq('user_id', req.cookies.userId)
+  .select();
+
+  if (InviteAcceptedError) {
+    res.status(400).json({success: false, error: InviteAcceptedError.message})
+  }
+
+  const { data: group, error: groupsError } = await supabase
+    .from("groups")
+    .select(
+      `
+        *,
+        profiles_groups!inner (
+        *,
+        profiles (
+        username,
+        email)
+        )
+        `
+    )
+    .eq('groups_id', req.body.groupId)
+    .limit();
+
+  if (groupsError) {
+    res.status(400).json({success: false, error: groupsError.message});
+  }
+
+  const members = group[0].profiles_groups?.map((pg) => {
+    return {
+      role: pg.role,
+      username: pg.profiles.username,
+      email: pg.profiles.email,
+      invite_status: pg.invite_status,
+      user_id: pg.user_id
+    };
+  }) || [];
+
+  // Need to retrieve all events
+  const events = await retrieveEvents(req.body.groupsId);
+  //Need to retrieve all ToDo Lists
+  const todoLists = await retrieveTodoLists(req.body.groupsId);
+
+  const {data: todayEvents, error: todayEventsError} = await supabase
+  .from('profiles_events')
+  .select('*')
+  .eq('user_id', req.cookies.userId)
+  .eq('rsvp_status', 'accepted');
+
+  group[0].created_at = format(new Date(group[0].created_at), 'dd-MM-yyyy');
+  
+  let totalEvents;
+  if (todayEventsError) {
+    totalEvents = 0;
+  }
+  totalEvents = todayEvents.length;
+
+  res.json({
+    success: true, 
+    group: group, 
+    members: members, 
+    events: events,
+    todoLists: todoLists,
+    totalEvents: totalEvents
+  })
+
+});
+
+app.post('/declineInviteGroup', authRequire, async (req, res) => {
+
+  const {data: inviteAccepted, error: InviteAcceptedError} = await supabase
+  .from('profiles_groups')
+  .update({invite_status: 'declined'})
+  .eq('groups_id', req.body.groupId)
+  .eq('user_id', req.cookies.userId)
+  .select();
+
+  if (InviteAcceptedError) {
+    res.status(400).json({success: false, error: InviteAcceptedError.message})
+  }
+
+  res.json({success: true})
 })
 
 //API Endpoints

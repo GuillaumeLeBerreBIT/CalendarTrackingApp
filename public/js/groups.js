@@ -18,13 +18,20 @@ const inviteUserModal = document.querySelector('#invite-user-modal');
 const formInviteUsers = document.querySelector('#form-modal-invite');
 const sendInviteUsers = document.querySelector('#sendInviteUsers');
 
+const inviteAcceptedBtn = document.querySelectorAll('#invite-accepted');
+const inviteDeclinedBtn = document.querySelectorAll('#invite-declined');
+
 closeBtnModal.forEach(c => c.addEventListener('click', function() {
     modalOverlayGroups.classList.remove('active');
-    inviteUserModal.classList.remove('active');
+
+    document.querySelector('#invite-user-input').value = '';
+    const usersIsAdded = selectedUsers.getElementsByTagName('*') || [];
+    [...usersIsAdded].forEach(n => {
+        n.remove();        
+    });
 }))
 
 closeBtnInvite.forEach(c => c.addEventListener('click', function() {
-    modalOverlayGroups.classList.remove('active');
     inviteUserModal.classList.remove('active');
     // Clean users saved from searching
     document.querySelector('#invite-user-input').value = '';
@@ -33,6 +40,62 @@ closeBtnInvite.forEach(c => c.addEventListener('click', function() {
         n.remove();        
     });
 }))
+
+document.addEventListener('click', async (e) => {
+
+    const acceptBtn = e.target.closest('.invite-accepted');
+    const declineBtn = e.target.closest('.invite-declined');
+
+    if (acceptBtn) {
+        const groupId = acceptBtn.dataset.groupId;
+        const card = acceptBtn.closest('.card-shape.group-card');
+        acceptBtn.disabled = true;
+
+        try {
+            const accepted = await acceptGroup(groupId);
+            
+            if (accepted) {
+                card.style.opacity = '0';
+                card.style.transition = 'opacity 0.3s';
+                setTimeout(() => card.remove(), 300);
+            } else {
+                alert('Failed to accept invitation');
+                acceptBtn.disabled = false;
+                acceptBtn.textContent = 'Accept';
+            }
+        } catch (error) {
+            console.error('Error accepting invite:', error);
+            alert('Error accepting invitation');
+            acceptBtn.disabled = false;
+            acceptBtn.textContent = 'Accept';
+        }
+    }
+
+    if (declineBtn) {
+        const groupId = declineBtn.dataset.groupId;
+        const card = declineBtn.closest('.card-shape.group-card');
+        
+        declineBtn.disabled = true;        
+        try {
+            const declined = await declineGroup(groupId);
+            
+            if (declined) {
+                card.style.opacity = '0';
+                card.style.transition = 'opacity 0.3s';
+                setTimeout(() => card.remove(), 300);
+            } else {
+                alert('Failed to decline invitation');
+                declineBtn.disabled = false;
+                declineBtn.textContent = 'Decline';
+            }
+        } catch (error) {
+            console.error('Error declining invite:', error);
+            alert('Error declining invitation');
+            declineBtn.disabled = false;
+            declineBtn.textContent = 'Decline';
+        }
+    }
+})
 
 createGroupBtn.addEventListener('click', function () {
     modalOverlayGroups.classList.add('active');
@@ -75,7 +138,7 @@ formInviteUsers.addEventListener('submit', async function (e) {
     e.preventDefault();
     inviteUser(document.querySelector('#invite-user-input'),
         document.querySelector('#selectedUsersModal'),
-        document.querySelector('#invite-user-btn'));
+        document.querySelector('.invite-user-btn'));
 })
 
 formModalGroup.addEventListener('submit', async (e) => {
@@ -203,4 +266,46 @@ async function inviteUser (inputField, usersToInvite, groupInvUserBtn) {
     } catch (error) {
         alert(`Internal server error could not handle request: ${e}`);
     }
+}
+
+async function acceptGroup(groupId) {
+
+    try {
+
+        const response = await axios.post('/acceptInviteGroup', {groupId: groupId});
+
+        if (!response.data.success) {
+            alert(`Wasn't able to accept the group Invite.`)
+            return false
+        }
+
+        appendGroupTemplate(response.data.group, response.data.members);
+        return true
+
+    } catch (error) {
+        alert('Could not complete the request to accept the invite.')
+        return false
+    }
+
+}
+
+async function declineGroup(groupId) {
+    
+    try {
+        const response = await axios.post('/declineInviteGroup', {groupId: groupId});
+
+        if (!response.data.success) {
+            alert(`Wasn't able to decline the Invite.`)
+            return false
+        }
+        return true
+        
+    } catch (error) {
+        
+        alert('Could not complete the request to accept the invite.')
+        return false
+    }
+
+
+
 }
