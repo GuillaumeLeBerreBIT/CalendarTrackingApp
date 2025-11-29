@@ -639,55 +639,56 @@ app.get('/renderEvents', authRequire, async (req, res) => {
   if (errorEvents) {
     res.status(400).json({success: false, error: errorEvents.message})
   } else {
-    const filteredEvents = events.map((e) => {
-      let start_date, end_date;
-      if (
-        !e.all_day &&
-        e.start_date === e.end_date &&
-        e.start_time.substring(0,5) !== e.end_time.substring(0,5)
-      ) {
-        start_date = `${e.start_date}T${e.start_time.substring(0,5)}`;
-        end_date   = `${e.end_date}T${e.end_time.substring(0,5)}`;
+    try {
+      const filteredEvents = events.map((e) => {
+        let start_date, end_date;
 
-      } else if (e.all_day && e.start_date === e.end_date) {
-        start_date = `${e.start_date}`;
-        end_date   = `${e.end_date}`;
+        const hasStartTime = e.start_time != null && e.start_time.length >= 5;
+        const hasEndTime = e.end_time != null && e.end_time.length >= 5;
+        if (
+          e.all_day ||
+          !hasStartTime ||
+          !hasEndTime
+        ) {
+          start_date = `${e.start_date}`;
+          end_date   = `${e.end_date}`;
 
-      } else if (e.all_day) {
-        start_date = `${e.start_date}`;
-        end_date   = `${e.end_date}`;
+        } else if (e.start_time === e.end_time || (e.start_time === '00:00' && e.end_time === '00:00')) {
+          start_date = `${e.start_date}`;
+          end_date   = `${e.end_date}`;
 
-      } else if (
-        e.start_time.substring(0,5) === '00:00' &&
-        e.end_time.substring(0,5) === '00:00') {
-        start_date = `${e.start_date}`;
-        end_date   = `${e.end_date}`;
+        } else if (e.all_day) {
+          start_date = `${e.start_date}`;
+          end_date   = `${e.end_date}`;
 
-      } else {
-        // Normal timed multi-day or single-day
-        start_date = `${e.start_date}T${e.start_time.substring(0,5)}`;
-        end_date   = `${e.end_date}T${e.end_time.substring(0,5)}`;
-      }
-
-      const participants = e.profiles_events.map((p) => {
-        return p.profiles.username
-      });
-
-      return {
-        id: e.event_id,
-        title: e.event_title,
-        start: start_date,
-        end: end_date,
-        backgroundColor: '#4A9D5F', // Need to make it custom
-        borderColor: '#4A9D5F',
-        extendedProps : {
-          description: e.event_description,
-          participants: participants,
-          groupName: ''
+        } else {
+          // Normal timed multi-day or single-day
+          start_date = `${e.start_date}T${e.start_time.substring(0,5)}`;
+          end_date   = `${e.end_date}T${e.end_time.substring(0,5)}`;
         }
-      }
-    })
-    res.json({success: true, events: filteredEvents})
+
+        const participants = e.profiles_events.map((p) => {
+          return p.profiles.username
+        });
+
+        return {
+          id: e.event_id,
+          title: e.event_title,
+          start: start_date,
+          end: end_date,
+          backgroundColor: '#4A9D5F', // Need to make it custom
+          borderColor: '#4A9D5F',
+          extendedProps : {
+            description: e.event_description,
+            participants: participants,
+            groupName: ''
+          }
+        }
+      })
+      res.json({success: true, events: filteredEvents});
+    } catch (error) {
+      res.status(500).json({success: false, error: error.message});
+    }
   }
 
 });

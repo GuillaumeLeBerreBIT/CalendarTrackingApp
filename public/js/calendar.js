@@ -106,6 +106,35 @@ document.addEventListener("DOMContentLoaded", async function () {
       updateShowModalEvent(info.event);
       document.querySelector("#modal-overlay-event").style.display = "flex";
     },
+    eventMouseEnter: function (info) {
+      console.log(info);
+
+      const div = document.createElement('div');
+      div.className = 'event-tooltip';
+      div.innerHTML = 
+      `
+      <strong>${info.event.title}</strong><br>
+      ${info.event.start.toLocaleString()}<br>
+      ${info.event.end ? info.event.end.toLocaleString() : ''}
+      ${info.event.description ? '<br>' + info.event.description : ''}
+      `;
+
+      document.body.appendChild(div);
+
+      const rect = info.el.getBoundingClientRect()
+      div.style.top = (rect.top - div.offsetHeight - 5) + 'px';
+      div.style.left = rect.left + 'px';
+      
+      info.el.tooltip = div;
+      
+    },
+
+    eventMouseLeave: function (info) {
+      if (info.el.tooltip) {
+        info.el.tooltip.remove();
+        info.el.tooltip = null;
+      }
+    }
     // Remove Event from the calander
   });
 
@@ -185,7 +214,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       if (!response.data.success) {
         console.log("Start filtering data.");
       } else {
-        return response.data.events;
+        return response.data.events || [];
       }
     } catch (error) {
       console.log(error);
