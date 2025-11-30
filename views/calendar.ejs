@@ -20,7 +20,6 @@
     <div class="modal-overlay" id="modal-overlay">
         <div class="modal-box hide-scrollbar"> 
             <span class="close-btn" id="close-btn">&times;</span>
-            <!-- <div class="modal-header">Enter an event.</div> -->
             <form class="form-modal" id="form-calendar">
                 <div class="flex-column gap-0">
                     <h3>Add Event</h3>
@@ -49,6 +48,20 @@
                     <input type="date" name="endDate" id="endDate">
                     <input type="time" name="endTime" id="endTime">
                 </div>
+                <%if (groupsTagNames) {%>
+                    <div class="flex-column">
+                        <label for="tagNames">Groups:</label>
+                        <select name="tagNames" id="tagNames">
+                            <option value="">-- Select a group to link event to --</option>
+                            <% Object.entries(groupsTagNames).forEach(entry => { %>
+                                <% const [id, tagName] = entry;%>
+                                <option value="<%=id%>"><%=tagName%></option>
+                            <%});%>
+                        </select>
+                    </div>
+                <%};%>
+                <!--Need to show the users that can be linked to an event when selecting a group.-->
+                
                 <input type="hidden" value="">
                 <button type="submit">Add Event</button>
             </form>
@@ -67,7 +80,7 @@
             <div class="modal-event">
                 <div class="left-border">
                     <h2 class="event-header" id="event-title">Event Title</h2>
-                    <span>Group Name</span>
+                    <span id="group-tag-name"></span>
                 </div>
 
                 <div class="justify-start gap-20">

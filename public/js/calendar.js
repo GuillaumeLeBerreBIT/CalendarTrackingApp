@@ -53,6 +53,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   showUpcomingEvents(loadedEvents)
 
   let calendar = new FullCalendar.Calendar(calendarEl, {
+    pre: 'chevron-left',
+    next: 'chevron-right',
     initialView: "dayGridMonth",
     firstDay: 1,
     customButtons: {
@@ -108,14 +110,21 @@ document.addEventListener("DOMContentLoaded", async function () {
     },
     eventMouseEnter: function (info) {
       console.log(info);
-
+      const options = {
+        day: "numeric",
+        month: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }
       const div = document.createElement('div');
       div.className = 'event-tooltip';
       div.innerHTML = 
       `
       <strong>${info.event.title}</strong><br>
-      ${info.event.start.toLocaleString()}<br>
-      ${info.event.end ? info.event.end.toLocaleString() : ''}
+      ${info.event.start.toLocaleString('nl-BE', options).replace(',', ' -')}<br>
+      ${info.event.end ? info.event.end.toLocaleString('nl-BE', options).replace(',', ' -') : ''}
       ${info.event.description ? '<br>' + info.event.description : ''}
       `;
 
@@ -228,6 +237,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     modalOverlayEvent.querySelector("#event-start-date").textContent = "";
     modalOverlayEvent.querySelector("#event-end-date").textContent = "";
     modalOverlayEvent.querySelector("#event-title").textContent = event.title;
+    if (event.extendedProps.groupName){
+      modalOverlayEvent.querySelector("#group-tag-name").textContent = event.extendedProps.groupName;
+      modalOverlayEvent.querySelector("#group-tag-name").classList.add('badge-secondary');
+    }
     modalOverlayEvent.querySelector("#event-description").textContent =
       event?.extendedProps.description || "No description given.";
 

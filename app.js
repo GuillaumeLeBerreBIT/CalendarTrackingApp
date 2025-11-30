@@ -62,9 +62,25 @@ app.get("/", authRequire, (req, res) => {
 });
 
 app.get("/calendar", authRequire, async (req, res) => {
-  //Later need to also make sure there is filtering done on Groups as well to find matching tasks
+  
+  const {data: groupsIds, error: groupsIdsError} = await supabase
+  .from('groups')
+  .select(`groups_id, tag_name,
+    profiles_groups!inner(
+    user_id
+    )`)
+  .eq('profiles_groups.user_id', req.cookies.userId);
 
-  res.render("calendar.ejs");
+  if (groupsIdsError) {
+    res.status(500).json({success: false, error: groupsIdsError.message})
+  }
+
+  let groupsTagNames = {};
+  groupsIds.filter(g => g.tag_name !== null).forEach(g => {
+    groupsTagNames[g.groups_id] = g.tag_name
+  })
+
+  res.render("calendar.ejs", {groupsTagNames: groupsTagNames});
 });
 
 app.get("/todo", authRequire, async (req, res) => {
@@ -621,6 +637,23 @@ app.get('/renderEvents', authRequire, async (req, res) => {
     res.status(400).json({success: false, error: profileEventsError.message})
   }
 
+  const {data: groupsIds, error: groupsIdsError} = await supabase
+  .from('groups')
+  .select(`groups_id, tag_name,
+    profiles_groups!inner(
+    user_id
+    )`)
+  .eq('profiles_groups.user_id', req.cookies.userId);
+
+  if (groupsIdsError) {
+    res.status(500).json({success: false, error: groupsIdsError.message})
+  }
+
+  let groupsTagNames = {};
+  groupsIds.filter(g => g.tag_name !== null).forEach(g => {
+    groupsTagNames[g.groups_id] = g.tag_name
+  })
+
   const taskIdsArray = profileEvents.map( e => e.event_id);
 
   const {data: events, error: errorEvents} = await supabase
@@ -661,6 +694,10 @@ app.get('/renderEvents', authRequire, async (req, res) => {
           start_date = `${e.start_date}`;
           end_date   = `${e.end_date}`;
 
+        } else if (e.start_time === '00:00' && e.end_time === '00:00') {
+          start_date = `${e.start_date}`;
+          end_date   = `${e.end_date}`;
+
         } else {
           // Normal timed multi-day or single-day
           start_date = `${e.start_date}T${e.start_time.substring(0,5)}`;
@@ -681,11 +718,11 @@ app.get('/renderEvents', authRequire, async (req, res) => {
           extendedProps : {
             description: e.event_description,
             participants: participants,
-            groupName: ''
+            groupName: groupsTagNames?.[e.groups_id] || ''
           }
         }
       })
-      res.json({success: true, events: filteredEvents});
+      res.json({success: true, events: filteredEvents, groupsTagNames: groupsTagNames});
     } catch (error) {
       res.status(500).json({success: false, error: error.message});
     }

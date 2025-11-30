@@ -339,6 +339,14 @@ td.fc-day.fc-day-sun {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
+.fc-icon-chevron-right {
+  color: white;
+}
+
+.fc-icon-chevron-left {
+  color: white;
+}
+
 /* Make events smaller on mobile */
 @media (max-width: 768px) {
   .fc-event {
