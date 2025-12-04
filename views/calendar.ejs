@@ -39,29 +39,34 @@
                     <input type="checkbox" name="allDay"  class="all-day" id="allDay">
                 </div>
                 <div class="flex-column">
-                    <label for="startDate">From:</label>
+                    <label for="startDate">From</label>
                     <input type="date" name="startDate" id="startDate">
                     <input type="time" name="startTime" id="startTime">
                 </div>
                 <div class="flex-column">
-                    <label for="startDate">To:</label>
+                    <label for="startDate">To</label>
                     <input type="date" name="endDate" id="endDate">
                     <input type="time" name="endTime" id="endTime">
                 </div>
                 <%if (groupsTagNames) {%>
                     <div class="flex-column">
-                        <label for="tagNames">Groups:</label>
+                        <label for="tagNames">Groups</label>
                         <select name="tagNames" id="tagNames">
                             <option value="">-- Select a group to link event to --</option>
                             <% Object.entries(groupsTagNames).forEach(entry => { %>
                                 <% const [id, tagName] = entry;%>
-                                <option value="<%=id%>"><%=tagName%></option>
+                                <option value="<%=id%>" data-group-id="<%=id%>"><%=tagName%></option>
                             <%});%>
                         </select>
                     </div>
                 <%};%>
                 <!--Need to show the users that can be linked to an event when selecting a group.-->
-                
+                <div class="flex-column set-display-none" id="select-users-wrapper">
+                    <label>Select Participants</label>
+                    <div id="participants-container" class="card-shape participants-box">
+
+                    </div>
+                </div>
                 <input type="hidden" value="">
                 <button type="submit">Add Event</button>
             </form>

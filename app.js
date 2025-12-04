@@ -565,7 +565,7 @@ app.post('/declineInviteGroup', authRequire, async (req, res) => {
   .select();
 
   if (InviteAcceptedError) {
-    res.status(400).json({success: false, error: InviteAcceptedError.message})
+    res.status(500).json({success: false, error: InviteAcceptedError.message})
   }
 
   res.json({success: true})
@@ -604,25 +604,59 @@ app.post("/addEvent", authRequire, async (req, res) => {
     .select();
 
   if (eventDataError) {
-    res.status(400).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 
-  // After adding Event need to update the profiles_event table
-  const {data: eventProfile, error: eventProfileError} = await supabase
-  .from('profiles_events')
-  .insert([
-    {user_id: req.cookies.userId, event_id: eventData[0].event_id}
-  ])
-  .select()
+  eventData["start_time"] = eventData['start_time'] ? eventData['start_time'].slice(0,-3) : '';
+  eventData["end_time"] = eventData['end_time'] ? eventData['end_time'].slice(0,-3) : '';
 
-  if (eventProfileError) {
-    res.status(400).json({ success: false, error: error.message });
+  if (insertEventObj.participants.length !== 0) {
+    const insertUsersArray = insertEventObj.participants.map( (p) => {
+      return {
+        user_id: p.userId, 
+        event_id: eventData[0].event_id,
+        rsvp_status: 'accepted'
+      }
+    })
+
+    const {data: eventUsersInvited, error: eventUsersInvitedError} = await supabase
+    .from('profiles_events')
+    .insert(insertUsersArray)
+    .select()
+
+    if (eventUsersInvitedError) {
+      res.status(500).json({ success: false, error: error.message });
+    } else {
+
+      const userArray = [];
+      insertEventObj.participants.forEach(u => { userArray.push(u.username)});
+
+      res.json({ success: true, eventData: eventData, participants: userArray });
+    } 
+
   } else {
 
-    eventData["start_time"] = eventData['start_time'] ? eventData['start_time'].slice(0,-3) : '';
-    eventData["end_time"] = eventData['end_time'] ? eventData['end_time'].slice(0,-3) : '';
-    res.json({ success: true, eventData });
+    const insertUsersArray = [{user_id: req.cookies.userId, event_id: eventData[0].event_id, rsvp_status: 'accepted'}];
+    // After adding Event need to update the profiles_event table
+    const {data: eventProfile, error: eventProfileError} = await supabase
+    .from('profiles_events')
+    .insert(insertUsersArray)
+    .select()
+
+    const {data: user, error: userError} = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('user_id', req.cookies.userId)
+    .limit(1);
+
+    if (eventProfileError) {
+      res.status(500).json({ success: false, error: error.message });
+    } else {
+
+      res.json({ success: true, eventData, participants: [user[0]?.username]});
+    } 
   } 
+
 });
 
 app.get('/renderEvents', authRequire, async (req, res) => {
@@ -729,6 +763,33 @@ app.get('/renderEvents', authRequire, async (req, res) => {
   }
 
 });
+
+app.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
+  console.log(parseInt(req.query.groupId))
+  const {data: groupUsers, error: groupUsersError } = await supabase
+  .from('profiles_groups')
+  .select(
+  `
+    user_id,
+    profiles!inner(
+    username
+    )
+  `)
+  .eq('groups_id', parseInt(req.query.groupId));
+
+  if (groupUsersError) {
+    return res.status(500).json({success: false, error: groupUsersError.message})
+  };
+
+  const selectUser = groupUsers.map((u) => {
+    return {
+      userId: u.user_id,
+      username: u?.profiles?.username || []
+    }
+  });
+
+  return res.json({success: true, selectUser: selectUser});
+})
 
 app.post("/createTaskList", authRequire, async (req, res) => {
 

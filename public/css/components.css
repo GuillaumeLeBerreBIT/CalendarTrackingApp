@@ -111,6 +111,7 @@ select
   font-family: inherit;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .form-modal textarea {
@@ -156,4 +157,55 @@ select
   border-left: 4px solid oklch(57.81% 0.1776 147.5);
   padding: 0 0 0 8px;
   border-radius: 0.25rem;;
+}
+
+.participants-box {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    
+    min-height: 80px;
+    padding: 10px;
+    gap: 10px;
+
+    width: 100%;
+    box-sizing: border-box;
+
+}
+
+.user-pill {
+  display: flex;
+  align-items: cneter;
+
+  padding: 10px 20px;
+  gap: 8px;
+
+  background: white;
+  color: #374151;
+  border: 2px solid #e5e7eb;
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+  transition: all 0.2 ease;
+}
+
+.user-pill:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
+}
+
+.user-pill.selected {
+  background: oklch(57.81% 0.1776 147.5);
+  color: white;
+  border-color: oklch(57.81% 0.1776 147.5);
+  box-shadow: 0 2px 4px rgba(74, 157, 95, 0.3);
+}
+
+.user-pill.selected:hover {
+    background: oklch(52% 0.16 147.5);
+    border-color: oklch(52% 0.16 147.5);
 }

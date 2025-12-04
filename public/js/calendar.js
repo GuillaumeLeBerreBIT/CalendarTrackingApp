@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   const closeBtnEvent = document.querySelector("#close-btn-event");
   const form = document.querySelector("#form-calendar");
   const checkWholeDay = document.querySelector(".all-day");
+  const selectedTagName = document.querySelector('#tagNames');
 
   const modalOverlayEvent = document.querySelector("#modal-overlay-event");
 
@@ -103,6 +104,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     dateClick: function (info) {
       //Need to prefill form with current dates
       modalOverlayForm.style.setProperty("display", "flex");
+
+      modalOverlayForm.querySelector('#startDate').value = info.dateStr;
+      modalOverlayForm.querySelector('#endDate').value = info.dateStr;
     },
     eventClick: function (info) {
       updateShowModalEvent(info.event);
@@ -170,6 +174,36 @@ document.addEventListener("DOMContentLoaded", async function () {
     createEvent();
   });
 
+  checkWholeDay.addEventListener("change", function () {
+    const timeFields = document.querySelectorAll("input[type=time]");
+    timeFields.forEach((t) => {
+      t.style.display = this.checked
+        ? "none"
+        : "block"; /*Show time when clicked else only show date*/
+    });
+  });
+
+  selectedTagName.addEventListener('change', async function (event) {
+    const selectedGroupId = event.target.value
+
+    const selectedText = event.target.options[event.target.selectedIndex].text;
+    const selectedGroupIdOption = event.target.options[event.target.selectedIndex].dataset.groupId;
+
+
+    if (selectedGroupId || selectedGroupIdOption) {
+      try {
+        const response = await axios.get('/retrieveUsersSelectedGroup', {params: {groupId: selectedGroupId || selectedGroupIdOption}});
+
+        if (response.data.success) {
+          updateUsersShownForm(response.data.selectUser);
+        }
+
+      } catch (error) {
+        console.log('Internal problems trying to retrieve all users from the group.')
+      }
+    }
+  });
+
   async function createEvent() {
     const formData = new FormData(form);
 
@@ -185,6 +219,8 @@ document.addEventListener("DOMContentLoaded", async function () {
       data["allDay"] = false;
     }
 
+    data.participants = retrieveAllSelectedUsers();
+
     let response = await axios.post("/addEvent", data);
 
     // Handle response to add event to the calendar
@@ -197,7 +233,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         startTime: response.data.eventData[0]["start_time"],
         endTime: response.data.eventData[0]["end_time"],
         allDay: response.data.eventData[0]["all_day"],
-        description: response.data.eventData[0]["description"],
+        backgroundColor: '#4a9d5f',
+        borderColor: '#4a9d5f',
+        textColor: 'white',
+        extendedProps: {
+          participants: response.data.participants || [],
+          description: response.data.eventData[0]["event_description"],
+        }
       });
 
       modalOverlayForm.style.setProperty("display", "none");
@@ -206,15 +248,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       alert("Something went wrong, could not be able to create an event ...");
     }
   }
-
-  checkWholeDay.addEventListener("change", function () {
-    const timeFields = document.querySelectorAll("input[type=time]");
-    timeFields.forEach((t) => {
-      t.style.display = this.checked
-        ? "none"
-        : "block"; /*Show time when clicked else only show date*/
-    });
-  });
 
   async function loadInEvents() {
     try {
@@ -283,9 +316,57 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     try {
       modalOverlayEvent.querySelector("#event-participants").textContent =
-      event.extendedProps.participants.join("-");
+      event.extendedProps.participants.join(" - ");
     } catch (e) {
       modalOverlayEvent.querySelector("#event-participants").textContent = 'No participants'
     }
   }
+
+  function updateUsersShownForm (selectedUsers) {
+
+    const containerUsers = document.querySelector('#participants-container');
+    const selectUsersWrapper = document.querySelector('#select-users-wrapper');
+
+    containerUsers.innerHTML = '';
+
+    if (selectedUsers.length === 0) {
+      containerUsers.innerHTML = '<span>No users available</span>';
+      return;
+    }
+
+    selectUsersWrapper.classList.remove('set-display-none');
+
+    selectedUsers.forEach(u => {
+      const div = document.createElement('div');
+      div.className = 'user-pill';
+      div.dataset.userId = u.userId
+      div.textContent = u.username
+
+      div.addEventListener('click', (event) => {
+        div.classList.toggle('selected');
+      })
+
+      containerUsers.appendChild(div);
+    })
+  }
+
+  function retrieveAllSelectedUsers () {
+    const participantsContainer = document.querySelector('#participants-container');
+    const userPills = participantsContainer.querySelectorAll('.user-pill.selected');
+
+    if (userPills.length === 0) {
+      return [];
+    };
+
+    let usersInvited = [];
+    [...userPills].forEach(p => {
+
+      usersInvited.push({
+        username: p.textContent,
+        userId: p.dataset.userId
+      });
+    });
+
+    return usersInvited;
+  };
 });
