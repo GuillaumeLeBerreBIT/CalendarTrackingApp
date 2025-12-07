@@ -40,6 +40,11 @@
     align-items: center;
 }
 
+.justify-between button.h-100 {
+    flex: 1;
+    white-space: nowrap;
+}
+
 .justify-start {
     display: flex;
     justify-content: flex-start;

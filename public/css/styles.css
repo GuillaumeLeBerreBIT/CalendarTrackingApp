@@ -1,6 +1,12 @@
 
 body {
     font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    min-width: 100vw;
+
+    /*This is important to split the website into 2 pages*/
+    display: grid;
+    grid-template-columns: auto 1fr;/*The first column should have automatic size and the rest of the website os for the content*/
 }
 
 .container {
