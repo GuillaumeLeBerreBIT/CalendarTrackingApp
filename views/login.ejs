@@ -1,26 +1,26 @@
+<%- include('partials/header.ejs') %>
 
+    <div class="login-container">
+        <div class="login-card card-shape">
+            <h1>CalendarTracking</h1>
+            <h2>Welcome back!</h2>
+            <p>Please enter your details.</p>
+            
+            <form method="post" action="/login" class="flex-column justify-center">
+                <input type="email" id="email" name="email" placeholder="Enter Email">
 
-<div>
-    <h2>CalendarTracking</h2>
+                <input type="password" id="password" name="password" placeholder="Enter password">    
 
-    <div>
-        <h2>Welcome back!</h2>
-        <p>Please enter your details.</p>
-        
-        <form method="post" action="/login">
-            <label>Email</label>
-            <input type="email" id="email" name="email">
+                <input type="submit" value="Login">
+            </form>
 
-            <label>Password</label>
-            <input type="password" id="password" name="password">    
+            <p>Not signed up yet?</p>
 
-            <input type="submit" value="Login">
-        </form>
-
-        <p>Not signed up yet?</p>
-
-        <form method="get" action="/register">
-            <input type="submit" value="Register">
-        </form>
+            <form method="get" action="/register" class="flex-column">
+                <input type="submit" value="Register">
+            </form>
+        </div>     
     </div>
-</div>
+    
+
+<%- include('partials/footer.ejs') %>

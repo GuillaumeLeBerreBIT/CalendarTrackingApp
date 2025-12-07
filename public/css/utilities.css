@@ -84,3 +84,33 @@
 .invite-declined {
     background-color: rgb(179, 24, 24);
 }
+
+.login-container {
+
+    display: flex;
+
+    margin: 0 auto;
+    height: 95vh;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-card {
+
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+
+    max-width: 500px;
+    width: 100%;
+    gap: 20px;
+
+    * {
+        gap: 20px;
+    }
+
+    h2, h1 {
+        margin: 5px auto;
+    }
+}

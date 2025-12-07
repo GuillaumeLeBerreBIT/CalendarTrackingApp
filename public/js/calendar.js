@@ -315,8 +315,14 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     try {
-      modalOverlayEvent.querySelector("#event-participants").textContent =
-      event.extendedProps.participants.join(" - ");
+      event.extendedProps.participants.forEach(p => {
+        const partiDiv = document.createElement('div');
+        partiDiv.className = 'badge-secondary';
+        partiDiv.textContent = p;
+        
+        modalOverlayEvent.querySelector("#event-participants").appendChild(partiDiv);
+      });
+      
     } catch (e) {
       modalOverlayEvent.querySelector("#event-participants").textContent = 'No participants'
     }

@@ -85,7 +85,11 @@ button {
 .form-modal textarea,
 .form-modal input[type="date"],
 .form-modal input[type="time"],
-.form-modal input[type="submit"]
+.form-modal input[type="submit"],
+.login-card input[type="email"],
+.login-card input[type="password"],
+.login-card input[type="submit"],
+.login-card input[type="text"]
  {
   width: 100%;
   padding: 12px 16px;
@@ -97,8 +101,17 @@ button {
   box-sizing: border-box;
 }
 
-.form-modal input[type="submit"]:hover {
-  background-color: oklch(76.811% 0.20038 149.171);
+.form-modal input[type="submit"]:hover,
+.login-card input[type="submit"]:hover
+{
+  background-color: oklch(66.979% 0.16322 150.152);
+  transition: background-color 0.5s ease;
+}
+
+.login-card input:hover
+{
+  border-color: oklch(66.979% 0.16322 150.152);
+  transition: border-color 0.5s ease;
 }
 
 input[type="search"],
