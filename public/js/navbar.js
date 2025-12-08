@@ -5,13 +5,15 @@ function toggleSidebar () {
     sidebar.classList.toggle('close');
     toggleButton.classList.toggle('rotate');
 
-    Array.from(sidebar.getElementsByClassName('show')).forEach( ul => {
-        ul.classList.remove('show');
-        ul.previousElementSibling.classList.remove('rotate');
-    }); //Open dropdowns in the form of an array
+    closeAllSubMenu();
 }
 
 function toggleSubMenu (button) {
+
+    if (!button.nextElementSibling.classList.contains('show')) {
+        closeAllSubMenu();
+    }
+
     button.nextElementSibling.classList.toggle('show');
     button.classList.toggle('rotate');
 
@@ -19,4 +21,11 @@ function toggleSubMenu (button) {
         sidebar.classList.toggle('close');
         toggleButton.classList.toggle('rotate');
     }
+}
+
+function closeAllSubMenu () {
+    Array.from(sidebar.getElementsByClassName('show')).forEach( ul => {
+        ul.classList.remove('show');
+        ul.previousElementSibling.classList.remove('rotate');
+    }); //Open dropdowns in the form of an array
 }
