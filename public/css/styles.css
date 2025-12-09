@@ -1,9 +1,9 @@
-
 body.app-page {
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
     min-width: 100%;
     margin: 0;
+    padding: 0;
 
     /*This is important to split the website into 2 pages*/
     display: grid;

@@ -349,6 +349,11 @@ app.post("/logout", async (req, res) => {
   res.redirect("/login");
 });
 
+app.get("/logout", async (req, res) => {
+  res.clearCookie("authCookie");
+  res.redirect("/login");
+});
+
 app.post('/checkUser', authRequire ,async (req, res) => {
 
   try {

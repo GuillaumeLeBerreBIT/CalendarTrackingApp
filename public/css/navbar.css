@@ -1,7 +1,7 @@
 :root {
     --base-clr: oklch(0.97 0 0);
-    --line-clr: #42434a;
-    --hover-clr: oklch(57.81% 0.1776 147.5);
+    --line-clr: oklch(0.922 0 0);
+    --hover-clr: oklch(70.143% 0.13815 152.127);
     --text-clr: #000000;
     --accent-clr: oklch(57.81% 0.1776 147.5);
     --accent-clr-hover: white;
@@ -29,14 +29,23 @@
     width: 60px;
 }
 
+#sidebar #toggle-btn {
+    margin: 0;
+}
+
+#sidebar button {
+    box-shadow: none;
+}
+
 #sidebar ul {
     list-style: none;
     margin: 0;
     padding: 0;
+
 }
 
 /*Style the logo*/
-#sidebar > ul >li:first-child {
+#sidebar > ul > li:first-child {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 16px;
@@ -45,11 +54,22 @@
     }
 }
 
+#sidebar > ul > li:last-child {
+    margin-top: auto;
+}
+
 #sidebar ul li.active a {
     color: var(--accent-clr);
 
     svg {
         fill: var(--accent-clr)
+    }
+}
+
+#sidebar ul li.active:hover {
+
+    svg {
+        fill: white;
     }
 }
 
@@ -61,6 +81,12 @@
     display: flex;
     align-items: center;
     gap: 1em; 
+}
+
+/*To fix the weird behaviour of the first li a item*/
+#sidebar a:first-child {
+    width: 100%;
+    box-sizing: border-box; 
 }
 
 .dropdown-btn {
