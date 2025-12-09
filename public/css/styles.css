@@ -1,17 +1,31 @@
 
-body {
+body.app-page {
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
-    min-width: 100vw;
+    min-width: 100%;
+    margin: 0;
 
     /*This is important to split the website into 2 pages*/
     display: grid;
     grid-template-columns: auto 1fr;/*The first column should have automatic size and the rest of the website os for the content*/
 }
 
+body.auth-page {
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    min-width: 100vw;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+}
+
+
 .container {
     height: auto;
-    width: 95vw;
+    width: 100%;
+    margin: 0;
 }
 
 p {

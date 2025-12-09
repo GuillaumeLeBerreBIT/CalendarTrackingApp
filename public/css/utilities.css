@@ -1,6 +1,13 @@
 .container {
+
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+
     height: auto;
-    width: 95vw;
+    width: 100%;
+    margin: 0;
 }
 
 .card-shape {
@@ -94,8 +101,9 @@
 
     display: flex;
 
-    margin: 0 auto;
+    margin: 0;
     height: 95vh;
+    width: 95vw;
     justify-content: center;
     align-items: center;
 }
