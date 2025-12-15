@@ -159,7 +159,7 @@
 /* Make sure now the CSS will only effect on smaller screens*/
 @media(max-width: 800px ) {
     
-    body {
+    body.app-page {
         grid-template-columns: 1fr;
 
     }
