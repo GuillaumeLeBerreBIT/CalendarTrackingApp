@@ -744,7 +744,7 @@ app.get('/renderEvents', authRequire, async (req, res) => {
         }
 
         const participants = e.profiles_events.map((p) => {
-          return p.profiles.username
+          return {username: p.profiles.username, userId: p.user_id};
         });
 
         return {
@@ -757,7 +757,9 @@ app.get('/renderEvents', authRequire, async (req, res) => {
           extendedProps : {
             description: e.event_description,
             participants: participants,
-            groupName: groupsTagNames?.[e.groups_id] || ''
+            groupName: groupsTagNames?.[e.groups_id] || '',
+            groupId: e.groups_id || '',
+
           }
         }
       })

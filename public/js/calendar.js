@@ -29,7 +29,8 @@ async function showUpcomingEvents(events) {
       e.extendedProps.participants.forEach(p => {
         const divPart = document.createElement('div');
         divPart.classList.add('badge-secondary');
-        divPart.textContent = p
+        divPart.textContent = p.username
+        divPart.dataset.userId = p.userId;
         eventParts.appendChild(divPart);
       }) 
     }
@@ -277,6 +278,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     modalOverlayEvent.querySelector("#event-description").textContent =
       event?.extendedProps.description || "No description given.";
 
+    const buttonEditEvent = modalOverlayEvent.querySelector('button#edit-event');
+      
     if (event.end) {
       endDate = event.end.toLocaleDateString("nl-BE", {
         weekday: "long",
@@ -318,7 +321,8 @@ document.addEventListener("DOMContentLoaded", async function () {
       event.extendedProps.participants.forEach(p => {
         const partiDiv = document.createElement('div');
         partiDiv.className = 'badge-secondary';
-        partiDiv.textContent = p;
+        partiDiv.textContent = p.username;
+        partiDiv.dataset.userId = p.userId;
         
         modalOverlayEvent.querySelector("#event-participants").appendChild(partiDiv);
       });
