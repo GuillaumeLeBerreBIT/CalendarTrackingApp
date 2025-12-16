@@ -599,11 +599,12 @@ app.post("/addEvent", authRequire, async (req, res) => {
       {
         event_title: insertEventObj["calendar-title"],
         event_description: insertEventObj["calendar-description"],
-        all_day: insertEventObj["allDay"],
-        start_date: insertEventObj["startDate"],
-        end_date: insertEventObj["endDate"],
-        start_time: insertEventObj["startTime"],
-        end_time: insertEventObj["endTime"],
+        all_day: insertEventObj.allDay,
+        start_date: insertEventObj.startDate,
+        end_date: insertEventObj.endDate,
+        start_time: insertEventObj.startTime,
+        end_time: insertEventObj.endTime,
+        groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : '' 
       },
     ])
     .select();
@@ -635,8 +636,14 @@ app.post("/addEvent", authRequire, async (req, res) => {
 
       const userArray = [];
       insertEventObj.participants.forEach(u => { userArray.push(u.username)});
+      
+      const participants = eventUsersInvited.map( p => {
 
-      res.json({ success: true, eventData: eventData, participants: userArray });
+        const userMatch = insertEventObj.participants.find(u => u.userId === p.user_id);
+        return {username: userMatch.username, userId: p.user_id}
+      })
+
+      res.json({ success: true, eventData: eventData, participants: participants });
     } 
 
   } else {
@@ -758,7 +765,7 @@ app.get('/renderEvents', authRequire, async (req, res) => {
             description: e.event_description,
             participants: participants,
             groupName: groupsTagNames?.[e.groups_id] || '',
-            groupId: e.groups_id || '',
+            groupsId: e.groups_id || '',
 
           }
         }

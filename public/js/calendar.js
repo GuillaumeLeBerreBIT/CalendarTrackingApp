@@ -54,6 +54,16 @@ document.addEventListener("DOMContentLoaded", async function () {
   const loadedEvents = await loadInEvents();
   showUpcomingEvents(loadedEvents)
 
+  let currentEvent = null
+  modalOverlayEvent.addEventListener('click', (e) => {
+
+    if (e.target.id === 'edit-event') {
+      if (currentEvent) {
+        updateEventForm(currentEvent);
+      }
+    }
+  })
+
   let calendar = new FullCalendar.Calendar(calendarEl, {
     pre: 'chevron-left',
     next: 'chevron-right',
@@ -105,12 +115,12 @@ document.addEventListener("DOMContentLoaded", async function () {
     dateClick: function (info) {
       //Need to prefill form with current dates
       modalOverlayForm.style.setProperty("display", "flex");
-
       modalOverlayForm.querySelector('#startDate').value = info.dateStr;
       modalOverlayForm.querySelector('#endDate').value = info.dateStr;
     },
     eventClick: function (info) {
-      updateShowModalEvent(info.event);
+      updateShowModalEvent(info.event); // Later need to reclose it
+      currentEvent = info.event;
       document.querySelector("#modal-overlay-event").style.display = "flex";
     },
     eventMouseEnter: function (info) {
@@ -240,6 +250,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         extendedProps: {
           participants: response.data.participants || [],
           description: response.data.eventData[0]["event_description"],
+          groupsId: response.data.eventData[0].groups_id
         }
       });
 
@@ -278,8 +289,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     modalOverlayEvent.querySelector("#event-description").textContent =
       event?.extendedProps.description || "No description given.";
 
-    const buttonEditEvent = modalOverlayEvent.querySelector('button#edit-event');
-      
     if (event.end) {
       endDate = event.end.toLocaleDateString("nl-BE", {
         weekday: "long",
@@ -316,7 +325,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         ? `${startTime} - ${startDate}`
         : `${startDate}`;
     }
-
+    
+    modalOverlayEvent.querySelector('#event-participants').innerHTML = '';
     try {
       event.extendedProps.participants.forEach(p => {
         const partiDiv = document.createElement('div');
@@ -379,4 +389,54 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     return usersInvited;
   };
+
+  function updateEventForm (event, startDate, endDate) {
+    modalOverlayEvent.style.setProperty('display', 'none');
+    modalOverlayForm.style.setProperty("display", "flex");
+
+    modalOverlayForm.querySelector('#calendar-title').value = event.title;
+    modalOverlayForm.querySelector('#calendar-description').value = event?.extendedProps.description;
+    modalOverlayForm.querySelector('#startDate').value = event.startStr;
+    modalOverlayForm.querySelector('#endDate').value = event.endStr ? event.endStr : event.startStr;
+
+    if (event.allDay) modalOverlayForm.querySelector('#allDay').checked = true;
+
+    // Need to select the corect group
+    const selectGroup = modalOverlayForm.querySelector('select#tagNames');
+
+    if (selectGroup && event.extendedProps?.groupId) {
+
+      const currentIndex = Array.from(selectGroup.options).findIndex(option => option.value === event?.extendedProps?.groupId)
+      selectGroup.selectedIndex = currentIndex
+
+    }
+
+    //Need to check the matching users
+
+    //Need to make sure the form will be sent to be updated. 
+
+  }
 });
+
+
+    // if (event.extendedProps.groupId) {
+    //   selectGroup.value = event.extendedProps.groupId;
+    //   // Trigger change event to load users for this group
+    //   selectGroup.dispatchEvent(new Event('change'));
+    // }
+
+    // // Pre-select the participants that were invited
+    // if (event.extendedProps.participants && event.extendedProps.participants.length > 0) {
+    //   setTimeout(() => {
+    //     event.extendedProps.participants.forEach(p => {
+    //       const userPill = document.querySelector(`#participants-container .user-pill[data-user-id="${p.userId}"]`);
+    //       if (userPill) {
+    //         userPill.classList.add('selected');
+    //       }
+    //     });
+    //   }, 100); // Small delay to ensure users are loaded first
+    // }
+
+    // // Mark form as edit mode (not implemented yet - see step 2)
+    // form.dataset.mode = 'edit';
+    // form.dataset.eventId = event.id;

@@ -117,14 +117,6 @@
   font-weight: 500;
 }
 
-.justify-start {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-
-  gap: 20px;
-}
-
 .justify-between {
   display: flex;
   justify-content: space-between;
