@@ -1,3 +1,5 @@
+import axios from "axios";
+
 async function showUpcomingEvents(events) {
   const now = new Date();
 
@@ -41,6 +43,7 @@ async function showUpcomingEvents(events) {
 }
 
 document.addEventListener("DOMContentLoaded", async function () {
+  let isUpdate = false; let eventId;
   const calendarEl = document.querySelector("#calendar");
   const modalOverlayForm = document.querySelector("#modal-overlay");
   const closeBtn = document.querySelector("#close-btn");
@@ -232,33 +235,43 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     data.participants = retrieveAllSelectedUsers();
 
+    if (isUpdate) {
+      // Need to peorform an update here 
+      let response = await axios.patch('/updateEvent', data);
+
+      
+    } else {
+
     let response = await axios.post("/addEvent", data);
 
     // Handle response to add event to the calendar
-    if (response.data.success) {
-      calendar.addEvent({
-        id: response.data.eventData[0]["event_id"],
-        title: response.data.eventData[0]["event_title"],
-        start: `${response.data.eventData[0]["start_date"]}`,
-        end: `${response.data.eventData[0]["end_date"]}`,
-        startTime: response.data.eventData[0]["start_time"],
-        endTime: response.data.eventData[0]["end_time"],
-        allDay: response.data.eventData[0]["all_day"],
-        backgroundColor: '#4a9d5f',
-        borderColor: '#4a9d5f',
-        textColor: 'white',
-        extendedProps: {
-          participants: response.data.participants || [],
-          description: response.data.eventData[0]["event_description"],
-          groupsId: response.data.eventData[0].groups_id
-        }
-      });
+      if (response.data.success) {
+        calendar.addEvent({
+          id: response.data.eventData[0]["event_id"],
+          title: response.data.eventData[0]["event_title"],
+          start: `${response.data.eventData[0]["start_date"]}`,
+          end: `${response.data.eventData[0]["end_date"]}`,
+          startTime: response.data.eventData[0]["start_time"],
+          endTime: response.data.eventData[0]["end_time"],
+          allDay: response.data.eventData[0]["all_day"],
+          backgroundColor: '#4a9d5f',
+          borderColor: '#4a9d5f',
+          textColor: 'white',
+          extendedProps: {
+            participants: response.data.participants || [],
+            description: response.data.eventData[0]["event_description"],
+            groupsId: response.data.eventData[0].groups_id
+          }
+        });
 
-      modalOverlayForm.style.setProperty("display", "none");
-    } else {
-      modalOverlayForm.style.setProperty("display", "none");
-      alert("Something went wrong, could not be able to create an event ...");
+        modalOverlayForm.style.setProperty("display", "none");
+      } else {
+        modalOverlayForm.style.setProperty("display", "none");
+        alert("Something went wrong, could not be able to create an event ...");
+      }
     }
+
+    resetForm();
   }
 
   async function loadInEvents() {
@@ -362,7 +375,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       div.dataset.userId = u.userId
       div.textContent = u.username
 
-      div.addEventListener('click', (event) => {
+      div.addEventListener('click', (e) => {
         div.classList.toggle('selected');
       })
 
@@ -390,7 +403,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     return usersInvited;
   };
 
-  function updateEventForm (event, startDate, endDate) {
+  async function updateEventForm (event, startDate, endDate) {
+    isUpdate = true;
+    eventId = event.id
+
     modalOverlayEvent.style.setProperty('display', 'none');
     modalOverlayForm.style.setProperty("display", "flex");
 
@@ -399,25 +415,54 @@ document.addEventListener("DOMContentLoaded", async function () {
     modalOverlayForm.querySelector('#startDate').value = event.startStr;
     modalOverlayForm.querySelector('#endDate').value = event.endStr ? event.endStr : event.startStr;
 
-    if (event.allDay) modalOverlayForm.querySelector('#allDay').checked = true;
+    if (event.allDay) {
+      modalOverlayForm.querySelector('#allDay').checked = true;
+      modalOverlayForm.querySelector('#endTime').style.display = 'none'
+      modalOverlayForm.querySelector('#startTime').style.display = 'none'
+
+    }
 
     // Need to select the corect group
     const selectGroup = modalOverlayForm.querySelector('select#tagNames');
 
-    if (selectGroup && event.extendedProps?.groupId) {
+    if (selectGroup && event.extendedProps?.groupsId) {
 
-      const currentIndex = Array.from(selectGroup.options).findIndex(option => option.value === event?.extendedProps?.groupId)
-      selectGroup.selectedIndex = currentIndex
+      const currentIndex = Array.from(selectGroup.options).findIndex(option => parseInt(option.value) === event?.extendedProps?.groupsId)
+      
+      if (currentIndex !== -1) {
+        selectGroup.selectedIndex = currentIndex
 
+        selectGroup.dispatchEvent(new Event('change')) // To trigger an already existing event. More research on it.
+      
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        if (event?.extendedProps?.participants) {
+          selectParticipants(event.extendedProps.participants)
+
+        }
+      }
     }
-
-    //Need to check the matching users
-
     //Need to make sure the form will be sent to be updated. 
 
   }
-});
 
+  function selectParticipants(participants) {
+    
+    const participantsId = participants.map( p => p.userId);
+
+    document.querySelectorAll('#participants-container .user-pill').forEach( pill => {
+
+      if (participantsId.includes(pill.dataset.userId)) pill.classList.add('selected');
+    })
+  }
+
+  function resetForm() {
+    isUpdate = false;
+    eventId = null;
+    form.reset();
+  }
+
+});
 
     // if (event.extendedProps.groupId) {
     //   selectGroup.value = event.extendedProps.groupId;
