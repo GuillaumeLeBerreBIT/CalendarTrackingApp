@@ -8,7 +8,7 @@ import "dotenv/config";
 import bcrypt from "bcrypt";
 import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
-import validatePassword from "./utils/utils.js";
+import {validatePassword, createEventObj} from "./utils/utils.js";
 import { stat } from "fs";
 import { error, group } from "console";
 import { format } from 'date-fns';
@@ -577,21 +577,23 @@ app.post('/declineInviteGroup', authRequire, async (req, res) => {
 })
 
 //API Endpoints
-app.post("/addEvent", authRequire, async (req, res) => {
-  const insertEventObj = {};
+app.post("/parseEvent", authRequire, async (req, res) => {
+  // const insertEventObj = {};
 
-  for (let [key, val] of Object.entries(req.body)) {
-    insertEventObj[key] = val;
-  }
+  // for (let [key, val] of Object.entries(req.body)) {
+  //   insertEventObj[key] = val;
+  // }
 
-  if (!insertEventObj["startTime"] || !insertEventObj["startTime"]) {
-    insertEventObj.allDay = true
-  }
+  // if (!insertEventObj["startTime"] || !insertEventObj["startTime"]) {
+  //   insertEventObj.allDay = true
+  // }
 
-  if (insertEventObj.allDay) {
-    insertEventObj['startTime'] = null,
-    insertEventObj['endTime'] = null
-  }
+  // if (insertEventObj.allDay) {
+  //   insertEventObj['startTime'] = null,
+  //   insertEventObj['endTime'] = null
+  // }
+
+  const insertEventObj = createEventObj(req.body)
 
   const { data: eventData, error: eventDataError } = await supabase
     .from("events")
@@ -670,6 +672,105 @@ app.post("/addEvent", authRequire, async (req, res) => {
   } 
 
 });
+
+app.put('/parseEvent/:eventId', authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId);
+  const updateEventObj = createEventObj(req.body)
+
+  const {data: updateEvent, error: updateEventError} = await supabase
+  .from('events')
+  .update({
+    event_title: updateEventObj["calendar-title"],
+    event_description: updateEventObj["calendar-description"],
+    all_day: updateEventObj.allDay,
+    start_date: updateEventObj.startDate,
+    end_date: updateEventObj.endDate,
+    start_time: updateEventObj.startTime,
+    end_time: updateEventObj.endTime,
+    groups_id: updateEventObj?.tagNames ? parseInt(updateEventObj?.tagNames) : '' 
+  })
+  .eq('event_id', eventId)
+  .select()
+
+  if (updateEventError) {
+    return res.status(500).json({success: false, error: updateEventError.message})
+  }
+
+  const {data: eventParticipants, error: eventParticipantsError} = await supabase
+  .from('profiles_events')
+  .select()
+  .eq('event_id', eventId);
+  
+  if (eventParticipantsError) {
+
+    res.status(500).json({success: false, error: eventParticipantsError.message})
+  }
+
+  const userIdArray = updateEventObj.participants.map(p => p.userId)
+
+
+  if (eventParticipants) {
+    const eventParticipantsUpdated = eventParticipants.map(p => {
+
+      if (userIdArray.includes(p.user_id)) {
+        return {
+          user_id: p.user_id,
+          event_id: eventId,
+          rsvp_status: 'accepted',
+        }
+      } else {
+          return {
+            user_id: p.user_id,
+            event_id: eventId,
+            rsvp_status: 'declined',
+        }
+      }
+
+    })
+
+    const users2Update = eventParticipantsUpdated.map( p => p.user_id)
+    updateEventObj.participants.forEach(p => {
+      if (!users2Update.includes(p.userId)) {
+        eventParticipantsUpdated.push({
+          user_id: p.userId,
+          event_id: eventId,
+          rsvp_status: 'accepted',
+        })
+      }
+    })
+
+    const {data: upsertUsers, error: upsertUsersError} = await supabase
+    .upsert(eventParticipantsUpdated)
+    .select()
+
+  } else {
+
+    const { data: updateUser, error: updateUserError } = await supabase
+    .update({
+      user_id: req.cookies.userId,
+      event_id: eventId,
+      rsvp_status: 'accepted',
+    })
+    .eq('event_id', eventId)
+    .select()
+  }
+  
+  res.json({success: true, eventData: updateEvent})
+})
+  
+app.get('/renderEvents', authRequire, async (req, res) => {
+  const {data: profileEvents, error: profileEventsError} = await supabase
+  .from('profiles_events')
+  .select()
+
+  if (updateEventObj.participants.length !== 0) {
+
+  } else {
+
+  }
+
+  res.json({success: true, eventData: updateEvent})
+})
 
 app.get('/renderEvents', authRequire, async (req, res) => {
   const {data: profileEvents, error: profileEventsError} = await supabase

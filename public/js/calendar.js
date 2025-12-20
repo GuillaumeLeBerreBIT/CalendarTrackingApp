@@ -1,5 +1,3 @@
-import axios from "axios";
-
 async function showUpcomingEvents(events) {
   const now = new Date();
 
@@ -112,10 +110,17 @@ document.addEventListener("DOMContentLoaded", async function () {
     multiMonthMaxColumns: 1,
     contentHeight: "auto",
     nowIndicator: true,
-    events: loadedEvents, // Its async need to make sure use async as well
+    events: loadedEvents,
 
     // Cick on calander field to add an event.
     dateClick: function (info) {
+
+      form.resetForm();
+      form.setAttribute('formaction', '/createEvent');
+      const updateBtn = modalOverlayForm.querySelector('button[type=submit]');
+      updateBtn.textContent = 'Add Event'
+      modalOverlayForm.querySelector('h3').textContent = 'Add Event'
+
       //Need to prefill form with current dates
       modalOverlayForm.style.setProperty("display", "flex");
       modalOverlayForm.querySelector('#startDate').value = info.dateStr;
@@ -185,7 +190,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    createEvent();
+    parseEvent();
   });
 
   checkWholeDay.addEventListener("change", function () {
@@ -218,7 +223,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
-  async function createEvent() {
+  async function parseEvent() {
     const formData = new FormData(form);
 
     const data = {};
@@ -237,12 +242,12 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     if (isUpdate) {
       // Need to peorform an update here 
-      let response = await axios.patch('/updateEvent', data);
+      let response = await axios.put(`/parseEvent/${eventId}`, data);
 
-      
+      console.log('Updated event.')
     } else {
 
-    let response = await axios.post("/addEvent", data);
+    let response = await axios.post("/parseEvent", data);
 
     // Handle response to add event to the calendar
       if (response.data.success) {
@@ -443,6 +448,10 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     }
     //Need to make sure the form will be sent to be updated. 
+    form.setAttribute('formaction', '/updateEvent');
+    const updateBtn = modalOverlayForm.querySelector('button[type=submit]');
+    updateBtn.textContent = 'Update Event'
+    modalOverlayForm.querySelector('h3').textContent = 'Update Event'
 
   }
 
