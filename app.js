@@ -667,7 +667,10 @@ app.post("/parseEvent", authRequire, async (req, res) => {
       res.status(500).json({ success: false, error: error.message });
     } else {
 
-      res.json({ success: true, eventData, participants: [user[0]?.username]});
+    res.json({ success: true, eventData, participants: [{
+      username: user[0]?.username,
+      userId: req.cookies.userId
+    }]});
     } 
   } 
 
@@ -708,7 +711,7 @@ app.put('/parseEvent/:eventId', authRequire, async (req, res) => {
 
   const userIdArray = updateEventObj.participants.map(p => p.userId)
 
-
+  let updatedParticipants;
   if (eventParticipants) {
     const eventParticipantsUpdated = eventParticipants.map(p => {
 
@@ -740,12 +743,20 @@ app.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     })
 
     const {data: upsertUsers, error: upsertUsersError} = await supabase
+    .from('profiles_events')
     .upsert(eventParticipantsUpdated)
     .select()
+
+    if (upsertUsersError) {
+      return res.status(500).json({success: false, error: updateEventError.message})
+    }
+
+    updatedParticipants = updateEventObj.participants;
 
   } else {
 
     const { data: updateUser, error: updateUserError } = await supabase
+    .from('profiles_events')
     .update({
       user_id: req.cookies.userId,
       event_id: eventId,
@@ -753,24 +764,26 @@ app.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     })
     .eq('event_id', eventId)
     .select()
+
+    const {data: user, error: userError} = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('user_id', req.cookies.userId)
+    .limit(1);
+
+    if (eventProfileError) {
+      res.status(500).json({ success: false, error: error.message });
+    } else {
+      updatedParticipants = {
+        userId: req.cookies.userId,
+        username: user[0].username
+      }
+    }
   }
-  
-  res.json({success: true, eventData: updateEvent})
+
+  res.json({success: true, eventData: updateEvent, participants: updatedParticipants || []})
 })
-  
-app.get('/renderEvents', authRequire, async (req, res) => {
-  const {data: profileEvents, error: profileEventsError} = await supabase
-  .from('profiles_events')
-  .select()
 
-  if (updateEventObj.participants.length !== 0) {
-
-  } else {
-
-  }
-
-  res.json({success: true, eventData: updateEvent})
-})
 
 app.get('/renderEvents', authRequire, async (req, res) => {
   const {data: profileEvents, error: profileEventsError} = await supabase

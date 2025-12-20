@@ -231,10 +231,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       data[key] = val;
     }
 
-    if (
-      !data.hasOwnProperty("allDay") ||
-      (!data["startTime"] && !data["endTime"])
-    ) {
+    if (!data.hasOwnProperty("allDay") || (!data["startTime"] && !data["endTime"])) {
       data["allDay"] = false;
     }
 
@@ -243,13 +240,28 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (isUpdate) {
       // Need to peorform an update here 
       let response = await axios.put(`/parseEvent/${eventId}`, data);
+      if (response.data.success) {
+        const outdatedEvent = calendar.getEventById(eventId)
+        const newEvent = response.data.eventData[0]
 
-      console.log('Updated event.')
+        if (outdatedEvent) {
+          outdatedEvent.setProp('title', newEvent['event_title'])
+          outdatedEvent.setStart(newEvent['start_date'])
+          outdatedEvent.setEnd(newEvent['end_date'])
+          outdatedEvent.setAllDay(newEvent['all_day'])
+          outdatedEvent.setExtendedProp('description', newEvent["event_description"]);
+          outdatedEvent.setExtendedProp('participants', response.data.participants || []);
+          outdatedEvent.setExtendedProp('groupsId', newEvent["groups_id"]);
+        }
+      }
+
+      modalOverlayForm.style.setProperty('display', 'none');
+
     } else {
 
-    let response = await axios.post("/parseEvent", data);
+      let response = await axios.post("/parseEvent", data);
 
-    // Handle response to add event to the calendar
+      // Handle response to add event to the calendar
       if (response.data.success) {
         calendar.addEvent({
           id: response.data.eventData[0]["event_id"],
@@ -472,25 +484,3 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 });
-
-    // if (event.extendedProps.groupId) {
-    //   selectGroup.value = event.extendedProps.groupId;
-    //   // Trigger change event to load users for this group
-    //   selectGroup.dispatchEvent(new Event('change'));
-    // }
-
-    // // Pre-select the participants that were invited
-    // if (event.extendedProps.participants && event.extendedProps.participants.length > 0) {
-    //   setTimeout(() => {
-    //     event.extendedProps.participants.forEach(p => {
-    //       const userPill = document.querySelector(`#participants-container .user-pill[data-user-id="${p.userId}"]`);
-    //       if (userPill) {
-    //         userPill.classList.add('selected');
-    //       }
-    //     });
-    //   }, 100); // Small delay to ensure users are loaded first
-    // }
-
-    // // Mark form as edit mode (not implemented yet - see step 2)
-    // form.dataset.mode = 'edit';
-    // form.dataset.eventId = event.id;
