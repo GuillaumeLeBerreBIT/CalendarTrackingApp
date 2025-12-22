@@ -19,7 +19,7 @@ async function showUpcomingEvents(events) {
     }
 
     if (e.start != e.end) {
-      upcomingClone.querySelector('#endDate') = e.end;
+      upcomingClone.querySelector('#endDate').textContent = e.end;
     } else {
       upcomingClone.querySelector('#endDate').remove();
     }
@@ -115,7 +115,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     // Cick on calander field to add an event.
     dateClick: function (info) {
 
-      form.resetForm();
+      resetForm();
       form.setAttribute('formaction', '/createEvent');
       const updateBtn = modalOverlayForm.querySelector('button[type=submit]');
       updateBtn.textContent = 'Add Event'

@@ -5,7 +5,7 @@
   flex-wrap: wrap;
 
   gap: 1rem;
-  width: 80vw;
+  width: 80%;
   margin: 20px auto;
   padding: 10px;
 }
@@ -95,16 +95,6 @@
 
   width: 100%;
   gap: 10px;
-}
-
-.card-shape {
-  padding: 20px;
-
-  background-color: oklch(0.97 0 0);
-  border-radius: 0.75rem;
-
-  border: 1px solid oklch(0.922 0 0);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .badge-secondary {

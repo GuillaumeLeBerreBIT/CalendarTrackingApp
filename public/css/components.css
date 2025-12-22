@@ -21,6 +21,22 @@ button {
     cursor: pointer;
 }
 
+button.delete {
+  padding: 5px;
+  margin-top: 5px;
+  background-color: oklch(62.72% 0.24513 28.19 / 0.955);
+  width: 36px;
+  height: 36px;
+}
+
+button.edit {
+  padding: 5px;
+  margin-top: 5px;
+  background-color: oklch(57.81% 0.1776 147.5);
+  width: 36px;
+  height: 36px;
+}
+
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -138,7 +154,7 @@ select
   align-items: flex-start;
   gap: 15px;
   /* margin: 0 6% 0 6%; */
-  width: 80%;
+  width: 90%;
   box-sizing: border-box;
 
   h3 {
@@ -169,7 +185,8 @@ select
 .left-border {
   border-left: 4px solid oklch(57.81% 0.1776 147.5);
   padding: 0 0 0 8px;
-  border-radius: 0.25rem;;
+  border-radius: 0.25rem;
+  margin-top: 5px;
 }
 
 .participants-box {
