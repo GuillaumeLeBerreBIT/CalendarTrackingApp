@@ -173,7 +173,7 @@ app.get("/groups", authRequire, async (req, res) => {
   .from('profiles_groups')
   .select('groups_id')
   .eq('user_id', req.cookies.userId)
-  .neq('invite_status', 'declined');
+  .eq('invite_status', 'accepted');
 
   if (userMembershipsError) {
     return res.status(400).json({success: false, error: membershipsError.message});
@@ -388,36 +388,69 @@ app.post('/checkUser', authRequire ,async (req, res) => {
 app.post('/InviteUsers', authRequire, async (req, res) => {
 
   try {
-    const invitePromises = req.body.userList.map(async (u) => {
-      const {data: inviteUser, error: inviteUserError} = await supabase
-      .from('profiles_groups')
-      .upsert({
+
+    const userIds = req.body.userList.map(u => u.user_id)
+
+    const {data: users2Check, error: users2CheckError } = await supabase
+    .from('profiles_groups')
+    .select()
+    .in('user_id', userIds)
+    .eq('groups_id', req.body.groupId);
+
+    const existingUsers = users2Check.filter(u => u.invite_status === 'accepted'
+      || u.invite_status === 'pending'
+    ).map(u => u.user_id) || [];
+
+    const users2Invite = req.body.userList.filter(u => !existingUsers.includes(u.user_id))
+
+    if (users2Invite.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All users are already members or invited',
+      })
+    }
+
+    const inviteUserDb = users2Invite.map(u => {
+      return {
         invite_status: 'pending',
         user_id: u.user_id,
         groups_id: req.body.groupId,
         role: 'member'
-      })
+      }
+    })
+
+    const {data: inviteUsers, error: inviteUsersError} = await supabase
+      .from('profiles_groups')
+      .upsert(inviteUserDb) // Need upsert if there is a declined in there
       .select()
 
-      const {data: userMail, error: userMailError} = await supabase
+    if (inviteUsersError) {
+      return res.status(500).json({success: false, error: inviteUsersError.message})
+    }
+
+    const emailIdList = inviteUsers.map(u => u.user_id)
+
+    const {data: userProfile, error: userProfileError} = await supabase
       .from('profiles')
-      .select('email')
-      .eq('user_id', u.user_id)
-      .limit(1)
+      .select('email, user_id, username')
+      .in('user_id', emailIdList)
+    
+    if (userProfileError) {
+      return res.status(500).json({success: false, error: userProfileError.message})
+    }
 
-      if (userMailError) throw userMailError;
+    const invitedUsersCompleted = inviteUsers.map(invite => {
+      const profile = userProfile?.find(p => p.user_id === invite.user_id);
+      return {
+        ...invite,
+        username: profile.username,
+        email: profile.email
+      }
+    })
 
-      if (inviteUserError) throw inviteUserError;
-
-      inviteUser[0]['email'] = userMail[0]?.email
-      return inviteUser;
-    });
-
-    const result = await Promise.all(invitePromises) // ForEach doesnt work well with Async, won't wait.
-
-    if (result) {
-      res.json({success: true, message: `You invited ${result.length}`,
-      invitedUsers: result})
+    if (invitedUsersCompleted) {
+      res.json({success: true, message: `You invited ${invitedUsersCompleted.length}`,
+      invitedUsers: invitedUsersCompleted})
     } else {
       res.status(400).json({success: false, error: "Couldn't send invite to the selected users."})
     }
