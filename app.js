@@ -80,7 +80,7 @@ app.get("/calendar", authRequire, async (req, res) => {
     groupsTagNames[g.groups_id] = g.tag_name
   })
 
-  res.render("calendar.ejs", {groupsTagNames: groupsTagNames});
+  res.render("calendar.ejs", {groupsTagNames: groupsTagNames, currentPage: 'calendar'});
 });
 
 app.get("/todo", authRequire, async (req, res) => {
@@ -162,7 +162,8 @@ app.get("/todo", authRequire, async (req, res) => {
 
   res.render("todo.ejs", {
     yourTaskLists,
-    groupTagObj: tagNameObj,
+    groupTagObj: tagNameObj, 
+    currentPage: 'todo'
   });
 });
 
@@ -263,7 +264,10 @@ app.get("/groups", authRequire, async (req, res) => {
     .eq('user_id', req.cookies.userId)
     .eq('invite_status', 'pending');
 
-  res.render("groups.ejs", { userGroups, yourGroups: groups.length, totalEvents, userInvites : userInvites || [] });
+  res.render("groups.ejs", { userGroups, yourGroups: groups.length, 
+    totalEvents, 
+    userInvites : userInvites || [], 
+    currentPage: 'groups' });
 });
 
 //Load the User login pages
@@ -578,20 +582,6 @@ app.post('/declineInviteGroup', authRequire, async (req, res) => {
 
 //API Endpoints
 app.post("/parseEvent", authRequire, async (req, res) => {
-  // const insertEventObj = {};
-
-  // for (let [key, val] of Object.entries(req.body)) {
-  //   insertEventObj[key] = val;
-  // }
-
-  // if (!insertEventObj["startTime"] || !insertEventObj["startTime"]) {
-  //   insertEventObj.allDay = true
-  // }
-
-  // if (insertEventObj.allDay) {
-  //   insertEventObj['startTime'] = null,
-  //   insertEventObj['endTime'] = null
-  // }
 
   const insertEventObj = createEventObj(req.body)
 
