@@ -58,9 +58,15 @@ document.addEventListener("DOMContentLoaded", async function () {
   let currentEvent = null
   modalOverlayEvent.addEventListener('click', (e) => {
 
-    if (e.target.id === 'edit-event') {
+    if (e.target.closest('#edit-event')) {
       if (currentEvent) {
         updateEventForm(currentEvent);
+      }
+    }
+
+    if (e.target.closest('#delete-event')) {
+      if (currentEvent) {
+        deleteEvent(currentEvent)
       }
     }
   })
@@ -465,6 +471,32 @@ document.addEventListener("DOMContentLoaded", async function () {
     updateBtn.textContent = 'Update Event'
     modalOverlayForm.querySelector('h3').textContent = 'Update Event'
 
+  }
+
+  async function deleteEvent(event) {
+    eventId = event.id
+    try {
+      const response = await axios.delete(`/parseEvent/${eventId}`);
+
+      if (response.status === 204 || response.data?.success) {
+            const matchEvent = calendar.getEventById(eventId);
+            
+            if (matchEvent) {
+                matchEvent.remove();
+                
+                modalOverlayEvent.style.display = 'none';
+                
+                alert('Event deleted successfully!');
+            } else {
+                console.warn('Event not found in calendar');
+            }
+        } else {
+            alert('Failed to delete event from server');
+        }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      alert('Unable to delete the event. Please try again.');
+    }
   }
 
   function selectParticipants(participants) {

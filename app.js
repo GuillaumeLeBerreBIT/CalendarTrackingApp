@@ -784,6 +784,37 @@ app.put('/parseEvent/:eventId', authRequire, async (req, res) => {
   res.json({success: true, eventData: updateEvent, participants: updatedParticipants || []})
 })
 
+app.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
+  try {
+    const eventId = parseInt(req.params.eventId)
+
+    const {error: deleteEventError } = await supabase
+    .from('events')
+    .delete()
+    .eq('event_id', eventId)
+
+    if (deleteEventError) {
+      return res.status(500).json({success: false, error: deleteEventError.message})
+    }
+
+    const {error: deleteProfileError } = await supabase
+    .from('profiles_events')
+    .delete()
+    .eq('event_id', eventId)
+
+    if (deleteProfileError) {
+      return res.status(500).json({success: false, error: deleteProfileError.message})
+    }
+
+    res.sendStatus(204);
+    
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+  
+})
+
 
 app.get('/renderEvents', authRequire, async (req, res) => {
   const {data: profileEvents, error: profileEventsError} = await supabase
