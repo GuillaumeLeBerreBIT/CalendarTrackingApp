@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   const form = document.querySelector("#form-calendar");
   const checkWholeDay = document.querySelector(".all-day");
   const selectedTagName = document.querySelector('#tagNames');
+  const navbarToggle = document.querySelector('button#toggle-btn')
 
   const modalOverlayEvent = document.querySelector("#modal-overlay-event");
 
@@ -191,6 +192,12 @@ document.addEventListener("DOMContentLoaded", async function () {
     document
       .querySelector("#modal-overlay-event")
       .style.setProperty("display", "none");
+  });
+
+  navbarToggle.addEventListener('click', (e) => {
+    setTimeout(() => {
+      calendar.updateSize();
+    }, 500)
   });
 
   // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event
