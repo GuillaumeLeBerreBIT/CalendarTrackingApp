@@ -174,7 +174,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         info.el.tooltip = null;
       }
     },
-
+    eventDisplay: 'block',
     eventContent: function (info) {
       let content;
 
