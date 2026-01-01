@@ -173,8 +173,33 @@ document.addEventListener("DOMContentLoaded", async function () {
         info.el.tooltip.remove();
         info.el.tooltip = null;
       }
+    },
+
+    eventContent: function (info) {
+      let content;
+
+      content = `<div class="fc-event-title">${info.event.title}</div>`
+
+      if (info?.timeText) {
+        content = `<div class="fc-event-time">${info.timeText}</div>` + content;
+      }
+
+      if (info.event.extendedProps?.participants.length > 0) {
+
+        const initials = info.event.extendedProps.participants.slice(0,3).map(p => 
+          `<div class="event-initial">${p.username.charAt(0).toUpperCase()}</div>`
+        ).join('')
+
+        let remaining = info.event.extendedProps?.participants.length > 3
+        ?`<div class="event-initial-more">+${info.event.extendedProps?.participants.length - 3}</div>`
+        :''
+
+        content = `<div class="fc-event-initials">${initials}${remaining}</div>` + content
+
+      }
+
+      return {html: `<div class="fc-event-main-frame">${content}</div>`}
     }
-    // Remove Event from the calander
   });
 
   calendar.render();
@@ -197,7 +222,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   navbarToggle.addEventListener('click', (e) => {
     setTimeout(() => {
       calendar.updateSize();
-    }, 500)
+    }, 280)
   });
 
   // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event

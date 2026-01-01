@@ -197,7 +197,7 @@
     font-weight: 500;
     line-height: 20px;
     box-shadow: rgba(27, 31, 35, 0.1) 0 1px 0;
-    background: oklch(57.81% 0.1776 147.5);
+    background: lch(53.4% 68.13 142.76);
     color: white;
     cursor: pointer;
   }
@@ -304,6 +304,7 @@ div.fc-event-time {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-sizing: border-box;
   /*font-size: 0.75em;*/ /* Make time smaller on mobile */
 }
 
@@ -349,6 +350,50 @@ td.fc-day.fc-day-sun {
 
 #event-start-date, #event-end-date {
   font-weight: 600;
+}
+
+.fc-event-initials {
+  display: flex;
+  gap: 2px;
+  margin-right: 5px;
+}
+
+.event-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.event-initial-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  color: white;
+  font-size: 9px;
+  font-weight: bold;
+}
+
+.fc-list-event .event-initial {
+  background: #4A9D5F;
+  color: white;
+  border: 1px solid rgba(74, 157, 95, 0.3);
+}
+
+div.fc-event-main-frame {
+  background: #4A9D5F;
+  
 }
 
 /* Make events smaller on mobile */
