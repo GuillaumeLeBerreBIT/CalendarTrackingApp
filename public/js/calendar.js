@@ -180,10 +180,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       content = `<div class="fc-event-title">${info.event.title}</div>`
 
-      if (info?.timeText) {
-        content = `<div class="fc-event-time">${info.timeText}</div>` + content;
-      }
-
       if (info.event.extendedProps?.participants.length > 0) {
 
         const initials = info.event.extendedProps.participants.slice(0,3).map(p => 
@@ -196,6 +192,10 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         content = `<div class="fc-event-initials">${initials}${remaining}</div>` + content
 
+      }
+
+      if (info?.timeText) {
+        content = `<div class="fc-event-time">${info.timeText}</div>` + content;
       }
 
       return {html: `<div class="fc-event-main-frame">${content}</div>`}

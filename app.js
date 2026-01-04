@@ -147,7 +147,7 @@ app.get("/todo", authRequire, async (req, res) => {
         idTl: tl.task_list_id,
         idG: tl.groups_id
       },
-      taskItems: tasks || [],
+      taskItems: tasks.sort(function(x, y) { return (x.is_completed === y.is_completed) ? 0: x.is_completed? 1: -1}) || [],
       totalTasks: tasks.length || 0,
       totalCompletedTasks: tasks.filter(t => t.is_completed === true).length || 0,
       progressWidth: (() => {
