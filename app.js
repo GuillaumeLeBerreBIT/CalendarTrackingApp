@@ -176,7 +176,7 @@ app.get("/groups", authRequire, async (req, res) => {
   .eq('invite_status', 'accepted');
 
   if (userMembershipsError) {
-    return res.status(400).json({success: false, error: membershipsError.message});
+    return res.status(400).json({success: false, error: userMembershipsError.message});
   }
 
   const groupIds = userMemberships.map(pg => pg.groups_id)
@@ -226,13 +226,19 @@ app.get("/groups", authRequire, async (req, res) => {
       //Need to retrieve all ToDo Lists
       const todoLists = await retrieveTodoLists(group.groups_id);
 
+      const totalTasks = todoLists.length > 0 ? await retrieveAllTasks(todoLists) : {all: 0, completed: 0};;
+
       return {
         groupInfo: {
           title: group.groups_title,
           description: group.groups_description,
           tag: group.tag_name,
           groupId: group.groups_id,
-          created_at: format(new Date(group.created_at), 'dd-MM-yyyy')
+          created_at: format(new Date(group.created_at), 'dd-MM-yyyy'),
+          totalTasks: totalTasks,
+          progressWidth: (() => {
+            return totalTasks.all > 0 ? (totalTasks.completed / totalTasks.all) * 100 : 0 
+          })()
         },
         members,
         events,
@@ -1081,5 +1087,23 @@ async function retrieveEvents(groupId) {
     console.log(`Couldn't retrieve any Events for groups Id: ${groupId}`)
     return []
   }
+}
 
+async function retrieveAllTasks(todoLists) {
+
+  const taskListIds = todoLists.map(t => t.task_list_id)
+
+  const {data: allEvents, error: allEventsError } = await supabase
+  .from('task')
+  .select(`*`)
+  .in('task_list_id', taskListIds);
+
+  if (allEventsError) {
+    console.error(`Something went wrong retrieving any events for this group: ${allEventsError.message}`)
+    return {all: 0, completed: 0};
+  }
+
+  const completedEvents = allEvents.filter(e => e.is_completed)
+
+  return {all: allEvents.length || 0, completed: completedEvents.length || 0}
 }

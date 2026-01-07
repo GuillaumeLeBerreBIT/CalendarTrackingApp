@@ -110,6 +110,17 @@
                         <span class="justify-center">+<%= remaining %> More members</span>
                         <% } %>
                         <hr>
+                        
+                        <div>
+                            <h4>Task Completion</h4>
+                            <div>
+                                <div class="progress-container" role="progressbar" aria-valuenow="<%= group.groupInfo.totalTasks.completed %>" aria-valuemax="<%= group.groupInfo.totalTasks.all %>">
+                                    <div class="progress" 
+                                    <% /* eslint-disable css-propertyvalueexpected */ %>
+                                    style="width: <%= group.groupInfo.progressWidth %>%"></div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="group-footer">
                             <p>Created at <%= group.groupInfo.created_at%></p>
