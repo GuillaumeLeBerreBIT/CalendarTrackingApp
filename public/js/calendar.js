@@ -49,7 +49,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   const form = document.querySelector("#form-calendar");
   const checkWholeDay = document.querySelector(".all-day");
   const selectedTagName = document.querySelector('#tagNames');
-  const navbarToggle = document.querySelector('button#toggle-btn')
+  const navbarToggle = document.querySelector('button#toggle-btn');
+  const calendarGroupTags = document.querySelectorAll('div.calendar-group-tag');
 
   const modalOverlayEvent = document.querySelector("#modal-overlay-event");
 
@@ -539,6 +540,32 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       if (participantsId.includes(pill.dataset.userId)) pill.classList.add('selected');
     })
+  }
+
+  calendarGroupTags.forEach(t => {
+
+    t.addEventListener('click', (event) => {
+
+      t.classList.toggle('deactive');
+
+      const displayUsed = t.classList.contains('deactive') ? 'none' : 'block'
+
+      const allEvents = calendar.getEvents();
+      updateCalendarVisibilityEvents(allEvents, event?.currentTarget.dataset.groupId, displayUsed);
+
+    })
+  })
+
+  function updateCalendarVisibilityEvents(allEvents, groupId, displayUsed) {
+    
+    allEvents.forEach(e => {
+      const eventGroupId = e.extendedProps?.groupsId ? e.extendedProps.groupsId : null
+
+      if (eventGroupId == groupId) {
+        e.setProp('display', displayUsed);
+      }
+    })
+    
   }
 
   function resetForm() {

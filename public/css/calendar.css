@@ -19,6 +19,18 @@
   margin: 20px 0;
 }
 
+.container-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+
+  width: 100%;
+  padding: 5px 20px;
+  margin: 20px 0; 
+  gap: 8px;
+}
+
 .upcoming-header {
   width: 100%;
 }

@@ -139,6 +139,12 @@ hr {
   box-sizing: border-box;
 
   overflow-x: scroll;
+  -ms-overflow-style: none; 
+  scrollbar-width: none;
+}
+
+.card-member::-webkit-scrollbar {
+  display: none;
 }
 
 .card-title {

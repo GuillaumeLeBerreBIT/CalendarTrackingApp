@@ -6,6 +6,17 @@
     <div id="calendar"></div>
 
     <!-- Show in a card the upcoming activities -->
+    <div class="container-tags card-shape">
+
+        <% Object.entries(groupsTagNames).forEach(t => { 
+            const [id, name] = t
+            %>
+            <div class="calendar-group-tag" data-group-id="<%=id%>">
+                <%= name %>
+            </div>
+        <%})%>
+        
+    </div>
     <div class="upcoming-container">
         <div class="justify-between upcoming-header">
             <h2>Upcoming Events</h2>
@@ -16,7 +27,6 @@
                 <!--Insert the Upcoming tasks-->
             </div>   
         <!-- </div> -->
-        
     </div>
 
     <div class="modal-overlay" id="modal-overlay">
