@@ -418,6 +418,13 @@ td.fc-day.fc-day-sun {
 
 /* Make events smaller on mobile */
 @media (max-width: 768px) {
+
+  .container-calendar {
+    width: 100%;
+    height: auto;
+    margin: auto;
+  }
+
   .fc-event {
     font-size: 0.7em;
     padding: 1px 2px;
