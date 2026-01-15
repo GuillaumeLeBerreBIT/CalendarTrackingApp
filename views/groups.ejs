@@ -111,9 +111,12 @@
                         <% } %>
                         <hr>
                         
-                        <div>
-                            <h4>Task Completion</h4>
-                            <div>
+                        <div class="card-shape group-todo">
+                            <div class="justify-between w-100">
+                                <h4>Task Completion</h4>
+                                <h4><%=group.groupInfo.totalTasks.completed%> of <%= group.groupInfo.totalTasks.all%></h4>
+                            </div>
+                            <div class="w-100">
                                 <div class="progress-container" role="progressbar" aria-valuenow="<%= group.groupInfo.totalTasks.completed %>" aria-valuemax="<%= group.groupInfo.totalTasks.all %>">
                                     <div class="progress" 
                                     <% /* eslint-disable css-propertyvalueexpected */ %>
