@@ -10,7 +10,7 @@ async function showUpcomingEvents(events) {
 
     upcomingClone.querySelector('#event-title').textContent = e.title;
     upcomingClone.querySelector('#event-description').textContent = e.extendedProps.description;
-    upcomingClone.querySelector('#startDate').textContent = e.start;
+    upcomingClone.querySelector('#startDate').textContent = convertDateObject(e.start);
 
     if (e.extendedProps.groupName) {
       upcomingClone.querySelector('#group-name').textContent = e.extendedProps.groupName;
@@ -19,7 +19,13 @@ async function showUpcomingEvents(events) {
     }
 
     if (e.start != e.end) {
-      upcomingClone.querySelector('#endDate').textContent = e.end;
+    
+      const newNode = document.createElement('span')
+      newNode.textContent = ' - '
+      const parentEle = upcomingClone.querySelector('#endDate').parentNode;
+      parentEle.insertBefore(newNode, upcomingClone.querySelector('#endDate'))
+
+      upcomingClone.querySelector('#endDate').textContent = convertDateObject(e.end);
     } else {
       upcomingClone.querySelector('#endDate').remove();
     }
@@ -38,6 +44,18 @@ async function showUpcomingEvents(events) {
     document.querySelector('div.upcoming-list.card-shape').appendChild(upcomingClone);
   })
 
+}
+
+function convertDateObject(date) {
+  const dateObj = new Date(date);
+
+  return dateObj.toLocaleString('nl-BE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).replace(',','')
 }
 
 document.addEventListener("DOMContentLoaded", async function () {
