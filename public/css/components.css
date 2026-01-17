@@ -257,3 +257,14 @@ select
     background: oklch(52% 0.16 147.5);
     border-color: oklch(52% 0.16 147.5);
 }
+
+@media(max-width: 800px ) {
+
+  .modal-box-event {
+    width: 100%;
+  }
+
+  .modal-box {
+    width: 100%;
+  }
+}
