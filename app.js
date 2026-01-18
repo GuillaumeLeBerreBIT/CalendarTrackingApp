@@ -59,33 +59,37 @@ async function refreshSession(req, res) {
 
   if (refreshSesError) throw new Error('Could not retrieve a bearer token for the user.')
   
-  const {session, user} = refreshSes
+  try{
+    const {session, user} = refreshSes
 
-  res.cookie("authCookie", session.access_token, {
+    res.cookie("authCookie", session.access_token, {
+        maxAge: 3 * 60 * 60 * 1000,
+        httpOnly: true,
+        sameSite: 'lax'
+      });
+
+    res.cookie('refreshToken', session.refresh_token, {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      samesite: 'lax'
+    });
+
+    res.cookie('expiresAt', session.expires_at, {
       maxAge: 3 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: 'lax'
     });
 
-  res.cookie('refreshToken', session.refresh_token, {
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    samesite: 'lax'
-  });
+    res.cookie('userId', user.id, {
+      maxAge: 3 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax'
+    })
 
-  res.cookie('expiresAt', session.expires_at, {
-    maxAge: 3 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax'
-  });
-
-  res.cookie('userId', user.id, {
-    maxAge: 3 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax'
-  })
-
-  return user
+    return user
+  } catch (error) {
+    throw new Error('Could not set the cookies for the User.')
+  }
 }
 
 app.use(bodyParser.urlencoded({ extended: true }));
