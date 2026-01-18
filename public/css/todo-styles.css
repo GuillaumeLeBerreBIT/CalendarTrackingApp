@@ -75,6 +75,10 @@
   width: 90%;
 }
 
+.task-card.hidden {
+  display: none;
+}
+
 .radio-box {
   display: flex;
   justify-content: center;

@@ -13,6 +13,8 @@ const formTask = document.querySelector("#task-form");
 const closeBtnTask = document.querySelector("#close-btn-task");
 const closeNewList = document.querySelector("#close-btn");
 
+const searchTask = document.querySelector('#search-task');
+
 function updateGroupID() {
   const tags = document.querySelector("#tag_name");
   const selectedOption = tags.options[tags.selectedIndex];
@@ -45,6 +47,22 @@ document.querySelectorAll(".group-card.card-shape").forEach((c) => {
   });
 
 });
+
+searchTask.addEventListener('input', (e) => {
+  const taskCards = document.querySelectorAll('div.task-card.card-shape');
+
+  [...taskCards].forEach(c => {
+
+    const task = c.querySelector('h4')?.textContent;
+    if (task.toLowerCase().includes(e.target.value.toLowerCase())) {
+      console.log(task)
+      c.classList.remove('hidden')
+    } else {
+      c.classList.add('hidden')
+    }
+  })
+  
+})
 
 // TASKS HANDLING
 function checkCompletedTasks(taskContainer) {
