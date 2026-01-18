@@ -6,7 +6,8 @@ A modern, collaborative web application for managing calendars, tasks, events, a
 ![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-Private-red.svg)
 
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen.svg)](https://calendartrackingapp.onrender.com)
+The link to the hosted version of the application [CalendarTracking](https://calendartrackingapp.onrender.com).
+
 
 ## ✨ Features
 
