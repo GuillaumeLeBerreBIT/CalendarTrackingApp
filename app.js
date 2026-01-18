@@ -26,20 +26,67 @@ const authRequire = async function (req, res, next) {
   const supaToken = req.cookies.authCookie;
 
   if (!supaToken) {
+    res.clearCookie('refreshToken');
+    res.clearCookie('expiresAt'); 
     return res.redirect("/login");
   }
 
   const { data, error } = await supabase.auth.getUser(supaToken);
 
   if (error || !data.user) {
-    res.clearCookie("authCookie");
-    return res.redirect("login");
+
+    try {
+      const userRefresh = await refreshSession(req, res);
+      req.user = userRefresh;
+      return next();
+
+    } catch (error) {
+      res.clearCookie("authCookie");
+      res.clearCookie("userId");
+      res.clearCookie('refreshToken');
+      res.clearCookie('expiresAt'); 
+      return res.redirect("login");
+    } 
   }
-
   req.user = data.user;
-
-  next();
+  return next();
 };
+
+async function refreshSession(req, res) {
+  if (!req.cookies.refreshToken) throw new Error('Could not find a refresh token from the cookies.')
+
+  const {data: refreshSes, error: refreshSesError} = await supabase.auth.refreshSession({refresh_token: req.cookies.refreshToken});
+
+  if (refreshSesError) throw new Error('Could not retrieve a bearer token for the user.')
+  
+  const {session, user} = refreshSes
+
+  res.cookie("authCookie", session.access_token, {
+      maxAge: 3 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax'
+    });
+
+  res.cookie('refreshToken', session.refresh_token, {
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    samesite: 'lax'
+  });
+
+  res.cookie('expiresAt', session.expires_at, {
+    maxAge: 3 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax'
+  });
+
+  res.cookie('userId', user.id, {
+    maxAge: 3 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax'
+  })
+
+  return user
+}
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -301,8 +348,25 @@ app.post("/login", async (req, res) => {
     res.cookie("authCookie", data.session.access_token, {
       maxAge: 3 * 60 * 60 * 1000,
       httpOnly: true,
+      sameSite: 'lax'
     });
-    res.cookie('userId', data.user.id,  { httpOnly: true });
+
+    res.cookie('userId', data.user.id,  { 
+      httpOnly: true,
+      sameSite: 'lax'
+    });
+
+    res.cookie('refreshToken', data.session.refresh_token, {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax'
+    });
+
+    res.cookie('expiresAt', data.session.expires_at, {
+      maxAge: 3 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax'
+    });
 
     res.redirect("/groups");
   }
@@ -347,8 +411,24 @@ app.post("/register", async (req, res) => {
     res.cookie("authCookie", data.session.access_token, {
       maxAge: 3 * 60 * 60 * 1000,
       httpOnly: true,
+      sameSite: 'lax'
     });
-    res.cookie('userId', data.user.id,  { httpOnly: true });
+    res.cookie('userId', data.user.id,  { 
+      httpOnly: true,
+      sameSite: 'lax'
+    });
+
+    res.cookie('refreshToken', data.session.refresh_token, {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax'
+    });
+
+    res.cookie('expiresAt', data.session.expires_at, {
+      maxAge: 3 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax'
+    });
 
     res.redirect("/groups");
   }
@@ -356,11 +436,17 @@ app.post("/register", async (req, res) => {
 
 app.post("/logout", async (req, res) => {
   res.clearCookie("authCookie");
+  res.clearCookie("refreshToken");
+  res.clearCookie("expiresAt");
+  res.clearCookie("userId");
   res.redirect("/login");
 });
 
 app.get("/logout", async (req, res) => {
   res.clearCookie("authCookie");
+  res.clearCookie("refreshToken");
+  res.clearCookie("expiresAt");
+  res.clearCookie("userId");
   res.redirect("/login");
 });
 
