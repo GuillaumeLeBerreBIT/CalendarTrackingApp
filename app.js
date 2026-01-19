@@ -162,7 +162,7 @@ app.get("/todo", authRequire, async (req, res) => {
     .select(
       `
     *,
-    groups(
+    groups!inner(
     *
     )
     `
