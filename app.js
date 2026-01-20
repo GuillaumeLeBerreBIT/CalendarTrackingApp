@@ -108,10 +108,6 @@ app.listen(app.get("port"), () => {
   console.log(`Listening on port: ${app.get("port")}`);
 });
 
-app.get("/", authRequire, (req, res) => {
-  res.render("index.ejs");
-});
-
 app.get("/calendar", authRequire, async (req, res) => {
   
   const {data: groupsIds, error: groupsIdsError} = await supabase
@@ -328,8 +324,8 @@ app.get("/groups", authRequire, async (req, res) => {
 });
 
 //Load the User login pages
-app.get("/", (req, res) => {
-  res.render("login.ejs");
+app.get("/", authRequire, (req, res) => {
+  res.redirect("/groups");
 });
 
 app.get("/login", (req, res) => {
