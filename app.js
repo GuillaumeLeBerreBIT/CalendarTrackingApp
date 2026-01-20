@@ -328,6 +328,10 @@ app.get("/groups", authRequire, async (req, res) => {
 });
 
 //Load the User login pages
+app.get("/", (req, res) => {
+  res.render("login.ejs");
+});
+
 app.get("/login", (req, res) => {
   res.render("login.ejs");
 });
