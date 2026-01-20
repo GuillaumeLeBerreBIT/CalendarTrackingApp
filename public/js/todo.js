@@ -14,6 +14,9 @@ const closeBtnTask = document.querySelector("#close-btn-task");
 const closeNewList = document.querySelector("#close-btn");
 
 const searchTask = document.querySelector('#search-task');
+const selectTasks = document.querySelector('#select-tasks')
+const taskCards = document.querySelectorAll('div.task-card.card-shape');
+
 
 function updateGroupID() {
   const tags = document.querySelector("#tag_name");
@@ -49,8 +52,6 @@ document.querySelectorAll(".group-card.card-shape").forEach((c) => {
 });
 
 searchTask.addEventListener('input', (e) => {
-  const taskCards = document.querySelectorAll('div.task-card.card-shape');
-
   [...taskCards].forEach(c => {
 
     const task = c.querySelector('h4')?.textContent;
@@ -62,6 +63,22 @@ searchTask.addEventListener('input', (e) => {
     }
   })
   
+})
+
+selectTasks.addEventListener('change', (e) => {
+
+  const action = e.target.value
+
+  if (action === 'all') {
+    [...taskCards].forEach(c => {
+      c.classList.contains('hidden') ? c.classList.remove('hidden') : null
+    })
+  } else if (action === 'completed') {
+    [...taskCards].forEach(c => {
+      c.querySelector('input[type=checkbox]:checked') ? c.classList.remove('hidden') : c.classList.add('hidden')
+    })
+  
+  }
 })
 
 // TASKS HANDLING

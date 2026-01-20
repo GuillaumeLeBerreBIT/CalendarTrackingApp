@@ -6,12 +6,12 @@
         <h1>Todo Lists</h1>
 
         <div class="center-vertical">
-            <input id="search-task" type="search" placeholder="Search task" class="w-80">
-            <div class="justify-between gap-5">
-                <select name="filter" id="filter">
+            <input id="search-task" type="search" placeholder="Search task" class="flex-shrink">
+            <div class="justify-between gap-5 fixed-item">
+                <select name="filter" id="select-tasks">
                     <option value="all">All Tasks</option>
-                    <option value="completed">Active</option>
-                    <option value="active">Completed</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
                     <option value="to-me">Assigned to Me</option>
                 </select>
                 <button class="h-100" id="btn-new-list">New List</button>
