@@ -725,7 +725,7 @@ app.post("/parseEvent", authRequire, async (req, res) => {
         end_date: insertEventObj.endDate,
         start_time: insertEventObj.startTime,
         end_time: insertEventObj.endTime,
-        groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : '' 
+        groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : null 
       },
     ])
     .select();
