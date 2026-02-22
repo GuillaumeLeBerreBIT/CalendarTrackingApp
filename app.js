@@ -151,7 +151,7 @@ app.get("/todo", authRequire, async (req, res) => {
   const tagNameObj =
     groupObj[0]?.profiles_groups
       .filter(pg => pg.groups.tag_name !== null)
-      .map(pg =>  ({gid: pg.groups_id, tag: pg.groups.tag_name})) || {};
+      .map(pg =>  ({gid: pg.groups_id, tag: pg.groups.tag_name})) || [];
 
   const { data: task_list, error: taskListError } = await supabase
     .from("task_list")
@@ -209,7 +209,7 @@ app.get("/todo", authRequire, async (req, res) => {
 
   res.render("todo.ejs", {
     yourTaskLists,
-    groupTagObj: tagNameObj, 
+    groupTagObj: tagNameObj || [], 
     currentPage: 'todo'
   });
 });
@@ -233,7 +233,8 @@ app.get("/groups", authRequire, async (req, res) => {
       userGroups: [], 
       yourGroups: 0, 
       totalEvents: 0, 
-      userInvites: [] 
+      userInvites: [],
+      currentPage: 'groups'
     });
   } 
 
