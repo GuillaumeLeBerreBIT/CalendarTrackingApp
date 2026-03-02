@@ -49,13 +49,10 @@ async function showUpcomingEvents(events) {
 function convertDateObject(date) {
   const dateObj = new Date(date);
 
-  return dateObj.toLocaleString('nl-BE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).replace(',','')
+  const time = dateObj.toLocaleString('nl-BE', { hour: '2-digit', minute: '2-digit' });
+  const day  = dateObj.toLocaleString('nl-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  return `${time} ${day}`;
 }
 
 document.addEventListener("DOMContentLoaded", async function () {

@@ -283,6 +283,7 @@ app.get("/groups", authRequire, async (req, res) => {
           tag: group.tag_name,
           groupId: group.groups_id,
           created_at: format(new Date(group.created_at), 'dd-MM-yyyy'),
+          created_at_raw: group.created_at,
           totalTasks: totalTasks,
           progressWidth: (() => {
             return totalTasks.all > 0 ? (totalTasks.completed / totalTasks.all) * 100 : 0 
@@ -318,7 +319,8 @@ app.get("/groups", authRequire, async (req, res) => {
     .eq('user_id', req.cookies.userId)
     .eq('invite_status', 'pending');
 
-  res.render("groups.ejs", { userGroups, yourGroups: groups.length, 
+  res.render("groups.ejs", { 
+    userGroups: userGroups.sort((a, b) => new Date(b.groupInfo.created_at_raw) - new Date(a.groupInfo.created_at_raw)), yourGroups: groups.length, 
     totalEvents, 
     userInvites : userInvites || [], 
     currentPage: 'groups' });
@@ -937,17 +939,6 @@ app.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
 
 
 app.get('/renderEvents', authRequire, async (req, res) => {
-  const {data: profileEvents, error: profileEventsError} = await supabase
-  .from('profiles_events')
-  .select(`
-    event_id
-    `)
-  .eq('user_id', req.cookies.userId)
-
-  if (profileEventsError) {
-    res.status(400).json({success: false, error: profileEventsError.message})
-  }
-
   const {data: groupsIds, error: groupsIdsError} = await supabase
   .from('groups')
   .select(`groups_id, tag_name,
@@ -957,7 +948,7 @@ app.get('/renderEvents', authRequire, async (req, res) => {
   .eq('profiles_groups.user_id', req.cookies.userId);
 
   if (groupsIdsError) {
-    res.status(500).json({success: false, error: groupsIdsError.message})
+    return res.status(500).json({success: false, error: groupsIdsError.message})
   }
 
   let groupsTagNames = {};
@@ -965,7 +956,7 @@ app.get('/renderEvents', authRequire, async (req, res) => {
     groupsTagNames[g.groups_id] = g.tag_name
   })
 
-  const taskIdsArray = profileEvents.map( e => e.event_id);
+  const groupIdArray = groupsIds.map(g => g.groups_id);
 
   const {data: events, error: errorEvents} = await supabase
   .from('events')
@@ -978,10 +969,10 @@ app.get('/renderEvents', authRequire, async (req, res) => {
     )
     )
     `)
-  .in('event_id', taskIdsArray);
+  .in('groups_id', groupIdArray);
 
   if (errorEvents) {
-    res.status(400).json({success: false, error: errorEvents.message})
+    return res.status(400).json({success: false, error: errorEvents.message})
   } else {
     try {
       const filteredEvents = events.map((e) => {

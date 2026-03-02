@@ -58,7 +58,7 @@
                 <button class="create-group-btn" id="create-group-btn">+ Create Group</button>
             </div>
             <div class="wrapper-cards card-shape hide-scrollbar" id="wrapper-cards">
-                <% if (userGroups) { userGroups.forEach((group) => {%>
+                <% if (locals.userGroups) { userGroups.forEach((group) => {%>
                     <div class="group-card card-shape">
                         <div class="group-header">
                             <h3><%= group.groupInfo.title %></h3>
