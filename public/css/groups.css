@@ -74,10 +74,10 @@ hr {
   width: 20%;
   max-width: 200px;
   height: 100%;
+}
 
-  * {
-    margin: 0;
-  }
+.summary-card * {
+  margin: 0;
 }
 
 .group-footer {
@@ -147,10 +147,10 @@ hr {
   align-items: center;
 
   width: 100%;
+}
 
-  h5 {
-    margin: 0;
-  }
+.card-title h5 {
+  margin: 0;
 }
 
 .group-todo {

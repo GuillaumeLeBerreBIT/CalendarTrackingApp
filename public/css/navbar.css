@@ -51,9 +51,10 @@
     display: flex;
     justify-content: flex-end;
     margin-bottom: 16px;
-    .logo {
-        font-weight: 600;
-    }
+}
+
+#sidebar > ul > li:first-child .logo {
+    font-weight: 600;
 }
 
 #sidebar > ul > li:last-child {
@@ -62,17 +63,14 @@
 
 #sidebar ul li.active a {
     color: var(--accent-clr);
-
-    svg {
-        fill: var(--accent-clr)
-    }
 }
 
-#sidebar ul li.active:hover {
+#sidebar ul li.active a svg {
+    fill: var(--accent-clr);
+}
 
-    svg {
-        fill: white;
-    }
+#sidebar ul li.active:hover svg {
+    fill: white;
 }
 
 #sidebar a, #sidebar .dropdown-btn, #sidebar .logo {
@@ -119,10 +117,10 @@
     display: grid;
     grid-template-rows: 0fr;
     transition: 300ms ease-in-out;
+}
 
-    > div {
-        overflow: hidden;
-    }
+#sidebar .sub-menu > div {
+    overflow: hidden;
 }
 /*Adding and removing the class will open and close dropdown menu*/
 #sidebar .sub-menu.show {
@@ -148,10 +146,10 @@
     border-radius: .5em;
     background: none;
     cursor: pointer;
+}
 
-    svg {
-        transition: rotate 150ms ease;
-    }
+#toggle-btn svg {
+    transition: rotate 150ms ease;
 }
 
 #toggle-btn:hover {
@@ -184,63 +182,60 @@
         position: fixed;
         top: unset;
         bottom: 0;
+    }
 
-        > ul {
-            padding: 0;
-            display: grid;
-            /*This will create automatically a grid where each column is 60px width and each item is placed inside a new column instead of default being row*/
-            grid-auto-columns: 60px;
-            grid-auto-flow: column;
-            align-items: center;
-            overflow-x: scroll;
-        }
+    #sidebar > ul {
+        padding: 0;
+        display: grid;
+        grid-auto-columns: 60px;
+        grid-auto-flow: column;
+        align-items: center;
+        overflow-x: scroll;
+    }
 
-        ul li {
-            height: 100%;
-        }
+    #sidebar ul li {
+        height: 100%;
+    }
 
-        ul a, ul .dropdown-btn {
-            width: 60px;
-            height: 60px;
-            padding: 0;
-            border-radius: 0;
-            justify-content: center;
-        }
+    #sidebar ul a, #sidebar ul .dropdown-btn {
+        width: 60px;
+        height: 60px;
+        padding: 0;
+        border-radius: 0;
+        justify-content: center;
+    }
 
-        ul li span, 
-        ul li:first-child,
-        .dropdown-btn svg:last-child
-        {
-            display: none;
-        }
+    #sidebar ul li span,
+    #sidebar ul li:first-child,
+    #sidebar .dropdown-btn svg:last-child {
+        display: none;
+    }
 
-        ul li .sub-menu.show {
-            position: fixed;
-            bottom: 60px;
-            left:0;
-            box-sizing: border-box;
-            height: 60px;;
-            width: 100%;
-            background-color: var(--base-clr);
-            border-top: 1px solid var(--line-clr);
-            display: flex;
-            justify-content: center;
+    #sidebar ul li .sub-menu.show {
+        position: fixed;
+        bottom: 60px;
+        left: 0;
+        box-sizing: border-box;
+        height: 60px;
+        width: 100%;
+        background-color: var(--base-clr);
+        border-top: 1px solid var(--line-clr);
+        display: flex;
+        justify-content: center;
+    }
 
-            > div {
-                overflow-x: auto;
-            }
+    #sidebar ul li .sub-menu.show > div {
+        overflow-x: auto;
+    }
 
-            li {
-                display: inline-flex;
-            }
+    #sidebar ul li .sub-menu.show li {
+        display: inline-flex;
+    }
 
-            a {
-                box-sizing: border-box;
-                padding: 1em;
-                width: auto;
-                justify-content: center;
-            }
-        }
-       
+    #sidebar ul li .sub-menu.show a {
+        box-sizing: border-box;
+        padding: 1em;
+        width: auto;
+        justify-content: center;
     }
 }

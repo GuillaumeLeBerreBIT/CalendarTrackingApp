@@ -9,8 +9,6 @@ import bcrypt from "bcrypt";
 import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
 import {validatePassword, createEventObj} from "./utils/utils.js";
-import { stat } from "fs";
-import { error, group } from "console";
 import { format } from 'date-fns';
 
 const app = express();
@@ -71,7 +69,7 @@ async function refreshSession(req, res) {
     res.cookie('refreshToken', session.refresh_token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      samesite: 'lax'
+      sameSite: 'lax'
     });
 
     res.cookie('expiresAt', session.expires_at, {
@@ -939,7 +937,8 @@ app.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
 
 
 app.get('/renderEvents', authRequire, async (req, res) => {
-  const {data: groupsIds, error: groupsIdsError} = await supabase
+
+  let {data: groupsIds, error: groupsIdsError} = await supabase
   .from('groups')
   .select(`groups_id, tag_name,
     profiles_groups!inner(
@@ -958,7 +957,23 @@ app.get('/renderEvents', authRequire, async (req, res) => {
 
   const groupIdArray = groupsIds.map(g => g.groups_id);
 
-  const {data: events, error: errorEvents} = await supabase
+  let { data: userEvents, error: userEventsError} = await supabase.
+  from('events')
+  .select(`*,
+    profiles_events(
+      user_id,
+      profiles(
+      username
+      )
+    )`)
+  .eq('profiles_events.user_id', req.cookies.userId)
+  .is('groups_id', null);
+
+  if (userEventsError) {
+    console.warn('Could not retrieve any of the events specifically to the user.', userEventsError)
+  }
+
+  let {data: events, error: errorEvents} = await supabase
   .from('events')
   .select(`
     *,
@@ -973,9 +988,12 @@ app.get('/renderEvents', authRequire, async (req, res) => {
 
   if (errorEvents) {
     return res.status(400).json({success: false, error: errorEvents.message})
-  } else {
-    try {
-      const filteredEvents = events.map((e) => {
+  }
+
+  const combinedEvents = [...events, ...(userEvents ?? [])];
+
+  try {
+      const filteredEvents = combinedEvents.map((e) => {
         let start_date, end_date;
 
         const hasStartTime = e.start_time != null && e.start_time.length >= 5;
@@ -983,20 +1001,10 @@ app.get('/renderEvents', authRequire, async (req, res) => {
         if (
           e.all_day ||
           !hasStartTime ||
-          !hasEndTime
+          !hasEndTime ||
+          e.start_time === e.end_time ||
+          (e.start_time === '00:00' && e.end_time === '00:00')
         ) {
-          start_date = `${e.start_date}`;
-          end_date   = `${e.end_date}`;
-
-        } else if (e.start_time === e.end_time || (e.start_time === '00:00' && e.end_time === '00:00')) {
-          start_date = `${e.start_date}`;
-          end_date   = `${e.end_date}`;
-
-        } else if (e.all_day) {
-          start_date = `${e.start_date}`;
-          end_date   = `${e.end_date}`;
-
-        } else if (e.start_time === '00:00' && e.end_time === '00:00') {
           start_date = `${e.start_date}`;
           end_date   = `${e.end_date}`;
 
@@ -1030,7 +1038,6 @@ app.get('/renderEvents', authRequire, async (req, res) => {
     } catch (error) {
       res.status(500).json({success: false, error: error.message});
     }
-  }
 
 });
 

@@ -173,11 +173,10 @@ select
   /* margin: 0 6% 0 6%; */
   width: 90%;
   box-sizing: border-box;
+}
 
-  h3 {
-    margin: 5px 0;
-  }
-
+.modal-event h3 {
+  margin: 5px 0;
 }
 
 .modal-box-event {
@@ -223,7 +222,7 @@ select
 
 .user-pill {
   display: flex;
-  align-items: cneter;
+  align-items: center;
 
   padding: 10px 20px;
   gap: 8px;
@@ -236,7 +235,7 @@ select
   font-weight: 500;
 
   cursor: pointer;
-  transition: all 0.2 ease;
+  transition: all 0.2s ease;
 }
 
 .user-pill:hover {

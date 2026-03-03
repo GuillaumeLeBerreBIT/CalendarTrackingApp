@@ -7,7 +7,7 @@ export function validatePassword (password) {
 
     if (password.length < minLength) {
 
-        return [false, 'Password is to small please provide a passsword with more then 8 characters.']
+        return [false, 'Password is too short. Please provide a password with at least 8 characters.']
     } 
 
     if (!hasUpper) {
