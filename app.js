@@ -10,15 +10,12 @@ import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
 import {validatePassword, createEventObj} from "./utils/utils.js";
 import { format } from 'date-fns';
+import supabase from "./db/supabase.js";
+import authRouter from "./routes/auth.js";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(
-  "https://fhaffbgrrepbowirthcb.supabase.co",
-  supabaseKey
-);
 
 const authRequire = async function (req, res, next) {
   const supaToken = req.cookies.authCookie;
@@ -96,11 +93,12 @@ app.use(express.json());
 app.use(cors());
 app.use(cookieParser());
 
-const SALT_ROUNDS = 10;
-
 app.set("port", process.env.PORT || 3000);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+
+// Need to set the Router after all middleware is configured.
+app.use('/', authRouter);
 
 app.listen(app.get("port"), () => {
   console.log(`Listening on port: ${app.get("port")}`);
@@ -329,131 +327,131 @@ app.get("/", authRequire, (req, res) => {
   res.redirect("/groups");
 });
 
-app.get("/login", (req, res) => {
-  res.render("login.ejs");
-});
+// app.get("/login", (req, res) => {
+//   res.render("login.ejs");
+// });
 
-app.get("/register", (req, res) => {
-  res.render("register.ejs");
-});
-// Processing the user login form.
-app.post("/login", async (req, res) => {
-  //Now need to login the user
+// app.get("/register", (req, res) => {
+//   res.render("register.ejs");
+// });
+// // Processing the user login form.
+// app.post("/login", async (req, res) => {
+//   //Now need to login the user
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: req.body["email"],
-    password: req.body["password"],
-  });
+//   const { data, error } = await supabase.auth.signInWithPassword({
+//     email: req.body["email"],
+//     password: req.body["password"],
+//   });
 
-  if (error) {
-    return res
-      .status(400)
-      .render("login.ejs", { success: false, message: error.message });
-  } else {
-    res.cookie("authCookie", data.session.access_token, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
+//   if (error) {
+//     return res
+//       .status(400)
+//       .render("login.ejs", { success: false, message: error.message });
+//   } else {
+//     res.cookie("authCookie", data.session.access_token, {
+//       maxAge: 3 * 60 * 60 * 1000,
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
 
-    res.cookie('userId', data.user.id,  { 
-      httpOnly: true,
-      sameSite: 'lax'
-    });
+//     res.cookie('userId', data.user.id,  { 
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
 
-    res.cookie('refreshToken', data.session.refresh_token, {
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
+//     res.cookie('refreshToken', data.session.refresh_token, {
+//       maxAge: 7 * 24 * 60 * 60 * 1000,
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
 
-    res.cookie('expiresAt', data.session.expires_at, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
+//     res.cookie('expiresAt', data.session.expires_at, {
+//       maxAge: 3 * 60 * 60 * 1000,
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
 
-    res.redirect("/groups");
-  }
-});
+//     res.redirect("/groups");
+//   }
+// });
 
-app.post("/register", async (req, res) => {
-  // Need to register a user and then also log in direclty.
+// app.post("/register", async (req, res) => {
+//   // Need to register a user and then also log in direclty.
 
-  if (req.body["password"] != req.body["passwordConfirm"]) {
-    return res.status(422).render("register.ejs", {
-      success: false,
-      error: "Make sure the passwords entered are identical to each other.",
-    });
-  }
+//   if (req.body["password"] != req.body["passwordConfirm"]) {
+//     return res.status(422).render("register.ejs", {
+//       success: false,
+//       error: "Make sure the passwords entered are identical to each other.",
+//     });
+//   }
 
-  const [isValid, messageSuccess] = validatePassword(req.body["password"]);
+//   const [isValid, messageSuccess] = validatePassword(req.body["password"]);
 
-  if (!isValid) {
-    return res
-      .status(422)
-      .render("register.ejs", { success: false, error: messageSuccess });
-  }
+//   if (!isValid) {
+//     return res
+//       .status(422)
+//       .render("register.ejs", { success: false, error: messageSuccess });
+//   }
 
-  // let hash_pass = await bcrypt.hash(req.body['password'], SALT_ROUNDS)
-  // console.log(hash_pass);
-  const { data, error } = await supabase.auth.signUp({
-    email: req.body["email"],
-    password: req.body["password"],
-    options: {
-      data: {
-        username: req.body["username"],
-      },
-    },
-  });
-  const refreshToken = data.session.refresh_token;
+//   // let hash_pass = await bcrypt.hash(req.body['password'], SALT_ROUNDS)
+//   // console.log(hash_pass);
+//   const { data, error } = await supabase.auth.signUp({
+//     email: req.body["email"],
+//     password: req.body["password"],
+//     options: {
+//       data: {
+//         username: req.body["username"],
+//       },
+//     },
+//   });
+//   const refreshToken = data.session.refresh_token;
 
-  if (error) {
-    return res
-      .status(400)
-      .render("register.ejs", { success: false, error: error.message });
-  } else {
-    res.cookie("authCookie", data.session.access_token, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
-    res.cookie('userId', data.user.id,  { 
-      httpOnly: true,
-      sameSite: 'lax'
-    });
+//   if (error) {
+//     return res
+//       .status(400)
+//       .render("register.ejs", { success: false, error: error.message });
+//   } else {
+//     res.cookie("authCookie", data.session.access_token, {
+//       maxAge: 3 * 60 * 60 * 1000,
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
+//     res.cookie('userId', data.user.id,  { 
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
 
-    res.cookie('refreshToken', data.session.refresh_token, {
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
+//     res.cookie('refreshToken', data.session.refresh_token, {
+//       maxAge: 7 * 24 * 60 * 60 * 1000,
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
 
-    res.cookie('expiresAt', data.session.expires_at, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
+//     res.cookie('expiresAt', data.session.expires_at, {
+//       maxAge: 3 * 60 * 60 * 1000,
+//       httpOnly: true,
+//       sameSite: 'lax'
+//     });
 
-    res.redirect("/groups");
-  }
-});
+//     res.redirect("/groups");
+//   }
+// });
 
-app.post("/logout", async (req, res) => {
-  res.clearCookie("authCookie");
-  res.clearCookie("refreshToken");
-  res.clearCookie("expiresAt");
-  res.clearCookie("userId");
-  res.redirect("/login");
-});
+// app.post("/logout", async (req, res) => {
+//   res.clearCookie("authCookie");
+//   res.clearCookie("refreshToken");
+//   res.clearCookie("expiresAt");
+//   res.clearCookie("userId");
+//   res.redirect("/login");
+// });
 
-app.get("/logout", async (req, res) => {
-  res.clearCookie("authCookie");
-  res.clearCookie("refreshToken");
-  res.clearCookie("expiresAt");
-  res.clearCookie("userId");
-  res.redirect("/login");
-});
+// app.get("/logout", async (req, res) => {
+//   res.clearCookie("authCookie");
+//   res.clearCookie("refreshToken");
+//   res.clearCookie("expiresAt");
+//   res.clearCookie("userId");
+//   res.redirect("/login");
+// });
 
 app.post('/checkUser', authRequire ,async (req, res) => {
 
