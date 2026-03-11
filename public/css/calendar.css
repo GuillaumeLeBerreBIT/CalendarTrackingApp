@@ -315,6 +315,8 @@ td.fc-day.fc-day-sun {
   gap: 2px;
   width: 100px;
   margin-right: -5px;
+  align-items: center;
+  justify-content: center;
 }
 
 .event-initial {
@@ -398,5 +400,24 @@ td.fc-day.fc-day-sun {
   td.fc-day > div {
     min-height: 80px; /* Reduce min-height on small screens */
   }
+
+  .fc-event-main-frame {
+    flex-direction: row !important;
+    padding: 0 !important;
+  }
+
+  .fc-event-main-frame .fc-event-time {
+    font-size: 10px !important;
+    font-weight: 400 !important;
+    color: white !important;
+  }
+
+  .fc-event-initials,
+  .fc-event-time {
+    display: none !important;
+  }
+
 }
+
+
 
