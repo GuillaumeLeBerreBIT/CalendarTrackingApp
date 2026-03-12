@@ -1,5 +1,6 @@
 import express from "express";
 import supabase from "../db/supabase.js";
+import { validatePassword } from "../utils/utils.js";
 
 const router = express.Router();
 
