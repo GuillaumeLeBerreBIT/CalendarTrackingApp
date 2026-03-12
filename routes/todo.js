@@ -33,11 +33,18 @@ router.get("/todo", authRequire, async (req, res) => {
       `
     *,
     groups!inner(
-    *
+    *,
+    profiles_groups!inner(
+    invite_status,
+    profiles!inner (
+    username
+    )
+    )
     )
     `
     )
-    .in("groups_id", groupIDs);
+    .in("groups_id", groupIDs)
+    .eq('groups.profiles_groups.invite_status', 'accepted');
 
   const yourTaskListsPromises = task_list.map(async (tl) => {
     const { data: tasks, error: errorTasks } = await supabase
