@@ -45,11 +45,48 @@ document.querySelectorAll(".group-card.card-shape").forEach((c) => {
   c.querySelectorAll('.task-container').forEach(tc => {checkCompletedTasks(tc)});
 
   btnAddTask.addEventListener("click", function (e) {
+
+    addAssignees(this.dataset.taskListId);
+
     modalNewTask.classList.add("set-display-flex");
     modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId; // Need to check why this
   });
 
 });
+
+async function addAssignees(taskListId) {
+
+  try {
+
+    const response = await axios.get('/membersTaskList/', {
+      params: { taskListId: taskListId}
+    })
+
+    if (!response.data.success) {
+      console.log('No members could not be found.')
+      return
+    }
+
+    const { members } = response.data
+
+    document.querySelector('#assign-member-container').innerHTML = ''
+
+    members.forEach(m => {
+
+      const newDiv = document.createElement('div');
+      newDiv.className = "user-pill"
+      newDiv.dataset.userId = m.userId
+      newDiv.textContent = m.username
+
+      document.querySelector('#assign-member-container').appendChild(newDiv)
+
+    })
+    
+  } catch (error) {
+    console.log(`Could not retrieve any of the users from Task List: ${e}`)
+  }
+
+}
 
 searchTask.addEventListener('input', (e) => {
   [...taskCards].forEach(c => {

@@ -49,7 +49,7 @@ router.get("/todo", authRequire, async (req, res) => {
   const yourTaskListsPromises = task_list.map(async (tl) => {
     const { data: tasks, error: errorTasks } = await supabase
       .from("task")
-      .select("*")
+      .select(`*, profiles_task!left(user_id, profiles!inner(username))`)
       .eq("task_list_id", tl.task_list_id);
 
     if (errorTasks) {
@@ -118,7 +118,6 @@ router.post("/createTaskList", authRequire, async (req, res) => {
       .status(400)
       .json({success: false, error: "Unable to create Task List" });
   } else {
-    // Send data back to the frontend >> Need to customize the submit of form
     res.json({success: true, createTaskList: createTaskList, tagName: tagName?.[0].tag_name || null})
   }
 
@@ -158,6 +157,47 @@ router.patch('/updateTask', authRequire, async(req, res) => {
     res.json({success: true, taskUpdate})
   } else {
     res.json({success: false, message: 'Unable to update the task.'})
+  }
+})
+
+router.get('/membersTaskList/', async (req, res) => {
+
+  const { taskListId } = req.query
+  try {
+
+    const {data: taskList} = await supabase
+    .from('task_list')
+    .select('groups_id')
+    .eq('task_list_id', taskListId)
+    .single()
+
+    const {data: taskMembers, error: taskMembersError} = await supabase
+    .from('profiles_groups')
+    .select(`user_id, profiles!left(username))`)
+    .eq('groups_id', taskList['groups_id'])
+    .eq('invite_status', 'accepted')
+
+    if (taskMembersError) {
+
+      return res.status(500).json({success: 'false', message: taskMembersError.message})
+    }
+
+    const members = taskMembers?.map((tm) => {
+
+      const username = tm?.profiles?.username
+      const userId = tm?.["user_id"] 
+
+      return {
+        username: username,
+        userId: userId
+      }
+    })
+    
+    return res.status(200).json({success: true, members: members})
+
+  } catch (error) {
+    
+    return res.status(404).json({success: 'false', message: e})
   }
 })
 
