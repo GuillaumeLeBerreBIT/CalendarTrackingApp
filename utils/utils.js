@@ -4,9 +4,24 @@ export default async function authRequire (req, res, next) {
   const supaToken = req.cookies.authCookie;
 
   if (!supaToken) {
-    res.clearCookie('refreshToken');
-    res.clearCookie('expiresAt'); 
-    return res.redirect("/login");
+
+    if (!req.cookies.refreshToken) {
+      res.clearCookie('expiresAt');
+      return res.redirect("/login");
+    }
+
+    try {
+      const userRefresh = await refreshSession(req, res)
+      req.user = userRefresh
+      return next()
+      
+    } catch (error) {
+      res.clearCookie("authCookie");
+      res.clearCookie("userId");
+      res.clearCookie('refreshToken');
+      res.clearCookie('expiresAt');
+      return res.redirect("/login");
+    }
   }
 
   const { data, error } = await supabase.auth.getUser(supaToken);
