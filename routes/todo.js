@@ -152,16 +152,28 @@ router.post("/createTask", authRequire, async (req, res) => {
 
   if (req.body.members && req.body.members.length >= 1) {
     const { data, error } = await supabase
-    .from("profiles_task")
-    .insert(req.body.members.map(m =>  {
-      return {
-        user_id: m, 
-        task_id: insertTask.task_id, 
-        status: 'accepted'
-      }}))
+      .from("profiles_task")
+      .insert(
+        req.body.members.map((m) => {
+          return {
+            user_id: m,
+            task_id: insertTask.task_id,
+            status: "accepted",
+          };
+        }),
+      )
       .select();
 
-      if (error) console.log(`Could not add users: ${error}`)
+    if (error) {
+      console.log(`Could not add users: ${error}`);
+    } else {
+      let { data: usersTask } = await supabase
+        .from("profiles")
+        .select("username, user_id")
+        .in("user_id", req.body.members);
+
+        if (usersTask) insertTask.members = usersTask;
+    }
   }
 
   if (insertTaskError) {

@@ -78,17 +78,26 @@
                                         <%= t.priority %>
                                     </span>
                                 </div>
+                                <% if (t.task_Description) { %>
                                 <p>
                                     <%= t.task_description %>
                                 </p>
-                                <div>
-                                    <span><%= t.assigned_to || 'Unassigned' %></span>
-                                    <% if (t?.due_date) {%>
-                                        <span>Due <%= new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) %></span>
-                                        <%} else {%>
-                                            <span>No deadline</span>
+                                <% } %>
+                                <%if (t?.due_date || t.profiles_task.length >= 1) {%>
+                                    <div>
+                                        <% if (t?.due_date) {%>
+                                            <span>Due <%= new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) %></span>
                                         <%} %>
-                                </div>
+                                        <div id="assigned-members" class="justify-start gap-5">
+                                            <%if (t.profiles_task) {%>
+                                                <%t.profiles_task.forEach((m) => {%>
+                                                    <div class="badge-secondary" data-user-id="<%=m.user_id%>">
+                                                        <%= m.profiles.username %>
+                                                    </div>
+                                            <%})}%>
+                                        </div>
+                                    </div>
+                                <%}%>
                             </div>
                         </div>
                     <%})} else { %>
@@ -207,8 +216,10 @@
                 </div>
                 <p id="task-description"></p>
                 <div>
-                    <span id="task-users">John Doe</span>
                     <span id="task-deadline">No deadline</span>
+                    <div id="assigned-members" class="justify-start gap-5">
+
+                    </div>
                 </div>
             </div>
         </div>

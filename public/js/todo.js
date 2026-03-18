@@ -233,17 +233,17 @@ formTask.addEventListener("submit", async (e) => {
 
   const form = new FormData(formTask);
 
-  payload = {};
+  let payload = {};
   for (let [key, val] of form.entries()) {
     payload[key] = val;
   }
 
-  payload.members = [...document.querySelectorAll('user-pill.selected')].map((u) => u.dataset.userId);
+  payload.members = [...document.querySelectorAll('.user-pill.selected')].map((u) => u.dataset.userId);
 
   const response = await axios.post("/createTask", payload);
 
   if (response.data.success) {
-    let createdTask = response.data?.insertTask[0];
+    let createdTask = response.data?.insertTask;
 
     createDivTask(createdTask);
   } else {
@@ -298,6 +298,27 @@ function createDivTask(data) {
 
   if (data.due_date) {
     cloneTaskTemp.querySelector("#task-deadline").textContent = data.due_date;
+  } else {
+    cloneTaskTemp.querySelector("#task-deadline").remove()
+  }
+
+  if (data.members) {
+
+    const assignedCont = cloneTaskTemp.querySelector('#assigned-members');
+
+    data.members.forEach(m => {
+      
+      let assignedUserDiv = document.createElement('div');
+      assignedUserDiv.classList.add('badge-secondary');
+      assignedUserDiv.dataset.userId = m.user_id;
+      assignedUserDiv.textContent = m.username;
+
+      assignedCont.appendChild(assignedUserDiv);
+      
+    })
+    
+  } else {
+    cloneTaskTemp.querySelector('#assigned-members').remove()
   }
 
   const taskListCard = document.querySelector(
