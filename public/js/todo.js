@@ -78,6 +78,12 @@ async function addAssignees(taskListId) {
       newDiv.dataset.userId = m.userId
       newDiv.textContent = m.username
 
+      newDiv.addEventListener('click', (event) => {
+        event.stopPropagation()
+
+        event.currentTarget.classList.toggle('selected')
+      })
+
       document.querySelector('#assign-member-container').appendChild(newDiv)
 
     })
@@ -216,7 +222,6 @@ formTaskList.addEventListener("submit", async (e) => {
       let createdTaskList = response.data?.createTaskList[0];
 
       createDivTaskList(createdTaskList, payload, response.data.tagName);
-      // NEED TO ADD EVENT HANDLIGN ON BUTTON?
     }
   } catch (e) {
     alert(`Unable to create a task list: ${e}`);
@@ -232,6 +237,8 @@ formTask.addEventListener("submit", async (e) => {
   for (let [key, val] of form.entries()) {
     payload[key] = val;
   }
+
+  payload.members = [...document.querySelectorAll('user-pill.selected')].map((u) => u.dataset.userId);
 
   const response = await axios.post("/createTask", payload);
 
