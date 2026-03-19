@@ -38,7 +38,7 @@ export default async function authRequire (req, res, next) {
       res.clearCookie("userId");
       res.clearCookie('refreshToken');
       res.clearCookie('expiresAt'); 
-      return res.redirect("login");
+      return res.redirect("/login");
     } 
   }
   req.user = data.user;
@@ -74,7 +74,7 @@ async function refreshSession(req, res) {
     });
 
     res.cookie('userId', user.id, {
-      maxAge: 3 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: 'lax'
     })

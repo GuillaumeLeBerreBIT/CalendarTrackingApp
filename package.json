@@ -7,7 +7,7 @@
   "type": "module",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.18",
@@ -24,5 +24,8 @@
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "fullcalendar": "^6.1.18"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
   }
 }
