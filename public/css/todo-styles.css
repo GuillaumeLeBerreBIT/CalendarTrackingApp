@@ -140,3 +140,35 @@ h4 {
 .fixed-item {
   flex: 0 0 auto;
 }
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-edit-task {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: oklch(0.55 0 0);
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.1s ease;
+  line-height: 1;
+}
+
+.task-card:hover .btn-edit-task {
+  opacity: 1;
+}
+
+.btn-edit-task:hover {
+  background-color: oklch(0.93 0 0);
+}
+
+#task-modal-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+}

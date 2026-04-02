@@ -16,6 +16,8 @@ const closeNewList = document.querySelector("#close-btn");
 const searchTask = document.querySelector('#search-task');
 const selectTasks = document.querySelector('#select-tasks')
 const taskCards = document.querySelectorAll('div.task-card.card-shape');
+const taskModalTitle = document.querySelector('#task-modal-title');
+const taskIdInput = document.querySelector('#task_id');
 
 
 function updateGroupID() {
@@ -30,7 +32,15 @@ closeNewList.addEventListener("click", function (e) {
 
 closeBtnTask.addEventListener("click", function () {
   modalNewTask.classList.remove("set-display-flex");
+  resetTaskModal();
 });
+
+function resetTaskModal() {
+  taskModalTitle.textContent = 'New Task';
+  document.querySelector('#btn-task-submit').value = 'Add Task';
+  taskIdInput.value = '';
+  formTask.reset();
+}
 
 tagNameList.addEventListener("change", updateGroupID);
 
@@ -45,16 +55,15 @@ document.querySelectorAll(".group-card.card-shape").forEach((c) => {
   c.querySelectorAll('.task-container').forEach(tc => {checkCompletedTasks(tc)});
 
   btnAddTask.addEventListener("click", function (e) {
-
+    resetTaskModal();
     addAssignees(this.dataset.taskListId);
-
     modalNewTask.classList.add("set-display-flex");
-    modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId; // Need to check why this
+    modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId;
   });
 
 });
 
-async function addAssignees(taskListId) {
+async function addAssignees(taskListId, preSelectedIds = []) {
 
   try {
 
@@ -78,21 +87,50 @@ async function addAssignees(taskListId) {
       newDiv.dataset.userId = m.userId
       newDiv.textContent = m.username
 
+      if (preSelectedIds.includes(m.userId)) {
+        newDiv.classList.add('selected')
+      }
+
       newDiv.addEventListener('click', (event) => {
         event.stopPropagation()
-
         event.currentTarget.classList.toggle('selected')
       })
 
       document.querySelector('#assign-member-container').appendChild(newDiv)
 
     })
-    
+
   } catch (error) {
-    console.log(`Could not retrieve any of the users from Task List: ${e}`)
+    console.log(`Could not retrieve any of the users from Task List: ${error}`)
   }
 
 }
+
+document.querySelector('.group-container').addEventListener('click', async function(e) {
+  const editBtn = e.target.closest('.btn-edit-task');
+  if (!editBtn) return;
+
+  const taskCard = editBtn.closest('.task-card.card-shape');
+  const taskListId = editBtn.dataset.taskListId
+    || taskCard.closest('.group-card.card-shape')?.dataset.taskListId;
+
+  formTask.querySelector('[name="task_title"]').value = editBtn.dataset.taskTitle || '';
+  formTask.querySelector('[name="task_description"]').value = editBtn.dataset.taskDescription || '';
+  formTask.querySelector('[name="priority"]').value = editBtn.dataset.priority || 'Low';
+  formTask.querySelector('[name="due_date"]').value = editBtn.dataset.dueDate || '';
+  taskIdInput.value = editBtn.dataset.taskId;
+  modalNewTask.querySelector('#task_list_id').value = taskListId || '';
+
+  const assignedUserIds = [...taskCard.querySelectorAll('[id="assigned-members"] [data-user-id]')]
+    .map(el => el.dataset.userId);
+
+  await addAssignees(taskListId, assignedUserIds);
+
+  taskModalTitle.textContent = 'Edit Task';
+  document.querySelector('#btn-task-submit').value = 'Save Changes';
+
+  modalNewTask.classList.add("set-display-flex");
+});
 
 searchTask.addEventListener('input', (e) => {
   [...taskCards].forEach(c => {
@@ -240,14 +278,30 @@ formTask.addEventListener("submit", async (e) => {
 
   payload.members = [...document.querySelectorAll('.user-pill.selected')].map((u) => u.dataset.userId);
 
-  const response = await axios.post("/createTask", payload);
-
-  if (response.data.success) {
-    let createdTask = response.data?.insertTask;
-
-    createDivTask(createdTask);
+  if (payload.task_id) {
+    try {
+      const response = await axios.patch("/updateTaskDetails", payload);
+      if (response.data.success) {
+        updateTaskCardUI(response.data.updatedTask);
+        modalNewTask.classList.remove("set-display-flex");
+        resetTaskModal();
+      } else {
+        alert("Unable to update the task.");
+      }
+    } catch (e) {
+      alert(`Unable to update the task: ${e}`);
+    }
   } else {
-    alert(`Unable to create a task for this Task List: ${e}`);
+    try {
+      const response = await axios.post("/createTask", payload);
+      if (response.data.success) {
+        createDivTask(response.data.insertTask);
+      } else {
+        alert("Unable to create a task for this Task List.");
+      }
+    } catch (e) {
+      alert(`Unable to create a task for this Task List: ${e}`);
+    }
   }
 });
 
@@ -272,6 +326,8 @@ function createDivTaskList(data, payload, tagName) {
   // ADD DYNAMIC CONTENT SO BUTTONS CAN BE ADDED
   // NEED TO USE A ANONYMOUS FUNCTION SINCE """THIS""" IN A ARROW FUNCTION DOESNT REFER TO TEH ELEMENT THAT IS CLICKED BUT THE LEXICAL SCOPE
   addTaskBtnTemp.addEventListener('click', function () {
+    resetTaskModal();
+    addAssignees(this.dataset.taskListId);
     modalNewTask.classList.add("set-display-flex");
     modalNewTask.querySelector("#task_list_id").value = this.dataset.taskListId;
   })
@@ -295,6 +351,16 @@ function createDivTask(data) {
   const taskCardTemp = cloneTaskTemp.querySelector(".task-card.card-shape");
   taskCardTemp.setAttribute("data-task-id", String(data.task_id));
   taskCardTemp.setAttribute("data-task-list-id", String(data.task_list_id));
+
+  const editBtnTemp = cloneTaskTemp.querySelector('.btn-edit-task');
+  if (editBtnTemp) {
+    editBtnTemp.dataset.taskId = String(data.task_id);
+    editBtnTemp.dataset.taskTitle = data.task_title;
+    editBtnTemp.dataset.taskDescription = data.task_description || '';
+    editBtnTemp.dataset.priority = data.priority;
+    editBtnTemp.dataset.dueDate = data.due_date || '';
+    editBtnTemp.dataset.taskListId = String(data.task_list_id);
+  }
 
   if (data.due_date) {
     cloneTaskTemp.querySelector("#task-deadline").textContent = data.due_date;
@@ -352,6 +418,36 @@ function createDivTask(data) {
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
     alert("Unable to create task.");
+  }
+}
+
+function updateTaskCardUI(task) {
+  const taskCard = document.querySelector(`.task-card.card-shape[data-task-id="${task.task_id}"]`);
+  if (!taskCard) return;
+
+  taskCard.querySelector('h4').textContent = task.task_title;
+
+  const priorityEl = taskCard.querySelector('.task-actions span, #task-priority');
+  if (priorityEl) priorityEl.textContent = task.priority;
+
+  const editBtn = taskCard.querySelector('.btn-edit-task');
+  if (editBtn) {
+    editBtn.dataset.taskTitle = task.task_title;
+    editBtn.dataset.taskDescription = task.task_description || '';
+    editBtn.dataset.priority = task.priority;
+    editBtn.dataset.dueDate = task.due_date || '';
+  }
+
+  const assignedDiv = taskCard.querySelector('[id="assigned-members"]');
+  if (assignedDiv) {
+    assignedDiv.innerHTML = '';
+    (task.members || []).forEach(m => {
+      const badge = document.createElement('div');
+      badge.className = 'badge-secondary';
+      badge.dataset.userId = m.user_id;
+      badge.textContent = m.username;
+      assignedDiv.appendChild(badge);
+    });
   }
 }
 

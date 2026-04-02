@@ -183,6 +183,45 @@ router.post("/createTask", authRequire, async (req, res) => {
   }
 });
 
+router.patch("/updateTaskDetails", authRequire, async (req, res) => {
+  const { task_id, task_title, task_description, priority, due_date, members } = req.body;
+
+  const { data: updatedTask, error: updateError } = await supabase
+    .from("task")
+    .update({
+      task_title,
+      task_description: task_description || null,
+      priority,
+      due_date: due_date || null,
+    })
+    .eq("task_id", task_id)
+    .select()
+    .single();
+
+  if (updateError) {
+    return res.status(500).json({ success: false, error: updateError.message });
+  }
+
+  await supabase.from("profiles_task").delete().eq("task_id", task_id);
+
+  if (members && members.length > 0) {
+    await supabase.from("profiles_task").insert(
+      members.map((m) => ({ user_id: m, task_id, status: "accepted" }))
+    );
+
+    const { data: updatedMembers } = await supabase
+      .from("profiles")
+      .select("username, user_id")
+      .in("user_id", members);
+
+    updatedTask.members = updatedMembers || [];
+  } else {
+    updatedTask.members = [];
+  }
+
+  res.json({ success: true, updatedTask });
+});
+
 router.patch("/updateTask", authRequire, async (req, res) => {
   const { data: taskUpdate, error: taskUpdateError } = await supabase
     .from("task")
