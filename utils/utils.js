@@ -1,4 +1,4 @@
-import supabase from "../db/supabase.js";
+import supabase, { createUserClient} from "../db/supabase.js";
 
 export default async function authRequire (req, res, next) {
   const supaToken = req.cookies.authCookie;
@@ -11,10 +11,11 @@ export default async function authRequire (req, res, next) {
     }
 
     try {
-      const userRefresh = await refreshSession(req, res)
-      req.user = userRefresh
+      const { user, accessToken } = await refreshSession(req, res)
+      req.user = user
+      req.supabase = createUserClient(accessToken)
       return next()
-      
+
     } catch (error) {
       res.clearCookie("authCookie");
       res.clearCookie("userId");
@@ -29,18 +30,20 @@ export default async function authRequire (req, res, next) {
   if (error || !data.user) {
 
     try {
-      const userRefresh = await refreshSession(req, res);
-      req.user = userRefresh;
+      const { user, accessToken } = await refreshSession(req, res);
+      req.user = user;
+      req.supabase = createUserClient(accessToken)
       return next();
 
     } catch (error) {
       res.clearCookie("authCookie");
       res.clearCookie("userId");
       res.clearCookie('refreshToken');
-      res.clearCookie('expiresAt'); 
+      res.clearCookie('expiresAt');
       return res.redirect("/login");
-    } 
+    }
   }
+  req.supabase = createUserClient(supaToken)
   req.user = data.user;
   return next();
 };
@@ -79,7 +82,7 @@ async function refreshSession(req, res) {
       sameSite: 'lax'
     })
 
-    return user
+    return { user, accessToken: session.access_token }
   } catch (error) {
     throw new Error('Could not set the cookies for the User.')
   }
