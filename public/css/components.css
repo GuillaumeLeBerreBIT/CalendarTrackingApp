@@ -10,15 +10,14 @@
 }
 
 .calendar-group-tag {
-  border-radius: 10px;
-  padding: 5px 10px;
-  border: 1px solid rgba(27, 31, 35, 0.15);
-  font-size: 14px;
+  background-color: #e8f5ec;
+  border: solid 1px rgb(205, 205, 205);
+  border-left: 3px solid #4A9D5F;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 1em;
-  box-shadow: rgba(27, 31, 35, 0.1) 0 1px 0;
-  background: oklch(57.81% 0.1776 147.5);
-  color: white;
+  color: #1a3d25;
   cursor: pointer;
 }
 
