@@ -134,10 +134,10 @@ export function createEventObj (events) {
     return eventObj
 }
 
-export async function retrieveTodoLists(groupId) {
+export async function retrieveTodoLists(groupId, client = supabase) {
 
   try {
-    const {data: todoLists, error: todoListsError} = await supabase
+    const {data: todoLists, error: todoListsError} = await client
     .from('task_list')
     .select('*')
     .eq('groups_id', groupId);
@@ -154,21 +154,21 @@ export async function retrieveTodoLists(groupId) {
   }
 }
 
-export async function retrieveEvents(groupId) {
+export async function retrieveEvents(groupId, client = supabase) {
 
   try {
-    const {data: events, error: eventsError} = await supabase
+    const {data: events, error: eventsError} = await client
     .from('events')
     .select(`
-      event_title, event_description, all_day, 
-      groups_id, start_date, 
+      event_title, event_description, all_day,
+      groups_id, start_date,
       end_date, start_time, end_time
       `)
     .eq('groups_id', groupId);
 
     if (eventsError) {
       console.log(`Couldn't retrieve any Events for groups Id: ${groupId}`)
-      return [];  
+      return [];
     }
 
     return events
@@ -178,11 +178,11 @@ export async function retrieveEvents(groupId) {
   }
 }
 
-export async function retrieveAllTasks(todoLists) {
+export async function retrieveAllTasks(todoLists, client = supabase) {
 
   const taskListIds = todoLists.map(t => t.task_list_id)
 
-  const {data: allEvents, error: allEventsError } = await supabase
+  const {data: allEvents, error: allEventsError } = await client
   .from('task')
   .select(`*`)
   .in('task_list_id', taskListIds);

@@ -11,7 +11,7 @@ export function createUserClient(accessToken) {
     process.env.SUPABASE_URL,
     process.env.SUPABASE_ANON_KEY,
     {
-      headers: {Authorization: `Bearer ${accessToken}`}
+      global: { headers: { Authorization: `Bearer ${accessToken}` } }
     }
   )
 }

@@ -5,7 +5,7 @@ import authRequire from "../utils/utils.js";
 const router = express.Router();
 
 router.get("/todo", authRequire, async (req, res) => {
-  const { data: groupObj, error: profileError } = await supabase
+  const { data: groupObj, error: profileError } = await req.supabase
     .from("profiles")
     .select(
       `
@@ -27,7 +27,7 @@ router.get("/todo", authRequire, async (req, res) => {
       .filter((pg) => pg.groups.tag_name !== null)
       .map((pg) => ({ gid: pg.groups_id, tag: pg.groups.tag_name })) || [];
 
-  const { data: task_list, error: taskListError } = await supabase
+  const { data: task_list, error: taskListError } = await req.supabase
     .from("task_list")
     .select(
       `
@@ -47,7 +47,7 @@ router.get("/todo", authRequire, async (req, res) => {
     .eq("groups.profiles_groups.invite_status", "accepted");
 
   const yourTaskListsPromises = task_list.map(async (tl) => {
-    const { data: tasks, error: errorTasks } = await supabase
+    const { data: tasks, error: errorTasks } = await req.supabase
       .from("task")
       .select(`*, profiles_task!left(user_id, profiles!inner(username))`)
       .eq("task_list_id", tl.task_list_id);
@@ -106,7 +106,7 @@ router.get("/todo", authRequire, async (req, res) => {
 });
 
 router.post("/createTaskList", authRequire, async (req, res) => {
-  const { data: createTaskList, error: createTaskListError } = await supabase
+  const { data: createTaskList, error: createTaskListError } = await req.supabase
     .from("task_list")
     .insert([
       {
@@ -117,7 +117,7 @@ router.post("/createTaskList", authRequire, async (req, res) => {
     ])
     .select();
 
-  const { data: tagName, error: tagNameError } = await supabase
+  const { data: tagName, error: tagNameError } = await req.supabase
     .from("groups")
     .select("tag_name")
     .eq("groups_id", req.body.groups_id);
@@ -136,7 +136,7 @@ router.post("/createTaskList", authRequire, async (req, res) => {
 });
 
 router.post("/createTask", authRequire, async (req, res) => {
-  const { data: insertTask, error: insertTaskError } = await supabase
+  const { data: insertTask, error: insertTaskError } = await req.supabase
     .from("task")
     .insert([
       {
@@ -151,7 +151,7 @@ router.post("/createTask", authRequire, async (req, res) => {
     .single();
 
   if (req.body.members && req.body.members.length >= 1) {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from("profiles_task")
       .insert(
         req.body.members.map((m) => {
@@ -167,7 +167,7 @@ router.post("/createTask", authRequire, async (req, res) => {
     if (error) {
       console.log(`Could not add users: ${error}`);
     } else {
-      let { data: usersTask } = await supabase
+      let { data: usersTask } = await req.supabase
         .from("profiles")
         .select("username, user_id")
         .in("user_id", req.body.members);
@@ -186,7 +186,7 @@ router.post("/createTask", authRequire, async (req, res) => {
 router.patch("/updateTaskDetails", authRequire, async (req, res) => {
   const { task_id, task_title, task_description, priority, due_date, members } = req.body;
 
-  const { data: updatedTask, error: updateError } = await supabase
+  const { data: updatedTask, error: updateError } = await req.supabase
     .from("task")
     .update({
       task_title,
@@ -202,14 +202,14 @@ router.patch("/updateTaskDetails", authRequire, async (req, res) => {
     return res.status(500).json({ success: false, error: updateError.message });
   }
 
-  await supabase.from("profiles_task").delete().eq("task_id", task_id);
+  await req.supabase.from("profiles_task").delete().eq("task_id", task_id);
 
   if (members && members.length > 0) {
-    await supabase.from("profiles_task").insert(
+    await req.supabase.from("profiles_task").insert(
       members.map((m) => ({ user_id: m, task_id, status: "accepted" }))
     );
 
-    const { data: updatedMembers } = await supabase
+    const { data: updatedMembers } = await req.supabase
       .from("profiles")
       .select("username, user_id")
       .in("user_id", members);
@@ -223,7 +223,7 @@ router.patch("/updateTaskDetails", authRequire, async (req, res) => {
 });
 
 router.patch("/updateTask", authRequire, async (req, res) => {
-  const { data: taskUpdate, error: taskUpdateError } = await supabase
+  const { data: taskUpdate, error: taskUpdateError } = await req.supabase
     .from("task")
     .update({ is_completed: req.body.isCompleted })
     .eq("task_id", req.body.taskId)
@@ -239,13 +239,13 @@ router.patch("/updateTask", authRequire, async (req, res) => {
 router.get("/membersTaskList/", async (req, res) => {
   const { taskListId } = req.query;
   try {
-    const { data: taskList } = await supabase
+    const { data: taskList } = await req.supabase
       .from("task_list")
       .select("groups_id")
       .eq("task_list_id", taskListId)
       .single();
 
-    const { data: taskMembers, error: taskMembersError } = await supabase
+    const { data: taskMembers, error: taskMembersError } = await req.supabase
       .from("profiles_groups")
       .select(`user_id, profiles!left(username))`)
       .eq("groups_id", taskList["groups_id"])

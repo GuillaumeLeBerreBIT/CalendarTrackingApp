@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.get("/groups", authRequire, async (req, res) => {
 
-  const {data: userMemberships, error: userMembershipsError} = await supabase
+  const {data: userMemberships, error: userMembershipsError} = await req.supabase
   .from('profiles_groups')
   .select('groups_id')
   .eq('user_id', req.cookies.userId)
@@ -31,7 +31,7 @@ router.get("/groups", authRequire, async (req, res) => {
 
   //Need to use the INNNER join to filter on nested tables and only return the
   // data if there is a match in the lower table.
-  const { data: groups, error: groupsError } = await supabase
+  const { data: groups, error: groupsError } = await req.supabase
     .from("groups")
     .select(
       `
@@ -61,11 +61,11 @@ router.get("/groups", authRequire, async (req, res) => {
         }) || [];
 
       // Need to retrieve all events
-      const events = await retrieveEvents(group.groups_id);
+      const events = await retrieveEvents(group.groups_id, req.supabase);
       //Need to retrieve all ToDo Lists
-      const todoLists = await retrieveTodoLists(group.groups_id);
+      const todoLists = await retrieveTodoLists(group.groups_id, req.supabase);
 
-      const totalTasks = todoLists.length > 0 ? await retrieveAllTasks(todoLists) : {all: 0, completed: 0};;
+      const totalTasks = todoLists.length > 0 ? await retrieveAllTasks(todoLists, req.supabase) : {all: 0, completed: 0};
 
       return {
         groupInfo: {
@@ -86,7 +86,7 @@ router.get("/groups", authRequire, async (req, res) => {
       };
     }) || []);
 
-  const {data: todayEvents, error: todayEventsError} = await supabase
+  const {data: todayEvents, error: todayEventsError} = await req.supabase
   .from('profiles_events')
   .select('*')
   .eq('user_id', req.cookies.userId)
@@ -98,7 +98,7 @@ router.get("/groups", authRequire, async (req, res) => {
   }
   totalEvents = todayEvents.length;
 
-  const {data: userInvites, error: UserInvitesError } = await supabase
+  const {data: userInvites, error: UserInvitesError } = await req.supabase
   .from('profiles_groups')
   .select(
     `*,
@@ -120,7 +120,7 @@ router.get("/groups", authRequire, async (req, res) => {
 router.post('/checkUser', authRequire ,async (req, res) => {
 
   try {
-    const {data: isUserFound, error: noUser} = await supabase
+    const {data: isUserFound, error: noUser} = await req.supabase
     .from('profiles')
     .select('username, user_id, email')
     .or(`username.ilike.${req.body.isUser},email.ilike.${req.body.isUser}`)
@@ -150,7 +150,7 @@ router.post('/InviteUsers', authRequire, async (req, res) => {
 
     const userIds = req.body.userList.map(u => u.user_id)
 
-    const {data: users2Check, error: users2CheckError } = await supabase
+    const {data: users2Check, error: users2CheckError } = await req.supabase
     .from('profiles_groups')
     .select()
     .in('user_id', userIds)
@@ -178,7 +178,7 @@ router.post('/InviteUsers', authRequire, async (req, res) => {
       }
     })
 
-    const {data: inviteUsers, error: inviteUsersError} = await supabase
+    const {data: inviteUsers, error: inviteUsersError} = await req.supabase
       .from('profiles_groups')
       .upsert(inviteUserDb) // Need upsert if there is a declined in there
       .select()
@@ -189,7 +189,7 @@ router.post('/InviteUsers', authRequire, async (req, res) => {
 
     const emailIdList = inviteUsers.map(u => u.user_id)
 
-    const {data: userProfile, error: userProfileError} = await supabase
+    const {data: userProfile, error: userProfileError} = await req.supabase
       .from('profiles')
       .select('email, user_id, username')
       .in('user_id', emailIdList)
@@ -221,7 +221,7 @@ router.post('/InviteUsers', authRequire, async (req, res) => {
 
 router.post('/createGroup', authRequire, async (req, res) => {
 
-  const {data: newGroup, error: newGroupError} = await supabase
+  const {data: newGroup, error: newGroupError} = await req.supabase
   .from('groups')
   .insert({
       groups_title: req.body['group-title'],
@@ -234,7 +234,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
     res.status(400).json({success: false, error: `Could not create Group ${newGroup}`})
   }
 
-  const {data: newProfilesGroup, error: newProfilesGroupError} = await supabase
+  const {data: newProfilesGroup, error: newProfilesGroupError} = await req.supabase
   .from('profiles_groups')
   .insert([{
     groups_id: newGroup[0].groups_id,
@@ -245,7 +245,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
   .select()
 
   if (newProfilesGroupError) {
-    const {error: deleteGroupError} = await supabase
+    const {error: deleteGroupError} = await req.supabase
     .from('groups')
     .delete()
     .eq('groups_id', newGroup[0].groups_id) 
@@ -258,7 +258,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
   if (req.body.usersInvite) {
     // Need to use map to catch alle results and do async programming with it.
     promiseInviteResults = await Promise.all(req.body.usersInvite.map( async (user) => {
-      let {data: inviteUser, error: inviteUserError} = await supabase
+      let {data: inviteUser, error: inviteUserError} = await req.supabase
       .from('profiles_groups')
       .upsert([{
         groups_id: newGroup[0].groups_id,
@@ -285,7 +285,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
 
 router.post('/acceptInviteGroup', authRequire, async (req, res) => {
 
-  const {data: inviteAccepted, error: InviteAcceptedError} = await supabase
+  const {data: inviteAccepted, error: InviteAcceptedError} = await req.supabase
   .from('profiles_groups')
   .update({invite_status: 'accepted'})
   .eq('groups_id', req.body.groupId)
@@ -296,7 +296,7 @@ router.post('/acceptInviteGroup', authRequire, async (req, res) => {
     res.status(400).json({success: false, error: InviteAcceptedError.message})
   }
 
-  const { data: group, error: groupsError } = await supabase
+  const { data: group, error: groupsError } = await req.supabase
     .from("groups")
     .select(
       `
@@ -327,11 +327,11 @@ router.post('/acceptInviteGroup', authRequire, async (req, res) => {
   }) || [];
 
   // Need to retrieve all events
-  const events = await retrieveEvents(req.body.groupsId);
+  const events = await retrieveEvents(req.body.groupsId, req.supabase);
   //Need to retrieve all ToDo Lists
-  const todoLists = await retrieveTodoLists(req.body.groupsId);
+  const todoLists = await retrieveTodoLists(req.body.groupsId, req.supabase);
 
-  const {data: todayEvents, error: todayEventsError} = await supabase
+  const {data: todayEvents, error: todayEventsError} = await req.supabase
   .from('profiles_events')
   .select('*')
   .eq('user_id', req.cookies.userId)
@@ -358,7 +358,7 @@ router.post('/acceptInviteGroup', authRequire, async (req, res) => {
 
 router.post('/declineInviteGroup', authRequire, async (req, res) => {
 
-  const {data: inviteAccepted, error: InviteAcceptedError} = await supabase
+  const {data: inviteAccepted, error: InviteAcceptedError} = await req.supabase
   .from('profiles_groups')
   .update({invite_status: 'declined'})
   .eq('groups_id', req.body.groupId)

@@ -8,7 +8,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
 
   const insertEventObj = createEventObj(req.body)
 
-  const { data: eventData, error: eventDataError } = await supabase
+  const { data: eventData, error: eventDataError } = await req.supabase
     .from("events")
     .insert([
       {
@@ -40,7 +40,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
       }
     })
 
-    const {data: eventUsersInvited, error: eventUsersInvitedError} = await supabase
+    const {data: eventUsersInvited, error: eventUsersInvitedError} = await req.supabase
     .from('profiles_events')
     .insert(insertUsersArray)
     .select()
@@ -65,12 +65,12 @@ router.post("/parseEvent", authRequire, async (req, res) => {
 
     const insertUsersArray = [{user_id: req.cookies.userId, event_id: eventData[0].event_id, rsvp_status: 'accepted'}];
     // After adding Event need to update the profiles_event table
-    const {data: eventProfile, error: eventProfileError} = await supabase
+    const {data: eventProfile, error: eventProfileError} = await req.supabase
     .from('profiles_events')
     .insert(insertUsersArray)
     .select()
 
-    const {data: user, error: userError} = await supabase
+    const {data: user, error: userError} = await req.supabase
     .from('profiles')
     .select('username')
     .eq('user_id', req.cookies.userId)
@@ -93,7 +93,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
   const eventId = parseInt(req.params.eventId);
   const updateEventObj = createEventObj(req.body)
 
-  const {data: updateEvent, error: updateEventError} = await supabase
+  const {data: updateEvent, error: updateEventError} = await req.supabase
   .from('events')
   .update({
     event_title: updateEventObj["calendar-title"],
@@ -112,7 +112,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     return res.status(500).json({success: false, error: updateEventError.message})
   }
 
-  const {data: eventParticipants, error: eventParticipantsError} = await supabase
+  const {data: eventParticipants, error: eventParticipantsError} = await req.supabase
   .from('profiles_events')
   .select()
   .eq('event_id', eventId);
@@ -155,7 +155,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
       }
     })
 
-    const {data: upsertUsers, error: upsertUsersError} = await supabase
+    const {data: upsertUsers, error: upsertUsersError} = await req.supabase
     .from('profiles_events')
     .upsert(eventParticipantsUpdated)
     .select()
@@ -168,7 +168,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
 
   } else {
 
-    const { data: updateUser, error: updateUserError } = await supabase
+    const { data: updateUser, error: updateUserError } = await req.supabase
     .from('profiles_events')
     .update({
       user_id: req.cookies.userId,
@@ -178,7 +178,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     .eq('event_id', eventId)
     .select()
 
-    const {data: user, error: userError} = await supabase
+    const {data: user, error: userError} = await req.supabase
     .from('profiles')
     .select('username')
     .eq('user_id', req.cookies.userId)
@@ -201,7 +201,7 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId)
 
-    const {error: deleteEventError } = await supabase
+    const {error: deleteEventError } = await req.supabase
     .from('events')
     .delete()
     .eq('event_id', eventId)
@@ -210,7 +210,7 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
       return res.status(500).json({success: false, error: deleteEventError.message})
     }
 
-    const {error: deleteProfileError } = await supabase
+    const {error: deleteProfileError } = await req.supabase
     .from('profiles_events')
     .delete()
     .eq('event_id', eventId)
@@ -231,7 +231,7 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
 
 router.get('/renderEvents', authRequire, async (req, res) => {
 
-  let {data: groupsIds, error: groupsIdsError} = await supabase
+  let {data: groupsIds, error: groupsIdsError} = await req.supabase
   .from('groups')
   .select(`groups_id, tag_name,
     profiles_groups!inner(
@@ -250,7 +250,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
   const groupIdArray = groupsIds.map(g => g.groups_id);
 
-  let { data: userEvents, error: userEventsError} = await supabase.
+  let { data: userEvents, error: userEventsError} = await req.supabase.
   from('events')
   .select(`*,
     profiles_events(
@@ -266,7 +266,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
     console.warn('Could not retrieve any of the events specifically to the user.', userEventsError)
   }
 
-  let {data: events, error: errorEvents} = await supabase
+  let {data: events, error: errorEvents} = await req.supabase
   .from('events')
   .select(`
     *,
@@ -336,7 +336,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
 router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
   console.log(parseInt(req.query.groupId))
-  const {data: groupUsers, error: groupUsersError } = await supabase
+  const {data: groupUsers, error: groupUsersError } = await req.supabase
   .from('profiles_groups')
   .select(
   `
