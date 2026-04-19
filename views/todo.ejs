@@ -78,7 +78,7 @@
                                         <span class="badge-secondary">
                                             <%= t.priority %>
                                         </span>
-                                        <button class=" " type="button"
+                                        <button class="edit-task" type="button"
                                             data-task-id="<%= t.task_id %>"
                                             data-task-title="<%= t.task_title %>"
                                             data-task-description="<%= t.task_description || '' %>"
@@ -162,15 +162,15 @@
 
                     <div class="flex-column">
                         <label for="">Title</label>
-                        <input type="text" name="task_title" class="" id="" placeholder="">
+                        <input type="text" name="task_title" class="" id="task_title" placeholder="">
                     </div>
                     <div class="flex-column">
                         <label for="">Task Description</label>
-                        <input type="text" name="task_description" class="" id="" placeholder="">
+                        <input type="text" name="task_description" class="" id="task_description" placeholder="">
                     </div>
                     <div class="flex-column">
                         <label for="">Priority</label>
-                        <select type="text" name="priority" class="" id="">
+                        <select type="text" name="priority" class="" id="task_priority">
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
                             <option value="High">High</option>
@@ -178,7 +178,7 @@
                     </div>
                     <div class="flex-column">
                         <label for="">Due Date</label>
-                        <input type="date" name="due_date" class="" id="">
+                        <input type="date" name="due_date" class="" id="task_due_date">
                     </div>
                     <div class="flex-column">
                         <label for="assign-member">Assign members</label>

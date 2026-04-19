@@ -18,6 +18,8 @@ const selectTasks = document.querySelector('#select-tasks')
 const taskCards = document.querySelectorAll('div.task-card.card-shape');
 const taskModalTitle = document.querySelector('#task-modal-title');
 const taskIdInput = document.querySelector('#task_id');
+const groupContainer = document.querySelector('.group-container')
+const editTasksButtons = document.querySelectorAll('.edit-task')
 
 
 function updateGroupID() {
@@ -129,6 +131,7 @@ document.querySelector('.group-container').addEventListener('click', async funct
   taskModalTitle.textContent = 'Edit Task';
   document.querySelector('#btn-task-submit').value = 'Save Changes';
 
+  formTask.querySelector('#task-modal-title').textContent = 'New Task'
   modalNewTask.classList.add("set-display-flex");
 });
 
@@ -241,6 +244,23 @@ document.querySelectorAll(".task-card.card-shape").forEach((t) => {
     });
   });
 });
+
+groupContainer.addEventListener("click", (e) => {
+  if (e.target.className == "edit-task") {
+    const { dueDate, priority, taskDescription, taskId, taskListId, taskTitle } = e.target.dataset;
+
+    modalNewTask.querySelector('#task-modal-title').textContent = 'Update Task'
+
+    formTask.querySelector('#task_title').value = taskTitle;
+    formTask.querySelector('#task_description').value = taskDescription;
+    formTask.querySelector('#task_priority').value = priority;
+    formTask.querySelector('#task_due_date').value = dueDate;
+    formTask.querySelector('#task_id').value = taskId;
+    formTask.querySelector('#task_list_id').value = taskListId;
+
+    modalNewTask.classList.add('set-display-flex');
+  }
+})
 
 // TASKLIST FORM HANDLING TO CREATE A NEW ONE
 formTaskList.addEventListener("submit", async (e) => {
@@ -410,7 +430,7 @@ function createDivTask(data) {
 
     taskCont.appendChild(cloneTaskTemp);
     // UPDATE UI AFTER ADDING TEMP TASK CARD TO TASKLIST ITSEFL (Need to go in depth here)
-    updateTaskUI(cloneTaskTemp.querySelector('input[type=checkbox]'), taskCardTemp)
+    updateTaskUI(cloneTaskTemp.querySelector('input[type=checkbox]').checked, taskCardTemp)
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
 
