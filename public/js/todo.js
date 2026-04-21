@@ -243,13 +243,14 @@ document.querySelectorAll(".task-card.card-shape").forEach((t) => {
       debouncedTaskUpdate(this.dataset.taskId, this.checked);
     });
   });
-});
+}); 
 
 groupContainer.addEventListener("click", (e) => {
   if (e.target.className == "edit-task") {
     const { dueDate, priority, taskDescription, taskId, taskListId, taskTitle } = e.target.dataset;
 
     modalNewTask.querySelector('#task-modal-title').textContent = 'Update Task'
+    modalNewTask.querySelector('#btn-task-submit').value = 'Update Task'
 
     formTask.querySelector('#task_title').value = taskTitle;
     formTask.querySelector('#task_description').value = taskDescription;
@@ -257,7 +258,6 @@ groupContainer.addEventListener("click", (e) => {
     formTask.querySelector('#task_due_date').value = dueDate;
     formTask.querySelector('#task_id').value = taskId;
     formTask.querySelector('#task_list_id').value = taskListId;
-
     modalNewTask.classList.add('set-display-flex');
   }
 })
