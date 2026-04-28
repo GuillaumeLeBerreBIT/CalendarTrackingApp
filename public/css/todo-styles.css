@@ -1,174 +1,224 @@
+/* ════════════════════════════════════════════════════
+   Todo page — header area
+════════════════════════════════════════════════════ */
 .todo-header-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  flex-wrap: wrap;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    flex-wrap: wrap;
 
-  gap: 1rem;
-  width: 80%;
-  margin: 20px auto;
-  padding: 10px;
+    gap: 16px;
+    width: 90%;
+    max-width: 1100px;
+    margin: 28px auto 12px auto;
+    padding: 0 4px;
 }
 
 .todo-header-container > * {
-  margin: auto;
+    margin: auto;
 }
 
+/* ════════════════════════════════════════════════════
+   Task list card layout
+════════════════════════════════════════════════════ */
 .group-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-
-  gap: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    padding-bottom: 32px;
 }
 
 .group-card {
-  display: flex;
-  flex-direction: column;
-  width: 90%;
-  max-width: 1100px;  
-
-  gap: 20px;
+    display: flex;
+    flex-direction: column;
+    width: 90%;
+    max-width: 1100px;
+    gap: 16px;
 }
 
 .group-header {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-
-  gap: 20px;
-  margin: 10px 0px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
 }
 
 .group-header .header-item {
-  gap: 10px;
+    gap: 8px;
+    display: flex;
+    align-items: center;
 }
 
 .group-header h4 {
-  margin: 0px 0px;
+    margin: 0;
 }
 
 .group-header h3 {
-  margin: 0;
+    margin: 0;
+    font-size: 16px;
 }
 
+/* Soft variant buttons (Add Task / …) */
+.btn.btn-soft {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-2);
+    border: 1px solid var(--color-border);
+    font-size: 13px;
+    padding: 6px 14px;
+    box-shadow: none;
+}
+
+.btn.btn-soft:hover {
+    background-color: var(--color-border);
+    color: var(--color-text-1);
+}
+
+/* ════════════════════════════════════════════════════
+   Task container
+════════════════════════════════════════════════════ */
 .task-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-
-  gap: 20px;
-
-  max-height: 800px;
-  overflow-y: auto;
-  overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    max-height: 800px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
+/* ════════════════════════════════════════════════════
+   Task card
+════════════════════════════════════════════════════ */
 .task-card {
-  display: flex;
-  flex-direction: row;
+    display: flex;
+    flex-direction: row;
+    width: 90%;
+    gap: 4px;
+    transition: box-shadow var(--transition-fast);
+}
 
-  width: 90%;
+.task-card:hover {
+    box-shadow: var(--shadow-md);
 }
 
 .task-card.hidden {
-  display: none;
+    display: none;
 }
 
+/* Checkbox column */
 .radio-box {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 28px;
-  width: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 2px;
+    height: 28px;
+    width: 40px;
+    flex-shrink: 0;
 }
 
 .radio-box input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  margin: 0;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--color-accent);
+    cursor: pointer;
 }
 
+/* Task text content */
 .task-content {
-  display: flex;
-  flex-direction: column;
-
-  width: 100%;
-  gap: 10px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 6px;
 }
 
 h4 {
     margin: 5px 0;
-  }
+}
 
+/* ════════════════════════════════════════════════════
+   Progress bar
+════════════════════════════════════════════════════ */
 .progress-bar-prog {
-  font-size: 14px;
-  color: oklch(0.35 0 0);
+    font-size: 13px;
+    color: var(--color-text-3);
+    font-variant-numeric: tabular-nums;
 }
 
 .progress-container {
-  width: 100%;
-  height: 8px;
-  background-color: #f3f4f6;
-  border-radius: 10px;
+    width: 100%;
+    height: 6px;
+    background-color: var(--color-surface-alt);
+    border-radius: var(--radius-full);
+    overflow: hidden;
 }
 
 .progress {
-  margin-top: 5px;
-  height: 100%;
-  width: 0%;
-  border-radius: 10px;  
-  transition: width 0.4s ease;
-  background-color: oklch(57.81% 0.1776 147.5);
+    height: 100%;
+    width: 0%;
+    border-radius: var(--radius-full);
+    transition: width 0.4s ease;
+    background-color: var(--color-accent);
 }
 
+/* ════════════════════════════════════════════════════
+   Completed task style
+════════════════════════════════════════════════════ */
 .task-completion h4,
 .task-completion span,
-.task-completion p
- {
-  text-decoration-line: line-through;
+.task-completion p {
+    text-decoration-line: line-through;
+    opacity: 0.5;
 }
 
-.flex-shrink {
-  flex: 1 1 auto;
-}
+/* ════════════════════════════════════════════════════
+   Flex helpers local
+════════════════════════════════════════════════════ */
+.flex-shrink { flex: 1 1 auto; }
+.fixed-item  { flex: 0 0 auto; }
 
-.fixed-item {
-  flex: 0 0 auto;
-}
-
+/* ════════════════════════════════════════════════════
+   Task action buttons (edit pencil, etc.)
+════════════════════════════════════════════════════ */
 .task-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .btn-edit-task {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: oklch(0.55 0 0);
-  opacity: 0;
-  transition: opacity 0.15s ease, background-color 0.1s ease;
-  line-height: 1;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--color-text-3);
+    opacity: 0;
+    transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+    line-height: 1;
+    box-shadow: none;
 }
 
 .task-card:hover .btn-edit-task {
-  opacity: 1;
+    opacity: 1;
 }
 
 .btn-edit-task:hover {
-  background-color: oklch(0.93 0 0);
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-2);
 }
 
+/* ════════════════════════════════════════════════════
+   Modal title
+════════════════════════════════════════════════════ */
 #task-modal-title {
-  margin: 0 0 16px 0;
-  font-size: 18px;
+    margin: 0 0 16px 0;
+    font-size: 17px;
+    font-weight: 600;
 }

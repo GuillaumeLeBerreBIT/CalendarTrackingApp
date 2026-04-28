@@ -1,71 +1,130 @@
+/* ════════════════════════════════════════════════════
+   Badges
+════════════════════════════════════════════════════ */
 .badge-secondary {
-    background: oklch(0.97 0 0);
-    color: oklch(0.400 0.00132 15.307);
-    border-radius: 2rem;
-    border: 1px solid oklch(0.800 0 0);
-    padding: 0.125rem 0.625rem;
-    font-size: 0.75rem;
+    background-color: var(--color-surface-alt, #F3F5F7);
+    color: var(--color-text-2);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    padding: 2px 10px;
+    font-size: 11px;
     font-weight: 500;
     width: fit-content;
+    letter-spacing: 0.01em;
 }
 
+/* ════════════════════════════════════════════════════
+   Calendar group tag chips
+════════════════════════════════════════════════════ */
 .calendar-group-tag {
-  background-color: #e8f5ec;
-  border: solid 1px rgb(205, 205, 205);
-  border-left: 3px solid #4A9D5F;
-  border-radius: 5px;
-  padding: 3px 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #1a3d25;
-  cursor: pointer;
+    background-color: var(--color-accent-light);
+    border: 1px solid rgba(59, 122, 87, 0.2);
+    border-left: 3px solid var(--color-accent);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-accent-hover);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), opacity var(--transition-fast);
 }
 
 .calendar-group-tag.deactive {
-  background: oklch(0.88 0 0);
-  color: #374151;
+    background-color: var(--color-surface-alt);
+    border-left-color: var(--color-border-hover);
+    color: var(--color-text-3);
+    opacity: 0.75;
 }
 
+/* ════════════════════════════════════════════════════
+   Buttons
+════════════════════════════════════════════════════ */
 button {
-    border-radius: 10px;
-    padding: 8px 20px;
-    border: 1px solid rgba(27, 31, 35, 0.15);
+    border-radius: var(--radius-md);
+    padding: 8px 18px;
+    border: 1px solid transparent;
     font-size: 14px;
     font-weight: 500;
-    line-height: 20px;
-    box-shadow: rgba(27, 31, 35, 0.1) 0 1px 0;
-    background: oklch(57.81% 0.1776 147.5);
-    color: white;
+    font-family: inherit;
+    line-height: 1.4;
     cursor: pointer;
+    background-color: var(--color-accent);
+    color: white;
+    transition:
+        background-color var(--transition-fast),
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast),
+        transform var(--transition-fast);
+    box-shadow: var(--shadow-xs);
 }
 
+button:hover {
+    background-color: var(--color-accent-hover);
+    box-shadow: var(--shadow-sm);
+}
+
+button:active {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* Icon-only delete button */
 button.delete {
-  padding: 5px;
-  margin-top: 5px;
-  background-color: oklch(62.72% 0.24513 28.19 / 0.955);
-  width: 36px;
-  height: 36px;
+    padding: 6px;
+    background-color: var(--color-danger-light);
+    border: 1px solid var(--color-danger-border);
+    color: var(--color-danger);
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
 }
 
+button.delete:hover {
+    background-color: var(--color-danger);
+    color: white;
+    border-color: var(--color-danger);
+}
+
+/* Icon-only edit button */
 button.edit {
-  padding: 5px;
-  margin-top: 5px;
-  background-color: oklch(57.81% 0.1776 147.5);
-  width: 36px;
-  height: 36px;
+    padding: 6px;
+    background-color: var(--color-accent-light);
+    border: 1px solid rgba(59, 122, 87, 0.2);
+    color: var(--color-accent);
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
 }
 
+button.edit:hover {
+    background-color: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+}
+
+/* ════════════════════════════════════════════════════
+   Modal overlay
+════════════════════════════════════════════════════ */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 100;
+    padding: 16px;
 }
 
 .modal-box {
@@ -73,48 +132,59 @@ button.edit {
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    background-color: white;
-    border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--color-border);
 
-    max-width: 720px;
+    max-width: 680px;
     min-width: 320px;
     width: 60%;
-    max-height: calc(100vh - 120px);
-    padding: 15px 20px 20px 20px;
+    max-height: calc(100vh - 80px);
+    padding: 24px 28px;
     overflow-y: auto;
 }
 
 .hide-scrollbar {
-  overflow-y: scroll; /* Or auto */
-  scrollbar-width: none;  /* Firefox */
-  -ms-overflow-style: none;  /* IE and Edge */
+    overflow-y: scroll;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .hide-scrollbar::-webkit-scrollbar {
-  display: none;
+    display: none;
 }
 
 .close-btn {
     position: absolute;
-    top: 10px;
-    right: 15px;
+    top: 14px;
+    right: 18px;
     cursor: pointer;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
+    color: var(--color-text-3);
+    line-height: 1;
+    transition: color var(--transition-fast);
 }
 
+.close-btn:hover {
+    color: var(--color-text-1);
+}
+
+/* ════════════════════════════════════════════════════
+   Form layout inside modals
+════════════════════════════════════════════════════ */
 .form-modal {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
 
-  margin: 10px 20px;
-  gap: 15px;
-  width: 80%;
-  max-width: 600px;
+    gap: 16px;
+    width: 100%;
+    max-width: 600px;
 }
 
+/* ── Shared input / textarea / date / time styles ── */
 .form-modal input[type="text"],
 .form-modal textarea,
 .form-modal input[type="date"],
@@ -123,55 +193,87 @@ button.edit {
 .login-card input[type="email"],
 .login-card input[type="password"],
 .login-card input[type="submit"],
-.login-card input[type="text"]
- {
-  width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: inherit;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
+.login-card input[type="text"] {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--color-text-1);
+    background-color: var(--color-surface);
+    transition: border-color var(--transition-base), box-shadow var(--transition-base);
+    box-sizing: border-box;
+    outline: none;
+}
+
+.form-modal input[type="text"]:focus,
+.form-modal textarea:focus,
+.form-modal input[type="date"]:focus,
+.form-modal input[type="time"]:focus,
+.login-card input[type="email"]:focus,
+.login-card input[type="password"]:focus,
+.login-card input[type="text"]:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(59, 122, 87, 0.12);
+}
+
+.form-modal input[type="submit"],
+.login-card input[type="submit"] {
+    background-color: var(--color-accent);
+    color: white;
+    border-color: transparent;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: var(--shadow-xs);
 }
 
 .form-modal input[type="submit"]:hover,
-.login-card input[type="submit"]:hover
-{
-  background-color: oklch(66.979% 0.16322 150.152);
-  transition: background-color 0.5s ease;
+.login-card input[type="submit"]:hover {
+    background-color: var(--color-accent-hover);
+    box-shadow: var(--shadow-sm);
 }
 
-.login-card input:hover
-{
-  border-color: oklch(66.979% 0.16322 150.152);
-  transition: border-color 0.5s ease;
+.login-card input:not([type="submit"]):hover {
+    border-color: var(--color-border-hover);
 }
 
 input[type="search"],
-select
- {
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: inherit;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
+select {
+    padding: 10px 14px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--color-text-1);
+    background-color: var(--color-surface);
+    transition: border-color var(--transition-base), box-shadow var(--transition-base);
+    box-sizing: border-box;
+    outline: none;
+}
+
+input[type="search"]:focus,
+select:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(59, 122, 87, 0.12);
 }
 
 .form-modal textarea {
-  resize: vertical;
+    resize: vertical;
 }
 
+/* ════════════════════════════════════════════════════
+   Event detail modal
+════════════════════════════════════════════════════ */
 .modal-box-event {
     position: relative;
     display: flex;
     flex-direction: column;
-    background-color: white;
-    border-radius: 12px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-    max-width: 480px;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--color-border);
+    max-width: 460px;
     width: 90%;
     overflow: hidden;
 }
@@ -181,7 +283,7 @@ select
     justify-content: space-between;
     align-items: center;
     padding: 12px 18px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .event-modal-label {
@@ -189,22 +291,22 @@ select
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #9ca3af;
+    color: var(--color-text-3);
 }
 
 .event-close-btn {
-    font-size: 1.3rem;
-    color: #9ca3af;
+    font-size: 1.25rem;
+    color: var(--color-text-3);
     cursor: pointer;
     line-height: 1;
-    padding: 2px 4px;
-    border-radius: 4px;
-    transition: color 0.15s ease, background-color 0.15s ease;
+    padding: 3px 5px;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .event-close-btn:hover {
-    color: #374151;
-    background-color: #f3f4f6;
+    color: var(--color-text-1);
+    background-color: var(--color-surface-alt);
 }
 
 .event-modal-title-row {
@@ -225,8 +327,8 @@ select
     width: 30px;
     height: 30px;
     padding: 5px;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
     background: transparent;
     cursor: pointer;
     display: flex;
@@ -234,27 +336,28 @@ select
     justify-content: center;
     box-shadow: none;
     margin: 0;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    color: var(--color-text-2);
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .btn-icon svg {
-    width: 16px;
-    height: 16px;
-    fill: #6b7280;
+    width: 15px;
+    height: 15px;
+    fill: var(--color-text-3);
 }
 
 .btn-icon:hover {
-    background: #f9fafb;
-    border-color: #d1d5db;
+    background-color: var(--color-surface-alt);
+    border-color: var(--color-border-hover);
 }
 
 .btn-icon-danger:hover {
-    background: #fef2f2;
-    border-color: #fca5a5;
+    background-color: var(--color-danger-light);
+    border-color: var(--color-danger-border);
 }
 
 .btn-icon-danger:hover svg {
-    fill: #ef4444;
+    fill: var(--color-danger);
 }
 
 .event-modal-body {
@@ -275,7 +378,7 @@ select
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9ca3af;
+    color: var(--color-text-3);
     min-width: 44px;
     flex-shrink: 0;
 }
@@ -283,85 +386,85 @@ select
 .event-description-box {
     margin-top: 4px;
     padding: 12px 14px;
-    background: #f9fafb;
-    border-radius: 8px;
-    border: 1px solid #f0f0f0;
+    background-color: var(--color-surface-alt);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
 }
 
 .event-description-box #event-description {
     font-size: 14px;
-    color: #374151;
+    color: var(--color-text-1);
     line-height: 1.6;
 }
 
 .event-header {
-  margin: 0 0 4px 0;
+    margin: 0 0 4px 0;
 }
 
 .left-border {
-  border-left: 3px solid oklch(57.81% 0.1776 147.5);
-  padding: 0 0 0 10px;
-  border-radius: 0.25rem;
+    border-left: 3px solid var(--color-accent);
+    padding: 0 0 0 10px;
+    border-radius: 0 0.25rem 0.25rem 0;
 }
 
+/* ════════════════════════════════════════════════════
+   Participant / user pills
+════════════════════════════════════════════════════ */
 .participants-box {
     display: flex;
     justify-content: flex-start;
     align-items: center;
     flex-wrap: wrap;
-    
-    min-height: 80px;
-    padding: 10px;
-    gap: 10px;
-
+    min-height: 72px;
+    padding: 12px;
+    gap: 8px;
     width: 100%;
     box-sizing: border-box;
-
 }
 
 .user-pill {
-  display: flex;
-  align-items: center;
-
-  padding: 10px 20px;
-  gap: 8px;
-
-  background: white;
-  color: #374151;
-  border: 2px solid #e5e7eb;
-  border-radius: 25px;
-  font-size: 14px;
-  font-weight: 500;
-
-  cursor: pointer;
-  transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 8px;
+    background-color: var(--color-surface);
+    color: var(--color-text-1);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--transition-base), border-color var(--transition-base), transform var(--transition-fast);
 }
 
 .user-pill:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  transform: translateY(-1px);
+    background-color: var(--color-surface-alt);
+    border-color: var(--color-border-hover);
+    transform: translateY(-1px);
 }
 
 .user-pill.selected {
-  background: oklch(57.81% 0.1776 147.5);
-  color: white;
-  border-color: oklch(57.81% 0.1776 147.5);
-  box-shadow: 0 2px 4px rgba(74, 157, 95, 0.3);
+    background-color: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+    box-shadow: 0 2px 6px rgba(59, 122, 87, 0.25);
 }
 
 .user-pill.selected:hover {
-    background: oklch(52% 0.16 147.5);
-    border-color: oklch(52% 0.16 147.5);
+    background-color: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
 }
 
-@media(max-width: 800px ) {
+/* ════════════════════════════════════════════════════
+   Responsive
+════════════════════════════════════════════════════ */
+@media (max-width: 800px) {
+    .modal-box-event {
+        width: 100%;
+    }
 
-  .modal-box-event {
-    width: 100%;
-  }
-
-  .modal-box {
-    width: 100%;
-  }
+    .modal-box {
+        width: 100%;
+        padding: 20px 20px;
+    }
 }

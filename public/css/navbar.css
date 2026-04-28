@@ -1,34 +1,89 @@
 :root {
-    --base-clr: oklch(0.97 0 0);
-    --line-clr: oklch(0.922 0 0);
-    --hover-clr: oklch(70.143% 0.13815 152.127);
-    --text-clr: #000000;
-    --accent-clr: oklch(57.81% 0.1776 147.5);
-    --accent-clr-hover: white;
-    --secondary-text-clr: #b0b3c1;
+    /* ── Design tokens ─────────────────────────────── */
+    --color-bg:           #F8F9FA;
+    --color-surface:      #FFFFFF;
+    --color-surface-alt:  #F3F5F7;
+    --color-border:       #E5E8ED;
+    --color-border-hover: #C8CDD5;
+    --color-text-1:       #1A202C;
+    --color-text-2:       #64748B;
+    --color-text-3:       #94A3B8;
+    --color-accent:       #3B7A57;
+    --color-accent-light: #EDF7F1;
+    --color-accent-hover: #2D6044;
+    --color-accent-text:  #FFFFFF;
+    --color-danger:       #DC2626;
+    --color-danger-light: #FEF2F2;
+    --color-danger-border:#FECACA;
+
+    /* Shadows */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+
+    /* Radii */
+    --radius-sm:   6px;
+    --radius-md:   10px;
+    --radius-lg:   14px;
+    --radius-xl:   18px;
+    --radius-full: 9999px;
+
+    /* Transitions */
+    --transition-fast: 120ms ease;
+    --transition-base: 200ms ease;
+    --transition-slow: 300ms ease;
+
+    /* ── Legacy aliases (keep — used by calendar.css & other CSS) ── */
+    --base-clr:            var(--color-bg);
+    --line-clr:            var(--color-border);
+    --hover-clr:           var(--color-accent-light);
+    --text-clr:            var(--color-text-1);
+    --accent-clr:          var(--color-accent);
+    --accent-clr-hover:    var(--color-accent-text);
+    --secondary-text-clr:  var(--color-text-3);
 }
 
+/* ────────────────────────────────────────────────────
+   Sidebar
+──────────────────────────────────────────────────── */
 #sidebar {
     height: 100vh;
     box-sizing: border-box;
-    width: 250px;
-    padding: 5px 1em;
-    background-color: var(--base-clr);
-    border-right: 1px solid var(--line-clr);
+    width: 256px;
+    padding: 16px 12px;
+    background-color: var(--color-surface);
+    border-right: 1px solid var(--color-border);
 
     position: sticky;
     top: 0;
     align-self: start;
-    transition: 300ms ease-in-out;
+    transition: width var(--transition-slow), padding var(--transition-slow);
     overflow: hidden;
     text-wrap: nowrap;
-
     z-index: 10;
 }
 
 #sidebar.close {
-    padding: 5px;
-    width: 60px;
+    padding: 16px 8px;
+    width: 64px;
+}
+
+/* Collapsed state — hide all text labels, center icons */
+#sidebar.close ul li span {
+    display: none;
+}
+
+#sidebar.close ul li a,
+#sidebar.close ul .dropdown-btn {
+    padding: 9px;
+    justify-content: center;
+}
+
+/* Hide logo, center toggle button */
+#sidebar.close > ul > li:first-child {
+    justify-content: center;
+    padding: 4px;
 }
 
 #sidebar #toggle-btn {
@@ -43,50 +98,66 @@
     list-style: none;
     margin: 0;
     padding: 0;
-
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 2px;
 }
 
-/*Style the logo*/
+/* Logo / brand row */
 #sidebar > ul > li:first-child {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 4px 4px 8px;
     margin-bottom: 16px;
 }
 
 #sidebar > ul > li:first-child .logo {
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text-1);
 }
 
 #sidebar > ul > li:last-child {
     margin-top: auto;
 }
 
+/* Active state */
 #sidebar ul li.active a {
-    color: var(--accent-clr);
+    background-color: var(--color-accent-light);
+    color: var(--color-accent);
+    font-weight: 600;
 }
 
 #sidebar ul li.active a svg {
-    fill: var(--accent-clr);
+    fill: var(--color-accent);
 }
 
 #sidebar ul li.active:hover svg {
     fill: white;
 }
 
-#sidebar a, #sidebar .dropdown-btn, #sidebar .logo {
-    border-radius: .5em;
-    padding: .85em;
+/* Nav links & buttons */
+#sidebar a,
+#sidebar .dropdown-btn,
+#sidebar .logo {
+    border-radius: var(--radius-md);
+    padding: 9px 12px;
     text-decoration: none;
-    color: var(--text-clr);
+    color: var(--color-text-2);
+    font-size: 14px;
+    font-weight: 500;
     display: flex;
     align-items: center;
-    gap: 1em; 
+    gap: 10px;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-/*To fix the weird behaviour of the first li a item*/
 #sidebar a:first-child {
     width: 100%;
-    box-sizing: border-box; 
+    box-sizing: border-box;
 }
 
 .dropdown-btn {
@@ -100,35 +171,44 @@
 
 #sidebar svg {
     flex-shrink: 0;
-    fill: var(--text-clr);
+    fill: var(--color-text-3);
+    transition: fill var(--transition-fast);
 }
 
-/*To make sure the carrat symbol is always moved to the right*/
-#sidbar a span, #sidebar .dropdown-btn span {
+#sidebar a:hover,
+#sidebar .dropdown-btn:hover {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-1);
+}
+
+#sidebar a:hover svg,
+#sidebar .dropdown-btn:hover svg {
+    fill: var(--color-text-2);
+}
+
+/* Caret span grows to push chevron right */
+#sidebar a span,
+#sidebar .dropdown-btn span {
     flex-grow: 1;
 }
 
-#sidebar a:hover, #sidebar .dropdown-btn:hover {
-    background-color: var(--hover-clr);
-}
-
-/*Min 14 explanation*/
+/* Sub-menu */
 #sidebar .sub-menu {
     display: grid;
     grid-template-rows: 0fr;
-    transition: 300ms ease-in-out;
+    transition: grid-template-rows var(--transition-slow);
 }
 
 #sidebar .sub-menu > div {
     overflow: hidden;
 }
-/*Adding and removing the class will open and close dropdown menu*/
+
 #sidebar .sub-menu.show {
     grid-template-rows: 1fr;
 }
 
 .dropdown-btn svg {
-    transition: 200ms ease;
+    transition: rotate 200ms ease;
 }
 
 .rotate svg:last-child {
@@ -136,16 +216,21 @@
 }
 
 #sidebar .sub-menu a {
-    padding-left: 2em;
+    padding-left: 34px;
 }
 
+/* Toggle button */
 #toggle-btn {
     margin-left: auto;
-    padding: 1em;
+    padding: 8px;
     border: none;
-    border-radius: .5em;
+    border-radius: var(--radius-sm);
     background: none;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--transition-fast);
 }
 
 #toggle-btn svg {
@@ -153,19 +238,20 @@
 }
 
 #toggle-btn:hover {
-    background-color: var(--hover-clr);
+    background-color: var(--color-surface-alt);
 }
 
-/* Make sure now the CSS will only effect on smaller screens*/
-@media(max-width: 800px ) {
-    
+/* ────────────────────────────────────────────────────
+   Mobile — bottom bar
+──────────────────────────────────────────────────── */
+@media (max-width: 800px) {
+
     body.app-page {
         grid-template-columns: 1fr;
-
     }
 
     main {
-        padding: 2em 1em 60px 1em;
+        padding: 24px 16px 72px 16px;
     }
 
     .container {
@@ -176,12 +262,15 @@
     #sidebar {
         height: 60px;
         width: 100%;
-        border-radius: none;
-        border-top: 1px solid var(--line-clr);
+        border-radius: 0;
+        border-top: 1px solid var(--color-border);
+        border-right: none;
         padding: 0;
         position: fixed;
         top: unset;
         bottom: 0;
+        background-color: var(--color-surface);
+        flex-direction: row;
     }
 
     #sidebar > ul {
@@ -191,13 +280,15 @@
         grid-auto-flow: column;
         align-items: center;
         overflow-x: scroll;
+        gap: 0;
     }
 
     #sidebar ul li {
         height: 100%;
     }
 
-    #sidebar ul a, #sidebar ul .dropdown-btn {
+    #sidebar ul a,
+    #sidebar ul .dropdown-btn {
         width: 60px;
         height: 60px;
         padding: 0;
@@ -218,8 +309,8 @@
         box-sizing: border-box;
         height: 60px;
         width: 100%;
-        background-color: var(--base-clr);
-        border-top: 1px solid var(--line-clr);
+        background-color: var(--color-surface);
+        border-top: 1px solid var(--color-border);
         display: flex;
         justify-content: center;
     }

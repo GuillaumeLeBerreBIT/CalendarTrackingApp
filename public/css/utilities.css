@@ -1,5 +1,7 @@
+/* ════════════════════════════════════════════════════
+   Layout containers
+════════════════════════════════════════════════════ */
 .container {
-
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -10,33 +12,39 @@
     margin: 0;
 }
 
+/* ════════════════════════════════════════════════════
+   Card shapes
+════════════════════════════════════════════════════ */
 .card-shape {
     padding: 20px;
-    background-color: oklch(0.97 0 0);
-    border-radius: 0.75rem;
-    border: 1px solid oklch(0.922 0 0);
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
     box-sizing: border-box;
 }
 
 .card-shape-2 {
     padding: 4%;
     margin: 0 10px;
-    width: calc(100% - 20px) !important; /*Margin isn't calculated into the border-box*/
+    width: calc(100% - 20px) !important;
     box-sizing: border-box;
-    background-color: oklch(0.97 0 0);
-    border-radius: 0.75rem;
-    border: 1px solid oklch(0.922 0 0);
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
 }
 
+/* ════════════════════════════════════════════════════
+   Flex helpers
+════════════════════════════════════════════════════ */
 .flex-column {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
     width: 100%;
-    gap: 10px;
+    gap: 8px;
 }
 
 .justify-center {
@@ -73,45 +81,40 @@
     width: 100%;
 }
 
-.gap-0 {
-    gap: 0 !important;
-}
+/* ════════════════════════════════════════════════════
+   Gap utilities
+════════════════════════════════════════════════════ */
+.gap-0  { gap: 0 !important; }
+.gap-5  { gap: 5px; }
+.gap-20 { gap: 20px; }
 
-.gap-5 {
-    gap: 5px;
-}
+/* ════════════════════════════════════════════════════
+   Display utilities
+════════════════════════════════════════════════════ */
+.set-display-flex { display: flex; }
+.set-display-none { display: none; }
 
-.gap-20 {
-    gap: 20px;
-}
-.set-display-flex {
-    display: flex;
-}
+/* ════════════════════════════════════════════════════
+   Misc helpers
+════════════════════════════════════════════════════ */
+.fw-bold { font-weight: 600; }
+.h-100   { height: 100%; }
+.w-100   { width: 100%; }
 
-.set-display-none {
-    display: none;
-}
-
-.fw-bold {
-    font-weight: bold;
-}
-
-.h-100 {
-    height: 100%;
-}
-
-.w-100 {
-    width: 100%;
-}
-
+/* ════════════════════════════════════════════════════
+   Status classes
+════════════════════════════════════════════════════ */
 .invite-declined {
-    background-color: rgb(179, 24, 24);
+    background-color: var(--color-danger) !important;
+    border-color: var(--color-danger) !important;
+    color: white !important;
 }
 
+/* ════════════════════════════════════════════════════
+   Auth / login
+════════════════════════════════════════════════════ */
 .login-container {
-
     display: flex;
-
     margin: 0;
     height: 95vh;
     width: 95vw;
@@ -122,18 +125,46 @@
 .login-card {
     display: flex;
     flex-direction: column;
-    justify-content: start;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: stretch;
 
-    max-width: 500px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+
+    max-width: 420px;
     width: 100%;
-    gap: 20px;
+    padding: 40px 36px;
+    gap: 6px;
 }
 
 .login-card * {
-    gap: 20px;
+    gap: 0;
 }
 
-.login-card h2, .login-card h1 {
-    margin: 5px auto;
+.login-card h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-accent);
+    margin: 0 0 4px 0;
+}
+
+.login-card h2 {
+    font-size: 18px;
+    margin: 0 0 2px 0;
+}
+
+.login-card p {
+    margin: 0 0 20px 0;
+    color: var(--color-text-3);
+    font-size: 14px;
+}
+
+.login-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
 }
