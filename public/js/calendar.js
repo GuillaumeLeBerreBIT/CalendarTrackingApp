@@ -191,6 +191,21 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     },
     eventDisplay: 'block',
+    eventDidMount: function (info) {
+      const color = info.event.backgroundColor;
+      if (!color) return;
+
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+
+      info.el.style.setProperty('background-color', `rgba(${r}, ${g}, ${b}, 0.12)`, 'important');
+      info.el.style.setProperty('border-left-color', color, 'important');
+
+      const darkColor = `rgb(${Math.round(r * 0.3)}, ${Math.round(g * 0.3)}, ${Math.round(b * 0.3)})`;
+      const mainEl = info.el.querySelector('.fc-event-main');
+      if (mainEl) mainEl.style.setProperty('color', darkColor, 'important');
+    },
     eventContent: function (info) {
       let content;
 
@@ -219,11 +234,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
 
   calendar.render();
-
-  document.querySelectorAll("a.fc-event").forEach((e) => {
-    e.style.backgroundColor = "#4A9D5F";
-    e.style.color = "white";
-  });
 
   closeBtn.addEventListener("click", () => {
     modalOverlayForm.style.setProperty("display", "none");
@@ -325,8 +335,8 @@ document.addEventListener("DOMContentLoaded", async function () {
           startTime: response.data.eventData[0]["start_time"],
           endTime: response.data.eventData[0]["end_time"],
           allDay: response.data.eventData[0]["all_day"],
-          backgroundColor: '#4a9d5f',
-          borderColor: '#4a9d5f',
+          backgroundColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#4A9D5F',
+          borderColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#4A9D5F',
           textColor: 'white',
           extendedProps: {
             participants: response.data.participants || [],
@@ -366,6 +376,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     modalOverlayEvent.querySelector("#event-start-date").textContent = "";
     modalOverlayEvent.querySelector("#event-end-date").textContent = "";
     modalOverlayEvent.querySelector("#event-title").textContent = event.title;
+    const leftBorder = modalOverlayEvent.querySelector('.left-border');
+    if (leftBorder) leftBorder.style.borderLeftColor = event.backgroundColor || '';
     if (event.extendedProps.groupName){
       modalOverlayEvent.querySelector("#group-tag-name").textContent = event.extendedProps.groupName;
       modalOverlayEvent.querySelector("#group-tag-name").classList.add('badge-secondary');

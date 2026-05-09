@@ -110,11 +110,14 @@ router.get("/groups", authRequire, async (req, res) => {
     .eq('user_id', req.cookies.userId)
     .eq('invite_status', 'pending');
 
-  res.render("groups.ejs", { 
-    userGroups: userGroups.sort((a, b) => new Date(b.groupInfo.created_at_raw) - new Date(a.groupInfo.created_at_raw)), yourGroups: groups.length, 
-    totalEvents, 
-    userInvites : userInvites || [], 
-    currentPage: 'groups' });
+  res.render("groups.ejs", {
+    userGroups: userGroups.sort((a, b) => new Date(b.groupInfo.created_at_raw) - new Date(a.groupInfo.created_at_raw)),
+    yourGroups: groups.length,
+    totalEvents,
+    userInvites: userInvites || [],
+    currentUserId: req.cookies.userId,
+    currentPage: 'groups'
+  });
 });
 
 router.post('/checkUser', authRequire ,async (req, res) => {
@@ -370,6 +373,52 @@ router.post('/declineInviteGroup', authRequire, async (req, res) => {
   }
 
   res.json({success: true})
+});
+
+router.get('/getGroupMembers/:groupId', authRequire, async (req, res) => {
+  const { groupId } = req.params;
+
+  const { data: members, error } = await req.supabase
+    .from('profiles_groups')
+    .select(`
+      user_id,
+      role,
+      color,
+      profiles (username, email)
+    `)
+    .eq('groups_id', groupId)
+    .eq('invite_status', 'accepted');
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  res.json({
+    success: true,
+    members: members.map(m => ({
+      user_id: m.user_id,
+      username: m.profiles.username,
+      email: m.profiles.email,
+      role: m.role,
+      color: m.color
+    }))
+  });
+});
+
+router.post('/setMemberColor', authRequire, async (req, res) => {
+  const { groupsId, color } = req.body;
+
+  if (!groupsId || !color) {
+    return res.status(400).json({ success: false, error: 'groupsId and color are required' });
+  }
+
+  const { error } = await req.supabase
+    .from('profiles_groups')
+    .update({ color })
+    .eq('groups_id', groupsId)
+    .eq('user_id', req.cookies.userId);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  res.json({ success: true });
 });
 
 export default router;

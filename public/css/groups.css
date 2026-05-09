@@ -440,3 +440,79 @@ hr {
         margin: 0 16px;
     }
 }
+
+/* ── Manage Members modal layout ── */
+#manage-modal .modal-box-groups {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 28px 32px;
+    gap: 20px;
+}
+
+#manage-modal h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.1rem;
+}
+
+#manage-modal > .modal-box-groups > p,
+#manage-modal .modal-box-groups .flex-column > p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+#manage-members-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    overflow: hidden;
+}
+
+.manage-member-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.manage-member-row:last-child {
+    border-bottom: none;
+}
+
+.manage-member-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.color-swatch {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--color-border);
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+#my-color-picker {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    padding: 2px;
+    cursor: pointer;
+    background: none;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+#save-color-btn {
+    align-self: flex-end;
+}

@@ -129,7 +129,7 @@
                             <p>Created at <%= group.groupInfo.created_at%></p>
                             <div class="group-end-btn">
                                 <button>Details</button>
-                                <button>Manage</button>
+                                <button class="manage-group-btn" data-group-id="<%= group.groupInfo.groupId %>">Manage</button>
                             </div>
                         </div>
                     </div>
@@ -266,6 +266,23 @@
             <div id="user-mail"></div>
         </div>
     </template>
+
+    <!-- Manage Members Modal -->
+    <div class="modal-overlay-groups" id="manage-modal">
+        <div class="modal-box-groups">
+            <span class="close-btn" id="close-btn-manage">&times;</span>
+            <div class="flex-column gap-0">
+                <h3>Manage Members</h3>
+                <p style="margin-top: 4px; font-size: 0.85rem; color: var(--color-text-muted, #6b7280);">Set your colour for this group — it shows on the calendar for events assigned to you.</p>
+            </div>
+            <div id="manage-members-list">
+                <!-- Populated by JS -->
+            </div>
+            <button id="save-color-btn">Save Colour</button>
+        </div>
+    </div>
+
+    <meta name="current-user-id" content="<%= currentUserId %>">
 
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.18/index.global.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.11.0/dist/axios.min.js"></script>

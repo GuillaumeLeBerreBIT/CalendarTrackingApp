@@ -250,6 +250,20 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
   const groupIdArray = groupsIds.map(g => g.groups_id);
 
+  // Fetch member colors for all groups upfront — avoids N+1 queries
+  const { data: memberColors } = await req.supabase
+    .from('profiles_groups')
+    .select('user_id, groups_id, color')
+    .in('groups_id', groupIdArray)
+    .eq('invite_status', 'accepted');
+
+  // Build { groupId: { userId: color } } lookup
+  const memberColorMap = {};
+  (memberColors || []).forEach(m => {
+    if (!memberColorMap[m.groups_id]) memberColorMap[m.groups_id] = {};
+    memberColorMap[m.groups_id][m.user_id] = m.color;
+  });
+
   let { data: userEvents, error: userEventsError} = await req.supabase.
   from('events')
   .select(`*,
@@ -311,19 +325,30 @@ router.get('/renderEvents', authRequire, async (req, res) => {
           return {username: p.profiles.username, userId: p.user_id};
         });
 
+        let eventColor;
+        if (!e.groups_id) {
+          // Personal event — no group membership, use default green
+          eventColor = '#4A9D5F';
+        } else if (participants.length === 1) {
+          // Single attendee — use their group color
+          eventColor = memberColorMap[e.groups_id]?.[participants[0].userId] || '#4A9D5F';
+        } else {
+          // Multiple attendees — neutral shared color
+          eventColor = '#6B7280';
+        }
+
         return {
           id: e.event_id,
           title: e.event_title,
           start: start_date,
           end: end_date,
-          backgroundColor: '#4A9D5F', // Need to make it custom
-          borderColor: '#4A9D5F',
+          backgroundColor: eventColor,
+          borderColor: eventColor,
           extendedProps : {
             description: e.event_description,
             participants: participants,
             groupName: groupsTagNames?.[e.groups_id] || '',
             groupsId: e.groups_id || '',
-
           }
         }
       })

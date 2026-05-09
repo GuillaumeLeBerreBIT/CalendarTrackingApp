@@ -290,7 +290,7 @@ async function acceptGroup(groupId) {
 }
 
 async function declineGroup(groupId) {
-    
+
     try {
         const response = await axios.post('/declineInviteGroup', {groupId: groupId});
 
@@ -299,13 +299,113 @@ async function declineGroup(groupId) {
             return false
         }
         return true
-        
+
     } catch (error) {
-        
+
         alert('Could not complete the request to accept the invite.')
         return false
     }
-
-
-
 }
+
+// --- Manage Members / Colour Panel ---
+
+const manageModal = document.querySelector('#manage-modal');
+const closeBtnManage = document.querySelector('#close-btn-manage');
+const saveColorBtn = document.querySelector('#save-color-btn');
+const manageMembersList = document.querySelector('#manage-members-list');
+const currentUserId = document.querySelector('meta[name="current-user-id"]')?.content;
+
+let activeManageGroupId = null;
+
+closeBtnManage.addEventListener('click', () => {
+    manageModal.classList.remove('active');
+    manageMembersList.innerHTML = '';
+    activeManageGroupId = null;
+});
+
+document.addEventListener('click', async (e) => {
+    const manageBtn = e.target.closest('.manage-group-btn');
+    if (!manageBtn) return;
+
+    activeManageGroupId = manageBtn.dataset.groupId;
+    manageMembersList.innerHTML = '<p>Loading...</p>';
+    manageModal.classList.add('active');
+
+    try {
+        const response = await axios.get(`/getGroupMembers/${activeManageGroupId}`);
+        if (!response.data.success) {
+            manageMembersList.innerHTML = '<p>Could not load members.</p>';
+            return;
+        }
+        renderManageMembers(response.data.members);
+    } catch (err) {
+        manageMembersList.innerHTML = '<p>Error loading members.</p>';
+    }
+});
+
+function renderManageMembers(members) {
+    manageMembersList.innerHTML = '';
+
+    members.forEach(member => {
+        const row = document.createElement('div');
+        row.classList.add('manage-member-row');
+
+        const info = document.createElement('div');
+        info.classList.add('manage-member-info');
+
+        const swatch = document.createElement('span');
+        swatch.classList.add('color-swatch');
+        swatch.style.backgroundColor = member.color || '#4A9D5F';
+
+        const name = document.createElement('span');
+        name.textContent = `${member.username} (${member.role})`;
+
+        info.appendChild(swatch);
+        info.appendChild(name);
+        row.appendChild(info);
+
+        if (member.user_id === currentUserId) {
+            const picker = document.createElement('input');
+            picker.type = 'color';
+            picker.value = member.color || '#4A9D5F';
+            picker.id = 'my-color-picker';
+            picker.addEventListener('input', () => {
+                swatch.style.backgroundColor = picker.value;
+            });
+            row.appendChild(picker);
+        }
+
+        manageMembersList.appendChild(row);
+    });
+}
+
+saveColorBtn.addEventListener('click', async () => {
+    const picker = document.querySelector('#my-color-picker');
+    if (!picker || !activeManageGroupId) return;
+
+    saveColorBtn.disabled = true;
+    saveColorBtn.textContent = 'Saving...';
+
+    try {
+        const response = await axios.post('/setMemberColor', {
+            groupsId: activeManageGroupId,
+            color: picker.value
+        });
+
+        if (response.data.success) {
+            saveColorBtn.textContent = 'Saved!';
+            setTimeout(() => {
+                saveColorBtn.textContent = 'Save Colour';
+                saveColorBtn.disabled = false;
+            }, 1500);
+        } else {
+            alert('Could not save colour.');
+            saveColorBtn.disabled = false;
+            saveColorBtn.textContent = 'Save Colour';
+        }
+    } catch (err) {
+        alert('Error saving colour.');
+        saveColorBtn.disabled = false;
+        saveColorBtn.textContent = 'Save Colour';
+    }
+});
