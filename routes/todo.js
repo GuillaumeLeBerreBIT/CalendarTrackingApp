@@ -269,7 +269,7 @@ router.get("/membersTaskList/", async (req, res) => {
 
     return res.status(200).json({ success: true, members: members });
   } catch (error) {
-    return res.status(404).json({ success: "false", message: e });
+    return res.status(404).json({ success: "false", message: error.message });
   }
 });
 
