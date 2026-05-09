@@ -456,15 +456,40 @@ select:focus {
 }
 
 /* ════════════════════════════════════════════════════
-   Responsive
+   Mobile
 ════════════════════════════════════════════════════ */
 @media (max-width: 800px) {
-    .modal-box-event {
-        width: 100%;
+
+    /* Bottom-sheet modal — slides up from the bottom edge */
+    .modal-overlay {
+        padding: 0;
+        align-items: flex-end;
     }
 
     .modal-box {
         width: 100%;
-        padding: 20px 20px;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        max-height: 88vh;
+        padding: 20px 16px 32px;  /* extra bottom so content clears home indicator */
+    }
+
+    .modal-box-event {
+        width: 100%;
+        max-width: 100%;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    }
+
+    /* Forms inside modals — full width, no excess horizontal margin */
+    .form-modal {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* User pills — tighter padding on small screens */
+    .user-pill {
+        padding: 7px 12px;
+        font-size: 13px;
     }
 }

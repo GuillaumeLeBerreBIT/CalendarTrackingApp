@@ -71,3 +71,12 @@ label {
     color: var(--color-text-2);
     display: block;
 }
+
+/* ── Mobile ─────────────────────────────────────── */
+@media (max-width: 800px) {
+    /* groups.ejs uses div.container (not main), so it needs its own bottom
+       clearance for the 60px fixed bottom nav bar */
+    .container {
+        padding-bottom: 72px;
+    }
+}

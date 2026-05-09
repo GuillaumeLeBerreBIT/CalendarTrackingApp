@@ -222,3 +222,39 @@ h4 {
     font-size: 17px;
     font-weight: 600;
 }
+
+/* ════════════════════════════════════════════════════
+   Mobile
+════════════════════════════════════════════════════ */
+@media (max-width: 800px) {
+
+    /* Full-width header — remove the 90% + nested margins */
+    .todo-header-container {
+        width: 100%;
+        margin: 16px auto 8px auto;
+        padding: 0 4px;
+    }
+
+    /* Search + filter + button row — stack the right-side controls under search */
+    .center-vertical {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .center-vertical .justify-between {
+        width: 100%;
+    }
+
+    .center-vertical input[type="search"] {
+        width: 100%;
+    }
+
+    /* Task list cards and task cards — full width to maximise reading space */
+    .group-card {
+        width: 100%;
+    }
+
+    .task-card {
+        width: 95%;
+    }
+}

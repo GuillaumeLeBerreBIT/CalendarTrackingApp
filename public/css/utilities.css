@@ -168,3 +168,23 @@
     gap: 12px;
     width: 100%;
 }
+
+/* ════════════════════════════════════════════════════
+   Mobile
+════════════════════════════════════════════════════ */
+@media (max-width: 800px) {
+
+    /* Reduce login card padding — 40px 36px is too generous on 375px */
+    .login-card {
+        padding: 28px 20px;
+        border-radius: var(--radius-lg);
+        /* let it breathe but not take over the whole screen */
+        max-width: 100%;
+        margin: 0 16px;
+    }
+
+    /* Slightly softer corner radius for cards on mobile */
+    .card-shape {
+        border-radius: var(--radius-md);
+    }
+}
