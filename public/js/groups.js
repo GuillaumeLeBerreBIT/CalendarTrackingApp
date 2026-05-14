@@ -312,8 +312,10 @@ async function declineGroup(groupId) {
 const manageModal = document.querySelector('#manage-modal');
 const closeBtnManage = document.querySelector('#close-btn-manage');
 const saveColorBtn = document.querySelector('#save-color-btn');
+const saveSharedColorBtn = document.querySelector('#save-shared-color-btn');
 const manageMembersList = document.querySelector('#manage-members-list');
 const currentUserId = document.querySelector('meta[name="current-user-id"]')?.content;
+
 
 let activeManageGroupId = null;
 
@@ -337,13 +339,13 @@ document.addEventListener('click', async (e) => {
             manageMembersList.innerHTML = '<p>Could not load members.</p>';
             return;
         }
-        renderManageMembers(response.data.members);
+        renderManageMembers(response.data.members, response.data.sharedColor || '#6B7280');
     } catch (err) {
         manageMembersList.innerHTML = '<p>Error loading members.</p>';
     }
 });
 
-function renderManageMembers(members) {
+function renderManageMembers(members, sharedColor) {
     manageMembersList.innerHTML = '';
 
     members.forEach(member => {
@@ -377,6 +379,36 @@ function renderManageMembers(members) {
 
         manageMembersList.appendChild(row);
     });
+
+    // "All" row — shared color used when multiple people share an event
+    const allRow = document.createElement('div');
+    allRow.classList.add('manage-member-row');
+
+    const allInfo = document.createElement('div');
+    allInfo.classList.add('manage-member-info');
+
+    const allSwatch = document.createElement('span');
+    allSwatch.classList.add('color-swatch');
+    allSwatch.id = 'shared-color-swatch';
+    allSwatch.style.backgroundColor = sharedColor;
+
+    const allLabel = document.createElement('span');
+    allLabel.textContent = 'All (shared)';
+
+    allInfo.appendChild(allSwatch);
+    allInfo.appendChild(allLabel);
+    allRow.appendChild(allInfo);
+
+    const sharedPicker = document.createElement('input');
+    sharedPicker.type = 'color';
+    sharedPicker.value = sharedColor;
+    sharedPicker.id = 'shared-color-picker';
+    sharedPicker.addEventListener('input', () => {
+        allSwatch.style.backgroundColor = sharedPicker.value;
+    });
+    allRow.appendChild(sharedPicker);
+
+    manageMembersList.appendChild(allRow);
 }
 
 saveColorBtn.addEventListener('click', async () => {
@@ -395,17 +427,48 @@ saveColorBtn.addEventListener('click', async () => {
         if (response.data.success) {
             saveColorBtn.textContent = 'Saved!';
             setTimeout(() => {
-                saveColorBtn.textContent = 'Save Colour';
+                saveColorBtn.textContent = 'Save My Colour';
                 saveColorBtn.disabled = false;
             }, 1500);
         } else {
             alert('Could not save colour.');
             saveColorBtn.disabled = false;
-            saveColorBtn.textContent = 'Save Colour';
+            saveColorBtn.textContent = 'Save My Colour';
         }
     } catch (err) {
         alert('Error saving colour.');
         saveColorBtn.disabled = false;
-        saveColorBtn.textContent = 'Save Colour';
+        saveColorBtn.textContent = 'Save My Colour';
+    }
+});
+
+saveSharedColorBtn.addEventListener('click', async () => {
+    const picker = document.querySelector('#shared-color-picker');
+    if (!picker || !activeManageGroupId) return;
+
+    saveSharedColorBtn.disabled = true;
+    saveSharedColorBtn.textContent = 'Saving...';
+
+    try {
+        const response = await axios.post('/setGroupSharedColor', {
+            groupsId: activeManageGroupId,
+            sharedColor: picker.value
+        });
+
+        if (response.data.success) {
+            saveSharedColorBtn.textContent = 'Saved!';
+            setTimeout(() => {
+                saveSharedColorBtn.textContent = 'Save Shared Colour';
+                saveSharedColorBtn.disabled = false;
+            }, 1500);
+        } else {
+            alert('Could not save shared colour.');
+            saveSharedColorBtn.disabled = false;
+            saveSharedColorBtn.textContent = 'Save Shared Colour';
+        }
+    } catch (err) {
+        alert('Error saving shared colour.');
+        saveSharedColorBtn.disabled = false;
+        saveSharedColorBtn.textContent = 'Save Shared Colour';
     }
 });

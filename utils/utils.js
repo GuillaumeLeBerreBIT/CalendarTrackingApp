@@ -122,13 +122,20 @@ export function createEventObj (events) {
         eventObj[key] = val
     }
 
-    if (!eventObj.startTime || !eventObj.endTime) {
+    // Normalize checkbox value ('on' when checked, false/absent when not) to boolean
+    eventObj.allDay = eventObj.allDay === 'on' || eventObj.allDay === true;
+
+    // No start time → treat as all-day regardless of checkbox state
+    if (!eventObj.startTime) {
         eventObj.allDay = true;
     }
 
     if (eventObj.allDay) {
         eventObj.startTime = null;
         eventObj.endTime = null;
+    } else {
+        // Start time present; normalize empty end time to null (allows start-only events)
+        eventObj.endTime = eventObj.endTime || null;
     }
 
     return eventObj

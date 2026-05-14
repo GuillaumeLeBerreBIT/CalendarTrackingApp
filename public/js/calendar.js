@@ -155,7 +155,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       document.querySelector("#modal-overlay-event").style.display = "flex";
     },
     eventMouseEnter: function (info) {
-      console.log(info);
       const options = {
         day: "numeric",
         month: 'numeric',
@@ -254,7 +253,12 @@ document.addEventListener("DOMContentLoaded", async function () {
   // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    parseEvent();
+    try {
+      await parseEvent();
+    } catch (err) {
+      console.error('Event save failed:', err);
+      alert('Something went wrong saving the event. Please try again.');
+    }
   });
 
   checkWholeDay.addEventListener("change", function () {
@@ -295,28 +299,47 @@ document.addEventListener("DOMContentLoaded", async function () {
       data[key] = val;
     }
 
-    if (!data.hasOwnProperty("allDay") || (!data["startTime"] && !data["endTime"])) {
+    if (!data.hasOwnProperty("allDay")) {
       data["allDay"] = false;
     }
 
     data.participants = retrieveAllSelectedUsers();
 
     if (isUpdate) {
-      // Need to peorform an update here 
       let response = await axios.put(`/parseEvent/${eventId}`, data);
-      if (response.data.success) {
-        const outdatedEvent = calendar.getEventById(eventId)
-        const newEvent = response.data.eventData[0]
+      if (!response.data.success) {
+        alert(`Could not update event: ${response.data.error || 'Unknown error'}`);
+        modalOverlayForm.style.setProperty('display', 'none');
+        return;
+      }
 
-        if (outdatedEvent) {
-          outdatedEvent.setProp('title', newEvent['event_title'])
-          outdatedEvent.setStart(newEvent['start_date'])
-          outdatedEvent.setEnd(newEvent['end_date'])
-          outdatedEvent.setAllDay(newEvent['all_day'])
-          outdatedEvent.setExtendedProp('description', newEvent["event_description"]);
-          outdatedEvent.setExtendedProp('participants', response.data.participants || []);
-          outdatedEvent.setExtendedProp('groupsId', newEvent["groups_id"]);
+      const outdatedEvent = calendar.getEventById(eventId);
+      const newEvent = response.data.eventData[0];
+
+      if (outdatedEvent && newEvent) {
+        const allDay = newEvent['all_day'];
+        const startTime = newEvent['start_time'] ? newEvent['start_time'].substring(0, 5) : null;
+        const endTime = newEvent['end_time'] ? newEvent['end_time'].substring(0, 5) : null;
+
+        let newStart, newEnd;
+        if (allDay || !startTime) {
+          newStart = newEvent['start_date'];
+          newEnd = newEvent['end_date'];
+        } else if (!endTime) {
+          newStart = `${newEvent['start_date']}T${startTime}`;
+          newEnd = null;
+        } else {
+          newStart = `${newEvent['start_date']}T${startTime}`;
+          newEnd = `${newEvent['end_date']}T${endTime}`;
         }
+
+        outdatedEvent.setProp('title', newEvent['event_title']);
+        outdatedEvent.setAllDay(allDay);
+        outdatedEvent.setStart(newStart);
+        outdatedEvent.setEnd(newEnd);
+        outdatedEvent.setExtendedProp('description', newEvent['event_description']);
+        outdatedEvent.setExtendedProp('participants', response.data.participants || []);
+        outdatedEvent.setExtendedProp('groupsId', newEvent['groups_id']);
       }
 
       modalOverlayForm.style.setProperty('display', 'none');
@@ -416,10 +439,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         hour: "2-digit",
         minute: "2-digit",
       });
-      //Use endTime to see wether there was a ending timestamp filled in
-      modalOverlayEvent.querySelector("#event-start-date").textContent = endTime
+      modalOverlayEvent.querySelector("#event-start-date").textContent = !event.allDay
         ? `${startTime} - ${startDate}`
-        : `${startDate}`;
+        : startDate;
     }
     
     modalOverlayEvent.querySelector('#event-participants').innerHTML = '';
@@ -486,51 +508,66 @@ document.addEventListener("DOMContentLoaded", async function () {
     return usersInvited;
   };
 
-  async function updateEventForm (event, startDate, endDate) {
+  async function updateEventForm (event) {
     isUpdate = true;
-    eventId = event.id
+    eventId = event.id;
 
     modalOverlayEvent.style.setProperty('display', 'none');
     modalOverlayForm.style.setProperty("display", "flex");
 
     modalOverlayForm.querySelector('#calendar-title').value = event.title;
-    modalOverlayForm.querySelector('#calendar-description').value = event?.extendedProps.description;
-    modalOverlayForm.querySelector('#startDate').value = event.startStr;
-    modalOverlayForm.querySelector('#endDate').value = event.endStr ? event.endStr : event.startStr;
+    modalOverlayForm.querySelector('#calendar-description').value = event?.extendedProps.description || '';
+
+    // startStr can be "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS+TZ" — take date part only
+    modalOverlayForm.querySelector('#startDate').value = event.startStr.substring(0, 10);
+    modalOverlayForm.querySelector('#endDate').value = event.endStr
+      ? event.endStr.substring(0, 10)
+      : event.startStr.substring(0, 10);
+
+    const startTimeInput = modalOverlayForm.querySelector('#startTime');
+    const endTimeInput = modalOverlayForm.querySelector('#endTime');
 
     if (event.allDay) {
       modalOverlayForm.querySelector('#allDay').checked = true;
-      modalOverlayForm.querySelector('#endTime').style.display = 'none'
-      modalOverlayForm.querySelector('#startTime').style.display = 'none'
-
+      startTimeInput.style.display = 'none';
+      endTimeInput.style.display = 'none';
+    } else {
+      modalOverlayForm.querySelector('#allDay').checked = false;
+      startTimeInput.style.display = 'block';
+      endTimeInput.style.display = 'block';
+      if (event.start) {
+        const h = String(event.start.getHours()).padStart(2, '0');
+        const m = String(event.start.getMinutes()).padStart(2, '0');
+        startTimeInput.value = `${h}:${m}`;
+      }
+      if (event.end) {
+        const h = String(event.end.getHours()).padStart(2, '0');
+        const m = String(event.end.getMinutes()).padStart(2, '0');
+        endTimeInput.value = `${h}:${m}`;
+      } else {
+        endTimeInput.value = '';
+      }
     }
 
-    // Need to select the corect group
     const selectGroup = modalOverlayForm.querySelector('select#tagNames');
-
     if (selectGroup && event.extendedProps?.groupsId) {
-
-      const currentIndex = Array.from(selectGroup.options).findIndex(option => parseInt(option.value) === event?.extendedProps?.groupsId)
-      
+      const currentIndex = Array.from(selectGroup.options).findIndex(
+        option => parseInt(option.value) === event?.extendedProps?.groupsId
+      );
       if (currentIndex !== -1) {
-        selectGroup.selectedIndex = currentIndex
-
-        selectGroup.dispatchEvent(new Event('change')) // To trigger an already existing event. More research on it.
-      
-        await new Promise(resolve => setTimeout(resolve, 300))
-
+        selectGroup.selectedIndex = currentIndex;
+        selectGroup.dispatchEvent(new Event('change'));
+        await new Promise(resolve => setTimeout(resolve, 300));
         if (event?.extendedProps?.participants) {
-          selectParticipants(event.extendedProps.participants)
-
+          selectParticipants(event.extendedProps.participants);
         }
       }
     }
-    //Need to make sure the form will be sent to be updated. 
+
     form.setAttribute('formaction', '/updateEvent');
     const updateBtn = modalOverlayForm.querySelector('button[type=submit]');
-    updateBtn.textContent = 'Update Event'
-    modalOverlayForm.querySelector('h3').textContent = 'Update Event'
-
+    updateBtn.textContent = 'Update Event';
+    modalOverlayForm.querySelector('h3').textContent = 'Update Event';
   }
 
   async function deleteEvent(event) {
@@ -599,6 +636,11 @@ document.addEventListener("DOMContentLoaded", async function () {
     isUpdate = false;
     eventId = null;
     form.reset();
+    // Restore time inputs (may have been hidden when editing an all-day event)
+    document.querySelectorAll("input[type=time]").forEach(t => t.style.display = 'block');
+    document.querySelector('#select-users-wrapper').classList.add('set-display-none');
+    document.querySelector('#participants-container').innerHTML = '';
+    document.querySelector('#tagNames').selectedIndex = 0;
   }
 
 });

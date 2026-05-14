@@ -378,21 +378,25 @@ router.post('/declineInviteGroup', authRequire, async (req, res) => {
 router.get('/getGroupMembers/:groupId', authRequire, async (req, res) => {
   const { groupId } = req.params;
 
-  const { data: members, error } = await req.supabase
-    .from('profiles_groups')
-    .select(`
-      user_id,
-      role,
-      color,
-      profiles (username, email)
-    `)
-    .eq('groups_id', groupId)
-    .eq('invite_status', 'accepted');
+  const [{ data: members, error }, { data: group, error: groupError }] = await Promise.all([
+    req.supabase
+      .from('profiles_groups')
+      .select(`user_id, role, color, profiles (username, email)`)
+      .eq('groups_id', groupId)
+      .eq('invite_status', 'accepted'),
+    req.supabase
+      .from('groups')
+      .select('shared_color')
+      .eq('groups_id', groupId)
+      .single()
+  ]);
 
   if (error) return res.status(500).json({ success: false, error: error.message });
+  if (groupError) return res.status(500).json({ success: false, error: groupError.message });
 
   res.json({
     success: true,
+    sharedColor: group.shared_color || '#6B7280',
     members: members.map(m => ({
       user_id: m.user_id,
       username: m.profiles.username,
@@ -401,6 +405,23 @@ router.get('/getGroupMembers/:groupId', authRequire, async (req, res) => {
       color: m.color
     }))
   });
+});
+
+router.post('/setGroupSharedColor', authRequire, async (req, res) => {
+  const { groupsId, sharedColor } = req.body;
+
+  if (!groupsId || !sharedColor) {
+    return res.status(400).json({ success: false, error: 'groupsId and sharedColor are required' });
+  }
+
+  const { error } = await req.supabase
+    .from('groups')
+    .update({ shared_color: sharedColor })
+    .eq('groups_id', groupsId);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  res.json({ success: true });
 });
 
 router.post('/setMemberColor', authRequire, async (req, res) => {

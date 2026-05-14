@@ -28,8 +28,8 @@ router.post("/parseEvent", authRequire, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 
-  eventData["start_time"] = eventData['start_time'] ? eventData['start_time'].slice(0,-3) : '';
-  eventData["end_time"] = eventData['end_time'] ? eventData['end_time'].slice(0,-3) : '';
+  if (eventData[0]['start_time']) eventData[0]['start_time'] = eventData[0]['start_time'].slice(0, -3);
+  if (eventData[0]['end_time']) eventData[0]['end_time'] = eventData[0]['end_time'].slice(0, -3);
 
   if (insertEventObj.participants.length !== 0) {
     const insertUsersArray = insertEventObj.participants.map( (p) => {
@@ -90,111 +90,76 @@ router.post("/parseEvent", authRequire, async (req, res) => {
 });
 
 router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
-  const eventId = parseInt(req.params.eventId);
-  const updateEventObj = createEventObj(req.body)
+  try {
+    const eventId = parseInt(req.params.eventId);
+    const updateEventObj = createEventObj(req.body);
+    const newParticipants = updateEventObj.participants || [];
 
-  const {data: updateEvent, error: updateEventError} = await req.supabase
-  .from('events')
-  .update({
-    event_title: updateEventObj["calendar-title"],
-    event_description: updateEventObj["calendar-description"],
-    all_day: updateEventObj.allDay,
-    start_date: updateEventObj.startDate,
-    end_date: updateEventObj.endDate,
-    start_time: updateEventObj.startTime,
-    end_time: updateEventObj.endTime,
-    groups_id: updateEventObj?.tagNames ? parseInt(updateEventObj?.tagNames) : '' 
-  })
-  .eq('event_id', eventId)
-  .select()
+    const { data: updateEvent, error: updateEventError } = await req.supabase
+      .from('events')
+      .update({
+        event_title: updateEventObj['calendar-title'],
+        event_description: updateEventObj['calendar-description'],
+        all_day: updateEventObj.allDay,
+        start_date: updateEventObj.startDate,
+        end_date: updateEventObj.endDate,
+        start_time: updateEventObj.startTime,
+        end_time: updateEventObj.endTime,
+        groups_id: updateEventObj.tagNames ? parseInt(updateEventObj.tagNames) : null
+      })
+      .eq('event_id', eventId)
+      .select();
 
-  if (updateEventError) {
-    return res.status(500).json({success: false, error: updateEventError.message})
-  }
-
-  const {data: eventParticipants, error: eventParticipantsError} = await req.supabase
-  .from('profiles_events')
-  .select()
-  .eq('event_id', eventId);
-  
-  if (eventParticipantsError) {
-
-    res.status(500).json({success: false, error: eventParticipantsError.message})
-  }
-
-  const userIdArray = updateEventObj.participants.map(p => p.userId)
-
-  let updatedParticipants;
-  if (eventParticipants) {
-    const eventParticipantsUpdated = eventParticipants.map(p => {
-
-      if (userIdArray.includes(p.user_id)) {
-        return {
-          user_id: p.user_id,
-          event_id: eventId,
-          rsvp_status: 'accepted',
-        }
-      } else {
-          return {
-            user_id: p.user_id,
-            event_id: eventId,
-            rsvp_status: 'declined',
-        }
-      }
-
-    })
-
-    const users2Update = eventParticipantsUpdated.map( p => p.user_id)
-    updateEventObj.participants.forEach(p => {
-      if (!users2Update.includes(p.userId)) {
-        eventParticipantsUpdated.push({
-          user_id: p.userId,
-          event_id: eventId,
-          rsvp_status: 'accepted',
-        })
-      }
-    })
-
-    const {data: upsertUsers, error: upsertUsersError} = await req.supabase
-    .from('profiles_events')
-    .upsert(eventParticipantsUpdated)
-    .select()
-
-    if (upsertUsersError) {
-      return res.status(500).json({success: false, error: updateEventError.message})
+    if (updateEventError) {
+      return res.status(500).json({ success: false, error: updateEventError.message });
     }
 
-    updatedParticipants = updateEventObj.participants;
+    const { data: existing, error: existingError } = await req.supabase
+      .from('profiles_events')
+      .select('user_id')
+      .eq('event_id', eventId);
 
-  } else {
+    if (existingError) {
+      return res.status(500).json({ success: false, error: existingError.message });
+    }
 
-    const { data: updateUser, error: updateUserError } = await req.supabase
-    .from('profiles_events')
-    .update({
-      user_id: req.cookies.userId,
-      event_id: eventId,
-      rsvp_status: 'accepted',
-    })
-    .eq('event_id', eventId)
-    .select()
+    const existingIds = (existing || []).map(p => p.user_id);
+    const newIds = newParticipants.map(p => p.userId);
 
-    const {data: user, error: userError} = await req.supabase
-    .from('profiles')
-    .select('username')
-    .eq('user_id', req.cookies.userId)
-    .limit(1);
-
-    if (eventProfileError) {
-      res.status(500).json({ success: false, error: error.message });
-    } else {
-      updatedParticipants = {
-        userId: req.cookies.userId,
-        username: user[0].username
+    // Update rsvp_status for everyone already in the table
+    if (existingIds.length > 0) {
+      const updates = existingIds.map(uid => ({
+        user_id: uid,
+        event_id: eventId,
+        rsvp_status: newIds.includes(uid) ? 'accepted' : 'declined'
+      }));
+      const { error: upsertError } = await req.supabase
+        .from('profiles_events')
+        .upsert(updates, { onConflict: 'user_id,event_id' });
+      if (upsertError) {
+        return res.status(500).json({ success: false, error: upsertError.message });
       }
     }
-  }
 
-  res.json({success: true, eventData: updateEvent, participants: updatedParticipants || []})
+    // Insert anyone newly added who wasn't in the table at all
+    const toInsert = newParticipants
+      .filter(p => !existingIds.includes(p.userId))
+      .map(p => ({ user_id: p.userId, event_id: eventId, rsvp_status: 'accepted' }));
+
+    if (toInsert.length > 0) {
+      const { error: insertError } = await req.supabase
+        .from('profiles_events')
+        .insert(toInsert);
+      if (insertError) {
+        return res.status(500).json({ success: false, error: insertError.message });
+      }
+    }
+
+    return res.json({ success: true, eventData: updateEvent, participants: newParticipants });
+  } catch (err) {
+    console.error('PUT /parseEvent error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
 })
 
 router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
@@ -233,7 +198,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
   let {data: groupsIds, error: groupsIdsError} = await req.supabase
   .from('groups')
-  .select(`groups_id, tag_name,
+  .select(`groups_id, tag_name, shared_color,
     profiles_groups!inner(
     user_id
     )`)
@@ -244,9 +209,12 @@ router.get('/renderEvents', authRequire, async (req, res) => {
   }
 
   let groupsTagNames = {};
-  groupsIds.filter(g => g.tag_name !== null).forEach(g => {
-    groupsTagNames[g.groups_id] = g.tag_name
-  })
+  // Build { groupId: tag_name } and { groupId: shared_color } lookups
+  const groupSharedColorMap = {};
+  groupsIds.forEach(g => {
+    if (g.tag_name !== null) groupsTagNames[g.groups_id] = g.tag_name;
+    groupSharedColorMap[g.groups_id] = g.shared_color || '#6B7280';
+  });
 
   const groupIdArray = groupsIds.map(g => g.groups_id);
 
@@ -303,22 +271,19 @@ router.get('/renderEvents', authRequire, async (req, res) => {
       const filteredEvents = combinedEvents.map((e) => {
         let start_date, end_date;
 
-        const hasStartTime = e.start_time != null && e.start_time.length >= 5;
-        const hasEndTime = e.end_time != null && e.end_time.length >= 5;
-        if (
-          e.all_day ||
-          !hasStartTime ||
-          !hasEndTime ||
-          e.start_time === e.end_time ||
-          (e.start_time === '00:00' && e.end_time === '00:00')
-        ) {
-          start_date = `${e.start_date}`;
-          end_date   = `${e.end_date}`;
+        const hasStartTime = e.start_time != null && e.start_time.trim().length >= 5;
+        const hasEndTime = e.end_time != null && e.end_time.trim().length >= 5;
 
+        if (e.all_day || !hasStartTime) {
+          start_date = e.start_date;
+          end_date = e.end_date;
+        } else if (!hasEndTime) {
+          // Start-time-only event: show at specific time, no forced end
+          start_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
+          end_date = null;
         } else {
-          // Normal timed multi-day or single-day
-          start_date = `${e.start_date}T${e.start_time.substring(0,5)}`;
-          end_date   = `${e.end_date}T${e.end_time.substring(0,5)}`;
+          start_date = `${e.start_date}T${e.start_time.substring(0, 5)}`;
+          end_date = `${e.end_date}T${e.end_time.substring(0, 5)}`;
         }
 
         const participants = e.profiles_events.map((p) => {
@@ -327,21 +292,19 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
         let eventColor;
         if (!e.groups_id) {
-          // Personal event — no group membership, use default green
           eventColor = '#4A9D5F';
         } else if (participants.length === 1) {
-          // Single attendee — use their group color
           eventColor = memberColorMap[e.groups_id]?.[participants[0].userId] || '#4A9D5F';
         } else {
-          // Multiple attendees — neutral shared color
-          eventColor = '#6B7280';
+          // Multiple attendees — use the group's shared color
+          eventColor = groupSharedColorMap[e.groups_id] || '#6B7280';
         }
 
         return {
           id: e.event_id,
           title: e.event_title,
           start: start_date,
-          end: end_date,
+          end: end_date ?? undefined,
           backgroundColor: eventColor,
           borderColor: eventColor,
           extendedProps : {
