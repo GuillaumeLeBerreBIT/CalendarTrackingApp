@@ -358,8 +358,8 @@ document.addEventListener("DOMContentLoaded", async function () {
           startTime: response.data.eventData[0]["start_time"],
           endTime: response.data.eventData[0]["end_time"],
           allDay: response.data.eventData[0]["all_day"],
-          backgroundColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#4A9D5F',
-          borderColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#4A9D5F',
+          backgroundColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#3D82F6',
+          borderColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#3D82F6',
           textColor: 'white',
           extendedProps: {
             participants: response.data.participants || [],

@@ -357,7 +357,7 @@ function renderManageMembers(members, sharedColor) {
 
         const swatch = document.createElement('span');
         swatch.classList.add('color-swatch');
-        swatch.style.backgroundColor = member.color || '#4A9D5F';
+        swatch.style.backgroundColor = member.color || '#3D82F6';
 
         const name = document.createElement('span');
         name.textContent = `${member.username} (${member.role})`;
@@ -369,7 +369,7 @@ function renderManageMembers(members, sharedColor) {
         if (member.user_id === currentUserId) {
             const picker = document.createElement('input');
             picker.type = 'color';
-            picker.value = member.color || '#4A9D5F';
+            picker.value = member.color || '#3D82F6';
             picker.id = 'my-color-picker';
             picker.addEventListener('input', () => {
                 swatch.style.backgroundColor = picker.value;

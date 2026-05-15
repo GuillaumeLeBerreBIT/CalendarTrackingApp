@@ -292,9 +292,9 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
         let eventColor;
         if (!e.groups_id) {
-          eventColor = '#4A9D5F';
+          eventColor = '#3D82F6';
         } else if (participants.length === 1) {
-          eventColor = memberColorMap[e.groups_id]?.[participants[0].userId] || '#4A9D5F';
+          eventColor = memberColorMap[e.groups_id]?.[participants[0].userId] || '#3D82F6';
         } else {
           // Multiple attendees — use the group's shared color
           eventColor = groupSharedColorMap[e.groups_id] || '#6B7280';
