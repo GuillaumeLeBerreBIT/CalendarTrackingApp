@@ -64,3 +64,7 @@ app.get("/calendar", authRequire, async (req, res) => {
 app.get("/", authRequire, (req, res) => {
   res.redirect("/groups");
 });
+
+app.get('/healthz',(req, res) => {
+  return res.json({success: true, datetime: new Date().toISOString()})
+})
