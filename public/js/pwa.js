@@ -9,4 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
   }
+
+  // Keep session alive — POST every 55 minutes to slide the cookie window
+  setInterval(async () => {
+    try {
+      await fetch('/refresh-session', { method: 'POST', credentials: 'include' });
+    } catch (_) {}
+  }, 55 * 60 * 1000);
 });

@@ -150,19 +150,32 @@ searchTask.addEventListener('input', (e) => {
 })
 
 selectTasks.addEventListener('change', (e) => {
+  const action = e.target.value;
+  // Re-query so newly added task cards are included
+  const allTaskCards = document.querySelectorAll('div.task-card.card-shape');
 
-  const action = e.target.value
-
-  if (action === 'all') {
-    [...taskCards].forEach(c => {
-      c.classList.contains('hidden') ? c.classList.remove('hidden') : null
-    })
-  } else if (action === 'completed') {
-    [...taskCards].forEach(c => {
-      c.querySelector('input[type=checkbox]:checked') ? c.classList.remove('hidden') : c.classList.add('hidden')
-    })
-  
-  }
+  allTaskCards.forEach(c => {
+    if (action === 'all') {
+      c.classList.remove('hidden');
+    } else if (action === 'completed') {
+      c.querySelector('input[type=checkbox]:checked')
+        ? c.classList.remove('hidden')
+        : c.classList.add('hidden');
+    } else if (action === 'active') {
+      c.querySelector('input[type=checkbox]:checked')
+        ? c.classList.add('hidden')
+        : c.classList.remove('hidden');
+    } else if (action === 'to-me') {
+      // Show tasks that have the current user assigned (identified by data-user-id on badge)
+      const currentUserMeta = document.querySelector('meta[name="current-user-id"]');
+      const currentUserId = currentUserMeta ? currentUserMeta.content : null;
+      if (currentUserId && c.querySelector(`[data-user-id="${currentUserId}"]`)) {
+        c.classList.remove('hidden');
+      } else {
+        c.classList.add('hidden');
+      }
+    }
+  });
 })
 
 // TASKS HANDLING
@@ -198,10 +211,10 @@ async function TaskUpdate(taskId, isCompleted) {
     });
 
     if (!response.data.success) {
-      alert("Something went wrong updating the task.");
+      showToast('Something went wrong updating the task.', 'error');
     }
   } catch (e) {
-    alert("Unable to update the selected task. Try again later.");
+    showToast('Unable to update the selected task. Try again later.', 'error');
   }
 }
 
@@ -278,16 +291,22 @@ formTaskList.addEventListener("submit", async (e) => {
 
     if (response.data.success) {
       let createdTaskList = response.data?.createTaskList[0];
-
+      showToast('Task list created!', 'success');
       createDivTaskList(createdTaskList, payload, response.data.tagName);
+    } else {
+      showToast('Unable to create task list.', 'error');
     }
   } catch (e) {
-    alert(`Unable to create a task list: ${e}`);
+    showToast('Unable to create a task list.', 'error');
   }
 });
 
 formTask.addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  const submitBtn = formTask.querySelector('#btn-task-submit');
+  const originalVal = submitBtn ? submitBtn.value : '';
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.value = 'Saving...'; }
 
   const form = new FormData(formTask);
 
@@ -298,30 +317,28 @@ formTask.addEventListener("submit", async (e) => {
 
   payload.members = [...document.querySelectorAll('.user-pill.selected')].map((u) => u.dataset.userId);
 
-  if (payload.task_id) {
-    try {
+  try {
+    if (payload.task_id) {
       const response = await axios.patch("/updateTaskDetails", payload);
       if (response.data.success) {
         updateTaskCardUI(response.data.updatedTask);
+        showToast('Task updated!', 'success');
         modalNewTask.classList.remove("set-display-flex");
         resetTaskModal();
       } else {
-        alert("Unable to update the task.");
+        showToast('Unable to update the task.', 'error');
       }
-    } catch (e) {
-      alert(`Unable to update the task: ${e}`);
-    }
-  } else {
-    try {
+    } else {
       const response = await axios.post("/createTask", payload);
       if (response.data.success) {
+        showToast('Task added!', 'success');
         createDivTask(response.data.insertTask);
       } else {
-        alert("Unable to create a task for this Task List.");
+        showToast('Unable to create a task for this task list.', 'error');
       }
-    } catch (e) {
-      alert(`Unable to create a task for this Task List: ${e}`);
     }
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.value = originalVal; }
   }
 });
 
@@ -437,7 +454,7 @@ function createDivTask(data) {
   } else {
     modalNewTask.classList.remove("set-display-flex");
     formTask.reset();
-    alert("Unable to create task.");
+    showToast('Unable to create task.', 'error');
   }
 }
 

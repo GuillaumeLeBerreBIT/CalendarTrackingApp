@@ -8,14 +8,14 @@
     <!-- Show in a card the upcoming activities -->
     <div class="container-tags card-shape">
 
-        <% Object.entries(groupsTagNames).forEach(t => { 
+        <% Object.entries(groupsTagNames).forEach(t => {
             const [id, name] = t
             %>
             <div class="calendar-group-tag" data-group-id="<%=id%>">
                 <%= name %>
             </div>
         <%})%>
-        
+
     </div>
 
     <div class="modal-overlay" id="modal-overlay">
@@ -114,21 +114,6 @@
         </div>
     </div>
 
-    <template id="template-upcoming">
-        <div class="card-shape group-card">
-            <div class="justify-between">
-                <h3 id="event-title">Event Title</h3>
-                <div class="badge-secondary" id="group-name">Group</div>
-            </div>
-            <div class="justify-start gap-20" id="event-participants">
-            </div>
-            <span id="event-description">Description</span>
-            <div class="justify-start gap-20">
-                <span id="startDate" class="fw-bold">Start Time</span>
-                <span id="endDate" class="fw-bold">End Date</span>    
-            </div>
-        </div>
-    </template>
 
 </div>
 

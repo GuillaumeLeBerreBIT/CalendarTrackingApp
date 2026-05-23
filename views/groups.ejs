@@ -58,7 +58,13 @@
                 <button class="create-group-btn" id="create-group-btn">+ Create Group</button>
             </div>
             <div class="wrapper-cards card-shape hide-scrollbar" id="wrapper-cards">
-                <% if (locals.userGroups) { userGroups.forEach((group) => {%>
+                <% if (!locals.userGroups || userGroups.length === 0) { %>
+                    <div class="empty-state-box">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="40px" viewBox="0 -960 960 960" width="40px" fill="currentColor" style="color: var(--color-text-3, #9ca3af)"><path d="M0-240v-63q0-43 44-70t116-27q13 0 25 .5t23 2.5q-14 21-21 44t-7 48v65H0Zm240 0v-65q0-32 17.5-58.5T307-410q32-20 76.5-30t96.5-10q53 0 97.5 10t76.5 30q32 20 49 46.5t17 58.5v65H240Zm540 0v-65q0-26-6.5-49T754-397q11-2 22.5-2.5t23.5-.5q72 0 116 26.5t44 70.5v63H780Z"/></svg>
+                        <p style="color: var(--color-text-3, #9ca3af); margin-top: 12px;">You're not part of any groups yet.</p>
+                        <p style="color: var(--color-text-3, #9ca3af);">Click "+ Create Group" to get started.</p>
+                    </div>
+                <% } else { userGroups.forEach((group) => {%>
                     <div class="group-card card-shape">
                         <div class="group-header">
                             <h3><%= group.groupInfo.title %></h3>

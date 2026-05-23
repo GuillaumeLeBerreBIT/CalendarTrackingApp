@@ -47,7 +47,7 @@ router.get("/groups", authRequire, async (req, res) => {
     .in("groups_id", groupIds)
 
   if (groupsError) {
-    res.status(400).json({success: false, error: groupsError.message});
+    return res.status(400).json({success: false, error: groupsError.message});
   }
 
   const userGroups =
@@ -147,7 +147,7 @@ router.post('/checkUser', authRequire ,async (req, res) => {
   
 });
 
-router.post('/InviteUsers', authRequire, async (req, res) => {
+router.post('/inviteUsers', authRequire, async (req, res) => {
 
   try {
 
@@ -234,7 +234,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
   .select()
 
   if (newGroupError) {
-    res.status(400).json({success: false, error: `Could not create Group ${newGroup}`})
+    return res.status(400).json({success: false, error: `Could not create Group: ${newGroupError.message}`})
   }
 
   const {data: newProfilesGroup, error: newProfilesGroupError} = await req.supabase
@@ -248,12 +248,12 @@ router.post('/createGroup', authRequire, async (req, res) => {
   .select()
 
   if (newProfilesGroupError) {
-    const {error: deleteGroupError} = await req.supabase
+    await req.supabase
     .from('groups')
     .delete()
-    .eq('groups_id', newGroup[0].groups_id) 
+    .eq('groups_id', newGroup[0].groups_id)
 
-    res.status(500).json({success: false, error: `Something went wrong after creating the groups: ${newProfilesGroupError}`})
+    return res.status(500).json({success: false, error: `Something went wrong after creating the group: ${newProfilesGroupError.message}`})
   }
 
   // Now need to ahndle sending invites to other users
@@ -296,7 +296,7 @@ router.post('/acceptInviteGroup', authRequire, async (req, res) => {
   .select();
 
   if (InviteAcceptedError) {
-    res.status(400).json({success: false, error: InviteAcceptedError.message})
+    return res.status(400).json({success: false, error: InviteAcceptedError.message})
   }
 
   const { data: group, error: groupsError } = await req.supabase
@@ -313,10 +313,10 @@ router.post('/acceptInviteGroup', authRequire, async (req, res) => {
         `
     )
     .eq('groups_id', req.body.groupId)
-    .limit();
+    .limit(1);
 
   if (groupsError) {
-    res.status(400).json({success: false, error: groupsError.message});
+    return res.status(400).json({success: false, error: groupsError.message});
   }
 
   const members = group[0].profiles_groups?.map((pg) => {
@@ -369,7 +369,7 @@ router.post('/declineInviteGroup', authRequire, async (req, res) => {
   .select();
 
   if (InviteAcceptedError) {
-    res.status(500).json({success: false, error: InviteAcceptedError.message})
+    return res.status(500).json({success: false, error: InviteAcceptedError.message})
   }
 
   res.json({success: true})

@@ -18,14 +18,23 @@ router.get("/todo", authRequire, async (req, res) => {
     )
     .eq("profiles_groups.user_id", req.cookies.userId);
 
-  const groupIDs = groupObj[0]?.profiles_groups.map((pg) => {
-    return pg.groups_id;
-  });
+  // User may have no group memberships — guard against undefined
+  const memberships = groupObj?.[0]?.profiles_groups || [];
 
-  const tagNameObj =
-    groupObj[0]?.profiles_groups
-      .filter((pg) => pg.groups.tag_name !== null)
-      .map((pg) => ({ gid: pg.groups_id, tag: pg.groups.tag_name })) || [];
+  const groupIDs = memberships.map((pg) => pg.groups_id);
+
+  const tagNameObj = memberships
+    .filter((pg) => pg.groups?.tag_name !== null)
+    .map((pg) => ({ gid: pg.groups_id, tag: pg.groups.tag_name }));
+
+  // If user has no groups, render the page with empty state immediately
+  if (groupIDs.length === 0) {
+    return res.render("todo.ejs", {
+      yourTaskLists: [],
+      groupTagObj: [],
+      currentPage: "todo",
+    });
+  }
 
   const { data: task_list, error: taskListError } = await req.supabase
     .from("task_list")
@@ -46,7 +55,11 @@ router.get("/todo", authRequire, async (req, res) => {
     .in("groups_id", groupIDs)
     .eq("groups.profiles_groups.invite_status", "accepted");
 
-  const yourTaskListsPromises = task_list.map(async (tl) => {
+  if (taskListError) {
+    return res.status(500).json({ success: false, error: taskListError.message });
+  }
+
+  const yourTaskListsPromises = (task_list || []).map(async (tl) => {
     const { data: tasks, error: errorTasks } = await req.supabase
       .from("task")
       .select(`*, profiles_task!left(user_id, profiles!inner(username))`)
@@ -102,6 +115,7 @@ router.get("/todo", authRequire, async (req, res) => {
     yourTaskLists,
     groupTagObj: tagNameObj || [],
     currentPage: "todo",
+    currentUserId: req.cookies.userId,
   });
 });
 
@@ -236,7 +250,7 @@ router.patch("/updateTask", authRequire, async (req, res) => {
   }
 });
 
-router.get("/membersTaskList/", async (req, res) => {
+router.get("/membersTaskList/", authRequire, async (req, res) => {
   const { taskListId } = req.query;
   try {
     const { data: taskList } = await req.supabase

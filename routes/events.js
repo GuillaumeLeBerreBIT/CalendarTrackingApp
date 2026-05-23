@@ -25,7 +25,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
     .select();
 
   if (eventDataError) {
-    res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: eventDataError.message });
   }
 
   if (eventData[0]['start_time']) eventData[0]['start_time'] = eventData[0]['start_time'].slice(0, -3);
@@ -46,7 +46,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
     .select()
 
     if (eventUsersInvitedError) {
-      res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ success: false, error: eventUsersInvitedError.message });
     } else {
 
       const userArray = [];
@@ -77,7 +77,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
     .limit(1);
 
     if (eventProfileError) {
-      res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ success: false, error: eventProfileError.message });
     } else {
 
     res.json({ success: true, eventData, participants: [{
@@ -161,6 +161,40 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     return res.status(500).json({ success: false, error: err.message });
   }
 })
+
+/**
+ * PATCH /parseEvent/:eventId
+ * Lightweight update for drag-to-reschedule and resize operations.
+ * Only updates date/time fields — does not touch title, description, or participants.
+ * Body: { startDate, endDate, startTime, endTime, allDay }
+ */
+router.patch('/parseEvent/:eventId', authRequire, async (req, res) => {
+  try {
+    const eventId = parseInt(req.params.eventId);
+    const { startDate, endDate, startTime, endTime, allDay } = req.body;
+
+    const { data: updatedEvent, error: updateError } = await req.supabase
+      .from('events')
+      .update({
+        start_date: startDate,
+        end_date: endDate || startDate,
+        start_time: allDay ? null : (startTime || null),
+        end_time: allDay ? null : (endTime || null),
+        all_day: allDay === true || allDay === 'true',
+      })
+      .eq('event_id', eventId)
+      .select();
+
+    if (updateError) {
+      return res.status(500).json({ success: false, error: updateError.message });
+    }
+
+    return res.json({ success: true, eventData: updatedEvent });
+  } catch (err) {
+    console.error('PATCH /parseEvent error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
   try {

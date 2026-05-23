@@ -1,0 +1,71 @@
+<%- include('partials/header.ejs') %>
+<body class="app-page">
+<%- include('partials/navbar.ejs', { currentPage: 'profile' }) %>
+<main>
+    <div class="profile-container">
+        <div class="profile-header">
+            <h1>Profile &amp; Settings</h1>
+            <p>Manage your account details and preferences</p>
+        </div>
+
+        <!-- Account Info -->
+        <section class="card-shape profile-section">
+            <h2>Account</h2>
+            <div class="profile-field">
+                <label>Username</label>
+                <div class="profile-field-value">
+                    <span id="display-username"><%= username %></span>
+                    <button class="btn-soft" id="edit-username-btn" type="button">Edit</button>
+                </div>
+            </div>
+            <div class="profile-field-row" id="edit-username-row" style="display:none;">
+                <input type="text" id="new-username-input" value="<%= username %>" maxlength="40" placeholder="New username">
+                <button type="button" id="save-username-btn">Save</button>
+                <button type="button" class="btn-soft" id="cancel-username-btn">Cancel</button>
+            </div>
+            <div class="profile-field">
+                <label>Email</label>
+                <div class="profile-field-value">
+                    <span><%= email %></span>
+                </div>
+            </div>
+            <div class="profile-field">
+                <label>Member since</label>
+                <div class="profile-field-value">
+                    <span><%= memberSince %></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Email Preferences -->
+        <section class="card-shape profile-section">
+            <h2>Email Preferences</h2>
+            <div class="profile-field">
+                <div>
+                    <label>Daily Digest Email</label>
+                    <p style="margin-top: 2px;">Receive a morning email with your day's events and open tasks.</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="digest-toggle" <%= emailDigestEnabled ? 'checked' : '' %>>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </section>
+
+        <!-- Danger Zone -->
+        <section class="card-shape profile-section profile-danger">
+            <h2>Account Actions</h2>
+            <div class="profile-field">
+                <div>
+                    <label>Sign Out</label>
+                    <p style="margin-top: 2px;">Sign out of your account on this device.</p>
+                </div>
+                <a href="/logout" class="btn-danger">Sign Out</a>
+            </div>
+        </section>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/axios@1.11.0/dist/axios.min.js"></script>
+<script src="js/profile.js"></script>
+<%- include('partials/footer.ejs') %>

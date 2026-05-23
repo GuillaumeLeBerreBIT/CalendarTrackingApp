@@ -80,3 +80,133 @@ label {
         padding-bottom: 72px;
     }
 }
+
+/* ════════════════════════════════════════════════════
+   Profile / Settings page
+════════════════════════════════════════════════════ */
+.profile-container {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.profile-header {
+    margin-bottom: 4px;
+}
+
+.profile-section {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.profile-section h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text-1);
+    margin: 0 0 4px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.profile-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.profile-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-2);
+}
+
+.profile-field-value {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--color-text-1);
+}
+
+.profile-field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.profile-field-row input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+}
+
+.profile-danger .profile-field label {
+    color: var(--color-text-1);
+}
+
+.btn-danger {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s;
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+}
+
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--color-border-hover, #d1d5db);
+    border-radius: 24px;
+    transition: background-color 0.2s;
+}
+
+.toggle-slider::before {
+    position: absolute;
+    content: '';
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--color-accent, #3b7a57);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}

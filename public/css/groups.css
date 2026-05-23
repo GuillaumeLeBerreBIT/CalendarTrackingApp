@@ -516,3 +516,17 @@ hr {
 #save-color-btn {
     align-self: flex-end;
 }
+
+/* ════════════════════════════════════════════════════
+   Empty states
+════════════════════════════════════════════════════ */
+.empty-state-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    width: 100%;
+    text-align: center;
+    color: var(--color-text-3, #9ca3af);
+}

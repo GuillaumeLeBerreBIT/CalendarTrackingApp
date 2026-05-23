@@ -43,6 +43,20 @@ export default async function authRequire (req, res, next) {
       return res.redirect("/login");
     }
   }
+  // Proactively refresh if token expires within 30 minutes
+  const expiresAt = parseInt(req.cookies.expiresAt || '0');
+  const thirtyMinFromNow = Math.floor(Date.now() / 1000) + 30 * 60;
+  if (expiresAt && expiresAt < thirtyMinFromNow && req.cookies.refreshToken) {
+    try {
+      const { user: freshUser, accessToken: freshToken } = await refreshSession(req, res);
+      req.user = freshUser;
+      req.supabase = createUserClient(freshToken);
+      return next();
+    } catch (_) {
+      // Fall through to use existing valid token
+    }
+  }
+
   req.supabase = createUserClient(supaToken)
   req.user = data.user;
   return next();
@@ -65,7 +79,7 @@ async function refreshSession(req, res) {
       });
 
     res.cookie('refreshToken', session.refresh_token, {
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: 'lax'
     });
@@ -77,7 +91,7 @@ async function refreshSession(req, res) {
     });
 
     res.cookie('userId', user.id, {
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: 'lax'
     })

@@ -1,51 +1,3 @@
-async function showUpcomingEvents(events) {
-  const now = new Date();
-
-  let upcomingEvents = events.filter( e => new Date(e.start) > now)
-  upcomingEvents = upcomingEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-  upcomingEvents.slice(0,10).forEach(e => {
-
-    const upcomingTaskTemp = document.querySelector('#template-upcoming');
-    const upcomingClone = upcomingTaskTemp.content.cloneNode(true);
-
-    upcomingClone.querySelector('#event-title').textContent = e.title;
-    upcomingClone.querySelector('#event-description').textContent = e.extendedProps.description;
-    upcomingClone.querySelector('#startDate').textContent = convertDateObject(e.start);
-
-    if (e.extendedProps.groupName) {
-      upcomingClone.querySelector('#group-name').textContent = e.extendedProps.groupName;
-    } else {
-      upcomingClone.querySelector('#group-name').remove();
-    }
-
-    if (e.start != e.end) {
-    
-      const newNode = document.createElement('span')
-      newNode.textContent = ' - '
-      const parentEle = upcomingClone.querySelector('#endDate').parentNode;
-      parentEle.insertBefore(newNode, upcomingClone.querySelector('#endDate'))
-
-      upcomingClone.querySelector('#endDate').textContent = convertDateObject(e.end);
-    } else {
-      upcomingClone.querySelector('#endDate').remove();
-    }
-
-    if (e.extendedProps.participants) {
-      const eventParts = upcomingClone.querySelector('#event-participants')
-      e.extendedProps.participants.forEach(p => {
-        const divPart = document.createElement('div');
-        divPart.classList.add('badge-secondary');
-        divPart.textContent = p.username
-        divPart.dataset.userId = p.userId;
-        eventParts.appendChild(divPart);
-      }) 
-    }
-    
-    document.querySelector('div.upcoming-list.card-shape').appendChild(upcomingClone);
-  })
-
-}
-
 function convertDateObject(date) {
   const dateObj = new Date(date);
 
@@ -70,7 +22,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   const modalOverlayEvent = document.querySelector("#modal-overlay-event");
 
   const loadedEvents = await loadInEvents();
-  showUpcomingEvents(loadedEvents)
 
   let currentEvent = null
   modalOverlayEvent.addEventListener('click', (e) => {
@@ -103,7 +54,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       todayBtn: {
         text: "Today",
         click: function () {
-          alert("Go to today.");
+          calendar.today();
         },
       },
     },
@@ -133,9 +84,46 @@ document.addEventListener("DOMContentLoaded", async function () {
     multiMonthMaxColumns: 1,
     contentHeight: "auto",
     nowIndicator: true,
+    editable: true,
     events: loadedEvents,
 
-    // Cick on calander field to add an event.
+    // Drag to reschedule
+    eventDrop: async function (info) {
+      const event = info.event;
+      const payload = buildDatePayload(event);
+      try {
+        const response = await axios.patch(`/parseEvent/${event.id}`, payload);
+        if (!response.data.success) {
+          showToast('Could not save the new date. Reverting.', 'error');
+          info.revert();
+        } else {
+          showToast('Event rescheduled.', 'success');
+        }
+      } catch (err) {
+        showToast('Error saving rescheduled event.', 'error');
+        info.revert();
+      }
+    },
+
+    // Resize event end time
+    eventResize: async function (info) {
+      const event = info.event;
+      const payload = buildDatePayload(event);
+      try {
+        const response = await axios.patch(`/parseEvent/${event.id}`, payload);
+        if (!response.data.success) {
+          showToast('Could not save the new end time. Reverting.', 'error');
+          info.revert();
+        } else {
+          showToast('Event end time updated.', 'success');
+        }
+      } catch (err) {
+        showToast('Error saving resized event.', 'error');
+        info.revert();
+      }
+    },
+
+    // Click on calendar field to add an event.
     dateClick: function (info) {
 
       resetForm();
@@ -250,14 +238,19 @@ document.addEventListener("DOMContentLoaded", async function () {
     }, 280)
   });
 
-  // So when submitting the form I do not receive the data direclty in neat form, so trigger the formData event
+  // So when submitting the form I do not receive the data directly in neat form, so trigger the formData event
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const submitBtn = form.querySelector('button[type=submit]');
+    const originalText = submitBtn ? submitBtn.textContent : '';
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving...'; }
     try {
       await parseEvent();
     } catch (err) {
       console.error('Event save failed:', err);
-      alert('Something went wrong saving the event. Please try again.');
+      showToast('Something went wrong saving the event. Please try again.', 'error');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalText; }
     }
   });
 
@@ -308,7 +301,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (isUpdate) {
       let response = await axios.put(`/parseEvent/${eventId}`, data);
       if (!response.data.success) {
-        alert(`Could not update event: ${response.data.error || 'Unknown error'}`);
+        showToast(`Could not update event: ${response.data.error || 'Unknown error'}`, 'error');
         modalOverlayForm.style.setProperty('display', 'none');
         return;
       }
@@ -342,6 +335,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         outdatedEvent.setExtendedProp('groupsId', newEvent['groups_id']);
       }
 
+      showToast('Event updated!', 'success');
       modalOverlayForm.style.setProperty('display', 'none');
 
     } else {
@@ -350,28 +344,44 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       // Handle response to add event to the calendar
       if (response.data.success) {
+        const ev = response.data.eventData[0];
+        const allDay = ev["all_day"];
+        const rawStart = ev["start_time"];
+        const rawEnd   = ev["end_time"];
+
+        let evStart, evEnd;
+        if (allDay || !rawStart) {
+          evStart = ev["start_date"];
+          evEnd   = ev["end_date"];
+        } else if (!rawEnd) {
+          evStart = `${ev["start_date"]}T${rawStart}`;
+          evEnd   = null;
+        } else {
+          evStart = `${ev["start_date"]}T${rawStart}`;
+          evEnd   = `${ev["end_date"]}T${rawEnd}`;
+        }
+
         calendar.addEvent({
-          id: response.data.eventData[0]["event_id"],
-          title: response.data.eventData[0]["event_title"],
-          start: `${response.data.eventData[0]["start_date"]}`,
-          end: `${response.data.eventData[0]["end_date"]}`,
-          startTime: response.data.eventData[0]["start_time"],
-          endTime: response.data.eventData[0]["end_time"],
-          allDay: response.data.eventData[0]["all_day"],
+          id:    ev["event_id"],
+          title: ev["event_title"],
+          start: evStart,
+          end:   evEnd,
+          allDay: allDay,
           backgroundColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#3D82F6',
-          borderColor: (response.data.participants || []).length > 1 ? '#6B7280' : '#3D82F6',
+          borderColor:     (response.data.participants || []).length > 1 ? '#6B7280' : '#3D82F6',
           textColor: 'white',
           extendedProps: {
             participants: response.data.participants || [],
-            description: response.data.eventData[0]["event_description"],
-            groupsId: response.data.eventData[0].groups_id
+            description:  ev["event_description"],
+            groupsId:     ev.groups_id
           }
         });
 
+        showToast('Event created!', 'success');
         modalOverlayForm.style.setProperty("display", "none");
       } else {
         modalOverlayForm.style.setProperty("display", "none");
-        alert("Something went wrong, could not be able to create an event ...");
+        showToast('Something went wrong — could not create the event.', 'error');
       }
     }
 
@@ -577,22 +587,20 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       if (response.status === 204 || response.data?.success) {
             const matchEvent = calendar.getEventById(eventId);
-            
+
             if (matchEvent) {
                 matchEvent.remove();
-                
                 modalOverlayEvent.style.display = 'none';
-                
-                alert('Event deleted successfully!');
+                showToast('Event deleted.', 'success');
             } else {
                 console.warn('Event not found in calendar');
             }
         } else {
-            alert('Failed to delete event from server');
+            showToast('Failed to delete event from server.', 'error');
         }
     } catch (error) {
       console.error('Error deleting event:', error);
-      alert('Unable to delete the event. Please try again.');
+      showToast('Unable to delete the event. Please try again.', 'error');
     }
   }
 
@@ -641,6 +649,33 @@ document.addEventListener("DOMContentLoaded", async function () {
     document.querySelector('#select-users-wrapper').classList.add('set-display-none');
     document.querySelector('#participants-container').innerHTML = '';
     document.querySelector('#tagNames').selectedIndex = 0;
+  }
+
+  /**
+   * Build the date/time payload expected by PATCH /parseEvent/:id
+   * from a FullCalendar event object.
+   */
+  function buildDatePayload(event) {
+    const pad = (n) => String(n).padStart(2, '0');
+
+    function toDateStr(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    function toTimeStr(d) {
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    const allDay = event.allDay;
+    const start = event.start;
+    const end = event.end;
+
+    return {
+      allDay,
+      startDate: toDateStr(start),
+      endDate: end ? toDateStr(end) : toDateStr(start),
+      startTime: allDay ? null : toTimeStr(start),
+      endTime: (!allDay && end) ? toTimeStr(end) : null,
+    };
   }
 
 });

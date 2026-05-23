@@ -12,6 +12,8 @@ import authRouter from "./routes/auth.js";
 import groupsRouter from "./routes/groups.js"
 import eventsRouter from "./routes/events.js"
 import todoRouter from "./routes/todo.js"
+import emailRouter from "./routes/email.js"
+import { startScheduler } from "./utils/scheduler.js"
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -32,9 +34,16 @@ app.use('/', authRouter);
 app.use('/', groupsRouter);
 app.use('/', eventsRouter);
 app.use('/', todoRouter);
+app.use('/', emailRouter);
+
+app.post('/refresh-session', authRequire, (req, res) => {
+  // authRequire already refreshes cookies if needed; just confirm alive
+  return res.json({ success: true });
+});
 
 app.listen(app.get("port"), () => {
   console.log(`Listening on port: ${app.get("port")}`);
+  startScheduler();
 });
 
 app.get("/calendar", authRequire, async (req, res) => {
@@ -62,7 +71,7 @@ app.get("/calendar", authRequire, async (req, res) => {
 
 //Load the User login pages
 app.get("/", authRequire, (req, res) => {
-  res.redirect("/groups");
+  res.redirect("/calendar");
 });
 
 app.get('/healthz',(req, res) => {

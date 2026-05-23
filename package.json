@@ -23,7 +23,9 @@
     "dotenv": "^17.2.1",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
-    "fullcalendar": "^6.1.18"
+    "fullcalendar": "^6.1.18",
+    "node-cron": "^4.2.1",
+    "resend": "^6.12.3"
   },
   "devDependencies": {
     "vitest": "^4.1.0"

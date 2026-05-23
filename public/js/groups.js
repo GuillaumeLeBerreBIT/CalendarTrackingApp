@@ -59,13 +59,13 @@ document.addEventListener('click', async (e) => {
                 card.style.transition = 'opacity 0.3s';
                 setTimeout(() => card.remove(), 300);
             } else {
-                alert('Failed to accept invitation');
+                showToast('Failed to accept invitation.', 'error');
                 acceptBtn.disabled = false;
                 acceptBtn.textContent = 'Accept';
             }
         } catch (error) {
             console.error('Error accepting invite:', error);
-            alert('Error accepting invitation');
+            showToast('Error accepting invitation.', 'error');
             acceptBtn.disabled = false;
             acceptBtn.textContent = 'Accept';
         }
@@ -84,13 +84,13 @@ document.addEventListener('click', async (e) => {
                 card.style.transition = 'opacity 0.3s';
                 setTimeout(() => card.remove(), 300);
             } else {
-                alert('Failed to decline invitation');
+                showToast('Failed to decline invitation.', 'error');
                 declineBtn.disabled = false;
                 declineBtn.textContent = 'Decline';
             }
         } catch (error) {
             console.error('Error declining invite:', error);
-            alert('Error declining invitation');
+            showToast('Error declining invitation.', 'error');
             declineBtn.disabled = false;
             declineBtn.textContent = 'Decline';
         }
@@ -165,14 +165,17 @@ formModalGroup.addEventListener('submit', async (e) => {
         const response = await axios.post('/createGroup', payload);
 
         if (!response.data.success) {
-            alert(`Could not create the group: ${response.error}`)
-            return
-        } 
+            showToast(`Could not create the group.`, 'error');
+            return;
+        }
 
+        showToast('Group created!', 'success');
         appendGroupTemplate(response.data.newGroup, response.data?.newUsers || {});
+        modalOverlayGroups.classList.remove('active');
 
     } catch (error) {
-        console.log(`Internal server error, couldn't handle the request: ${error}`)
+        console.error(`Internal server error, couldn't handle the request: ${error}`);
+        showToast('Something went wrong creating the group.', 'error');
     }
 
     // Invite the user to the current group.
@@ -237,9 +240,9 @@ async function checkUserExist (inputField, usersToInvite) {
 
                 usersToInvite.appendChild(span);
                 inputField.value = '';
-                
+
             } else {
-                alert('User does not exist in the application.')
+                showToast('User not found in the application.', 'error');
             }
         }
     } catch (e) {
@@ -259,12 +262,13 @@ async function inviteUser (inputField, usersToInvite, groupInvUserBtn) {
         const response = await axios.post('/inviteUsers', {userList: userList, groupId: groupId });
 
         if (response.data.success) {
-            alert('User(s) have been invited to your Group');
+            showToast('User(s) invited to your group!', 'success');
+            inviteUserModal.classList.remove('active');
         } else {
-            alert(response.data?.error);
+            showToast(response.data?.error || 'Could not invite users.', 'error');
         }
     } catch (error) {
-        alert(`Internal server error could not handle request: ${e}`);
+        showToast('Something went wrong sending the invite.', 'error');
     }
 }
 
@@ -275,16 +279,17 @@ async function acceptGroup(groupId) {
         const response = await axios.post('/acceptInviteGroup', {groupId: groupId});
 
         if (!response.data.success) {
-            alert(`Wasn't able to accept the group Invite.`)
-            return false
+            showToast("Wasn't able to accept the group invite.", 'error');
+            return false;
         }
 
+        showToast('Group invite accepted!', 'success');
         appendGroupTemplate(response.data.group, response.data.members);
-        return true
+        return true;
 
     } catch (error) {
-        alert('Could not complete the request to accept the invite.')
-        return false
+        showToast('Could not complete the request to accept the invite.', 'error');
+        return false;
     }
 
 }
@@ -295,15 +300,15 @@ async function declineGroup(groupId) {
         const response = await axios.post('/declineInviteGroup', {groupId: groupId});
 
         if (!response.data.success) {
-            alert(`Wasn't able to decline the Invite.`)
-            return false
+            showToast("Wasn't able to decline the invite.", 'error');
+            return false;
         }
-        return true
+        showToast('Invite declined.', 'info');
+        return true;
 
     } catch (error) {
-
-        alert('Could not complete the request to accept the invite.')
-        return false
+        showToast('Could not complete the request to decline the invite.', 'error');
+        return false;
     }
 }
 
@@ -425,18 +430,19 @@ saveColorBtn.addEventListener('click', async () => {
         });
 
         if (response.data.success) {
+            showToast('Your colour saved!', 'success');
             saveColorBtn.textContent = 'Saved!';
             setTimeout(() => {
                 saveColorBtn.textContent = 'Save My Colour';
                 saveColorBtn.disabled = false;
             }, 1500);
         } else {
-            alert('Could not save colour.');
+            showToast('Could not save colour.', 'error');
             saveColorBtn.disabled = false;
             saveColorBtn.textContent = 'Save My Colour';
         }
     } catch (err) {
-        alert('Error saving colour.');
+        showToast('Error saving colour.', 'error');
         saveColorBtn.disabled = false;
         saveColorBtn.textContent = 'Save My Colour';
     }
@@ -456,18 +462,19 @@ saveSharedColorBtn.addEventListener('click', async () => {
         });
 
         if (response.data.success) {
+            showToast('Shared colour saved!', 'success');
             saveSharedColorBtn.textContent = 'Saved!';
             setTimeout(() => {
                 saveSharedColorBtn.textContent = 'Save Shared Colour';
                 saveSharedColorBtn.disabled = false;
             }, 1500);
         } else {
-            alert('Could not save shared colour.');
+            showToast('Could not save shared colour.', 'error');
             saveSharedColorBtn.disabled = false;
             saveSharedColorBtn.textContent = 'Save Shared Colour';
         }
     } catch (err) {
-        alert('Error saving shared colour.');
+        showToast('Error saving shared colour.', 'error');
         saveSharedColorBtn.disabled = false;
         saveSharedColorBtn.textContent = 'Save Shared Colour';
     }
