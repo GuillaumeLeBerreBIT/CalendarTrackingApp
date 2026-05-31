@@ -72,28 +72,34 @@ async function refreshSession(req, res) {
   try{
     const {session, user} = refreshSes
 
+    const secure = process.env.NODE_ENV === 'production';
+
     res.cookie("authCookie", session.access_token, {
         maxAge: 3 * 60 * 60 * 1000,
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'lax',
+        secure,
       });
 
     res.cookie('refreshToken', session.refresh_token, {
       maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      sameSite: 'lax'
+      sameSite: 'lax',
+      secure,
     });
 
     res.cookie('expiresAt', session.expires_at, {
       maxAge: 3 * 60 * 60 * 1000,
       httpOnly: true,
-      sameSite: 'lax'
+      sameSite: 'lax',
+      secure,
     });
 
     res.cookie('userId', user.id, {
       maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      sameSite: 'lax'
+      sameSite: 'lax',
+      secure,
     })
 
     return { user, accessToken: session.access_token }

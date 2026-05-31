@@ -9,9 +9,6 @@ import authRequire from '../utils/utils.js';
 
 const router = express.Router();
 
-// UUID v4 validation regex
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const FROM_EMAIL = process.env.FROM_EMAIL || 'digest@calendartracking.app';
 
 // ---------------------------------------------------------------------------
@@ -379,27 +376,6 @@ export async function sendDigestForUser(userId) {
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
-
-/**
- * POST /send-digest/:userId
- * Send the digest email for a specific user. No auth required — intended for
- * internal scheduler use. userId is validated as a UUID before any DB query.
- */
-router.post('/send-digest/:userId', async (req, res) => {
-  const { userId } = req.params;
-
-  if (!UUID_RE.test(userId)) {
-    return res.status(400).json({ success: false, error: 'Invalid userId format.' });
-  }
-
-  try {
-    const result = await sendDigestForUser(userId);
-    return res.json(result);
-  } catch (error) {
-    console.error(`[digest] Failed to send digest for ${userId}:`, error.message);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 /**
  * GET /email-preferences

@@ -151,6 +151,17 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
 
   try {
 
+    const { data: membership, error: membershipError } = await req.supabase
+      .from('profiles_groups')
+      .select('role')
+      .eq('groups_id', req.body.groupId)
+      .eq('user_id', req.cookies.userId)
+      .single();
+
+    if (membershipError || membership?.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only group admins can invite members.' });
+    }
+
     const userIds = req.body.userList.map(u => u.user_id)
 
     const {data: users2Check, error: users2CheckError } = await req.supabase

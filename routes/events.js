@@ -19,7 +19,8 @@ router.post("/parseEvent", authRequire, async (req, res) => {
         end_date: insertEventObj.endDate,
         start_time: insertEventObj.startTime,
         end_time: insertEventObj.endTime,
-        groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : null 
+        groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : null,
+        created_by: req.cookies.userId,
       },
     ])
     .select();
@@ -199,6 +200,20 @@ router.patch('/parseEvent/:eventId', authRequire, async (req, res) => {
 router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId)
+
+    const { data: event, error: fetchError } = await req.supabase
+      .from('events')
+      .select('created_by')
+      .eq('event_id', eventId)
+      .single();
+
+    if (fetchError || !event) {
+      return res.status(404).json({ success: false, error: 'Event not found.' });
+    }
+
+    if (event.created_by !== req.cookies.userId) {
+      return res.status(403).json({ success: false, error: 'You can only delete events you created.' });
+    }
 
     const {error: deleteEventError } = await req.supabase
     .from('events')
