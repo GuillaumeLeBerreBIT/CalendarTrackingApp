@@ -7,7 +7,7 @@ export default async function authRequire (req, res, next) {
 
     if (!req.cookies.refreshToken) {
       res.clearCookie('expiresAt');
-      return res.redirect("/login");
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
     try {
@@ -21,7 +21,7 @@ export default async function authRequire (req, res, next) {
       res.clearCookie("userId");
       res.clearCookie('refreshToken');
       res.clearCookie('expiresAt');
-      return res.redirect("/login");
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
   }
 
@@ -40,7 +40,7 @@ export default async function authRequire (req, res, next) {
       res.clearCookie("userId");
       res.clearCookie('refreshToken');
       res.clearCookie('expiresAt');
-      return res.redirect("/login");
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
   }
   // Proactively refresh if token expires within 30 minutes

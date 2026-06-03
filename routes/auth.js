@@ -10,14 +10,6 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
 const secureCookie = () => process.env.NODE_ENV === 'production';
 
-router.get("/login", (req, res) => {
-  res.render("login.ejs");
-});
-
-router.get("/register", (req, res) => {
-  res.render("register.ejs");
-});
-
 router.post("/login", authLimiter, async (req, res) => {
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -26,46 +18,44 @@ router.post("/login", authLimiter, async (req, res) => {
   });
 
   if (error) {
-    return res
-      .status(400)
-      .render("login.ejs", { success: false, message: error.message });
-  } else {
-    res.cookie("authCookie", data.session.access_token, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: secureCookie(),
-    });
-
-    res.cookie('userId', data.user.id,  {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: secureCookie(),
-    });
-
-    res.cookie('refreshToken', data.session.refresh_token, {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: secureCookie(),
-    });
-
-    res.cookie('expiresAt', data.session.expires_at, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: secureCookie(),
-    });
-
-    res.redirect("/calendar");
+    return res.status(400).json({ success: false, error: error.message });
   }
+
+  res.cookie("authCookie", data.session.access_token, {
+    maxAge: 3 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.cookie('userId', data.user.id, {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.cookie('refreshToken', data.session.refresh_token, {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.cookie('expiresAt', data.session.expires_at, {
+    maxAge: 3 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.json({ success: true });
 });
 
 router.post("/register", authLimiter, async (req, res) => {
 
   if (req.body["password"] != req.body["passwordConfirm"]) {
-    return res.status(422).render("register.ejs", {
+    return res.status(422).json({
       success: false,
       error: "Make sure the passwords entered are identical to each other.",
     });
@@ -74,9 +64,7 @@ router.post("/register", authLimiter, async (req, res) => {
   const [isValid, messageSuccess] = validatePassword(req.body["password"]);
 
   if (!isValid) {
-    return res
-      .status(422)
-      .render("register.ejs", { success: false, error: messageSuccess });
+    return res.status(422).json({ success: false, error: messageSuccess });
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -90,35 +78,38 @@ router.post("/register", authLimiter, async (req, res) => {
   });
 
   if (error) {
-    return res
-      .status(400)
-      .render("register.ejs", { success: false, error: error.message });
-  } else {
-    res.cookie("authCookie", data.session.access_token, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
-    res.cookie('userId', data.user.id,  {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
-
-    res.cookie('refreshToken', data.session.refresh_token, {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
-
-    res.cookie('expiresAt', data.session.expires_at, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax'
-    });
-
-    res.redirect("/calendar");
+    return res.status(400).json({ success: false, error: error.message });
   }
+
+  res.cookie("authCookie", data.session.access_token, {
+    maxAge: 3 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.cookie('userId', data.user.id, {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.cookie('refreshToken', data.session.refresh_token, {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.cookie('expiresAt', data.session.expires_at, {
+    maxAge: 3 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookie(),
+  });
+
+  res.json({ success: true });
 });
 
 router.post("/logout", async (req, res) => {
@@ -126,7 +117,7 @@ router.post("/logout", async (req, res) => {
   res.clearCookie("refreshToken");
   res.clearCookie("expiresAt");
   res.clearCookie("userId");
-  res.redirect("/login");
+  res.json({ success: true });
 });
 
 router.get("/logout", async (req, res) => {
@@ -134,7 +125,7 @@ router.get("/logout", async (req, res) => {
   res.clearCookie("refreshToken");
   res.clearCookie("expiresAt");
   res.clearCookie("userId");
-  res.redirect("/login");
+  res.json({ success: true });
 });
 
 /**
@@ -151,19 +142,19 @@ router.get('/profile', authRequire, async (req, res) => {
     .single();
 
   if (profileError) {
-    return res.status(500).render('login.ejs', { success: false, message: 'Could not load profile.' });
+    return res.status(500).json({ success: false, error: 'Could not load profile.' });
   }
 
   const memberSince = profile.created_at
     ? new Date(profile.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : 'Unknown';
 
-  return res.render('profile.ejs', {
+  return res.json({
+    success: true,
     username: profile.username || '',
     email: profile.email || '',
     memberSince,
-    emailDigestEnabled: profile.email_digest_enabled !== false, // default true
-    currentPage: 'profile',
+    emailDigestEnabled: profile.email_digest_enabled !== false,
   });
 });
 

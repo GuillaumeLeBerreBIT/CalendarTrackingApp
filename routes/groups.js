@@ -20,14 +20,14 @@ router.get("/groups", authRequire, async (req, res) => {
   const groupIds = userMemberships.map(pg => pg.groups_id)
 
   if (groupIds.length === 0) {
-    return res.render("groups.ejs", { 
-      userGroups: [], 
-      yourGroups: 0, 
-      totalEvents: 0, 
+    return res.json({
+      success: true,
+      userGroups: [],
+      yourGroups: 0,
+      totalEvents: 0,
       userInvites: [],
-      currentPage: 'groups'
     });
-  } 
+  }
 
   //Need to use the INNNER join to filter on nested tables and only return the
   // data if there is a match in the lower table.
@@ -110,13 +110,13 @@ router.get("/groups", authRequire, async (req, res) => {
     .eq('user_id', req.cookies.userId)
     .eq('invite_status', 'pending');
 
-  res.render("groups.ejs", {
+  res.json({
+    success: true,
     userGroups: userGroups.sort((a, b) => new Date(b.groupInfo.created_at_raw) - new Date(a.groupInfo.created_at_raw)),
     yourGroups: groups.length,
     totalEvents,
     userInvites: userInvites || [],
     currentUserId: req.cookies.userId,
-    currentPage: 'groups'
   });
 });
 

@@ -27,13 +27,8 @@ router.get("/todo", authRequire, async (req, res) => {
     .filter((pg) => pg.groups?.tag_name !== null)
     .map((pg) => ({ gid: pg.groups_id, tag: pg.groups.tag_name }));
 
-  // If user has no groups, render the page with empty state immediately
   if (groupIDs.length === 0) {
-    return res.render("todo.ejs", {
-      yourTaskLists: [],
-      groupTagObj: [],
-      currentPage: "todo",
-    });
+    return res.json({ success: true, yourTaskLists: [], groupTagObj: [] });
   }
 
   const { data: task_list, error: taskListError } = await req.supabase
@@ -111,10 +106,10 @@ router.get("/todo", authRequire, async (req, res) => {
 
   const yourTaskLists = await Promise.all(yourTaskListsPromises);
 
-  res.render("todo.ejs", {
+  res.json({
+    success: true,
     yourTaskLists,
     groupTagObj: tagNameObj || [],
-    currentPage: "todo",
     currentUserId: req.cookies.userId,
   });
 });
