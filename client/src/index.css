@@ -1,0 +1,288 @@
+@import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+/* ════════════════════════════════════════════════════════════
+   EVENTLI — Design System
+   Dark-primary social calendar + event discovery
+════════════════════════════════════════════════════════════ */
+
+:root {
+  --accent-h: 252;
+  --accent-s: 88%;
+  --accent-l: 66%;
+  --accent:        hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-hover:  hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) + 6%));
+  --accent-press:  hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) - 8%));
+  --accent-soft:   hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.14);
+  --accent-softer: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.08);
+  --accent-line:   hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.32);
+  --accent-text:   #ffffff;
+  --accent-glow:   hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.40);
+
+  --r-xs:   6px;
+  --r-sm:   9px;
+  --r-md:   12px;
+  --r-lg:   16px;
+  --r-xl:   22px;
+  --r-full: 9999px;
+
+  --font-body: 'Inter', -apple-system, system-ui, sans-serif;
+  --transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Group color-coding */
+  --g-family:  #f59e0b;
+  --g-friends: #ec4899;
+  --g-work:    #22d3aa;
+  --g-climb:   #38bdf8;
+  --g-book:    #c084fc;
+  --g-self:    var(--accent);
+
+  /* Source brand tints */
+  --src-ticket:     #2b6df6;
+  --src-eventbrite: #f0603c;
+  --src-meetup:     #f0436b;
+}
+
+/* ── Dark theme (default) ─────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:          #0b0b12;
+  --bg-deep:     #07070c;
+  --surface:     #14141f;
+  --surface-2:   #1b1b29;
+  --surface-3:   #232334;
+  --surface-hi:  #2a2a3d;
+  --border:      hsl(250 18% 100% / 0.08);
+  --border-2:    hsl(250 18% 100% / 0.13);
+  --border-hi:   hsl(250 18% 100% / 0.20);
+  --text-1:      #f3f3f8;
+  --text-2:      #a9a9be;
+  --text-3:      #6f6f87;
+  --text-inv:    #0b0b12;
+  --shadow-sm:   0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md:   0 8px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3);
+  --shadow-lg:   0 24px 64px rgba(0,0,0,0.6), 0 8px 20px rgba(0,0,0,0.4);
+  --scrim:       rgba(6,6,12,0.72);
+  --img-a:       #2b2b46;
+  --img-b:       #1d1d30;
+  --overlay-grad: linear-gradient(180deg, transparent 30%, rgba(7,7,12,0.55) 70%, rgba(7,7,12,0.92) 100%);
+  color-scheme: dark;
+}
+
+/* ── Light theme ──────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg:          #f6f6fa;
+  --bg-deep:     #eeeef4;
+  --surface:     #ffffff;
+  --surface-2:   #f7f7fb;
+  --surface-3:   #f0f0f6;
+  --surface-hi:  #e9e9f2;
+  --border:      hsl(250 20% 12% / 0.09);
+  --border-2:    hsl(250 20% 12% / 0.14);
+  --border-hi:   hsl(250 20% 12% / 0.22);
+  --text-1:      #16161f;
+  --text-2:      #585870;
+  --text-3:      #8a8aa0;
+  --text-inv:    #ffffff;
+  --shadow-sm:   0 1px 2px rgba(20,20,40,0.06);
+  --shadow-md:   0 10px 28px rgba(30,30,60,0.10), 0 2px 6px rgba(30,30,60,0.06);
+  --shadow-lg:   0 28px 70px rgba(30,30,60,0.16), 0 8px 20px rgba(30,30,60,0.08);
+  --scrim:       rgba(20,20,40,0.40);
+  --img-a:       #d8d8ec;
+  --img-b:       #e8e8f4;
+  --overlay-grad: linear-gradient(180deg, transparent 30%, rgba(10,10,25,0.30) 70%, rgba(10,10,25,0.78) 100%);
+  color-scheme: light;
+}
+
+/* ── Reset ────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+#root { height: 100vh; }
+
+h1, h2, h3, h4 {
+  font-family: var(--font-body);
+  margin: 0;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+h1 { letter-spacing: -0.035em; }
+p  { margin: 0; }
+button { font-family: inherit; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+
+::selection { background: var(--accent-soft); }
+
+/* ── Scrollbars ───────────────────────────────────────────── */
+.scroll, .app-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hi) transparent;
+}
+.scroll::-webkit-scrollbar,
+.app-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+.scroll::-webkit-scrollbar-thumb,
+.app-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-hi);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* ── Image placeholder (striped, labelled) ────────────────── */
+.img-ph {
+  position: relative;
+  background:
+    repeating-linear-gradient(135deg, var(--img-a) 0 2px, transparent 2px 11px),
+    linear-gradient(135deg, var(--img-b), var(--img-a));
+  overflow: hidden;
+}
+.img-ph[data-cat="music"]    { --img-a:#3b2a5e; --img-b:#241a3d; }
+.img-ph[data-cat="sports"]   { --img-a:#1f4a44; --img-b:#15302d; }
+.img-ph[data-cat="food"]     { --img-a:#5a3320; --img-b:#3a2014; }
+.img-ph[data-cat="workshop"] { --img-a:#1f3a5a; --img-b:#15263a; }
+.img-ph[data-cat="market"]   { --img-a:#4a3a1c; --img-b:#2f2512; }
+.img-ph[data-cat="art"]      { --img-a:#4a2440; --img-b:#2f1729; }
+.img-ph .ph-label {
+  position: absolute;
+  left: 10px; bottom: 9px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  z-index: 1;
+}
+
+/* ── Animations ───────────────────────────────────────────── */
+@keyframes fadeUp   { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+@keyframes scaleIn  { from { opacity:0; transform:scale(0.96) translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes pop      { 0% { transform:scale(0.8); } 50% { transform:scale(1.12); } 100% { transform:scale(1); } }
+
+/* ── Nav items ────────────────────────────────────────────── */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: left;
+  width: 100%;
+  transition: var(--transition);
+}
+.nav-item:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+.nav-item--on,
+.nav-item--on:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+
+/* ── Interactive row hover ────────────────────────────────── */
+.row-hover  { transition: background var(--transition); }
+.row-hover:hover { background: var(--surface-2); }
+.menu-item  { transition: background var(--transition); }
+.menu-item:hover { background: var(--surface-3); }
+
+/* ── Focus ────────────────────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── FullCalendar theme overrides ─────────────────────────── */
+.fc {
+  --fc-border-color: var(--border);
+  --fc-today-bg-color: var(--accent-softer);
+  --fc-highlight-color: var(--accent-soft);
+  --fc-button-bg-color: var(--accent);
+  --fc-button-border-color: var(--accent);
+  --fc-button-hover-bg-color: var(--accent-hover);
+  --fc-button-hover-border-color: var(--accent-hover);
+  --fc-button-active-bg-color: var(--accent-press);
+  --fc-button-active-border-color: var(--accent-press);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--surface-2);
+  --fc-list-event-hover-bg-color: var(--surface-2);
+}
+.fc .fc-toolbar-title    { font-size: 1.1rem; font-weight: 700; color: var(--text-1); letter-spacing: -0.02em; }
+.fc .fc-button           { border-radius: var(--r-xs); font-size: 13px; font-weight: 600; }
+.fc .fc-col-header-cell  { background: transparent; }
+.fc .fc-col-header-cell-cushion { color: var(--text-3); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.fc .fc-daygrid-day-number { color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+}
+.fc-theme-standard td, .fc-theme-standard th { border-color: var(--border); }
+.fc-event { cursor: pointer; border-radius: var(--r-xs); }
+.fc .fc-event-title { font-size: 11.5px; font-weight: 600; }
+
+/* ── Cursor helpers ───────────────────────────────────────── */
+[role="button"], [tabindex] { cursor: pointer; }
+
+/* ── Touch target minimum (44px) ──────────────────────────── */
+.nav-item { min-height: 44px; }
+
+/* ── Skeleton loading animation ──────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* ── Mobile safe-area support ─────────────────────────────── */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-top    { padding-top:    env(safe-area-inset-top,    0px); }
+
+/* ── Improve text-3 on dark surface (raise slightly for contrast) ── */
+[data-theme="dark"] { --text-3: #7a7a95; }
+
+/* ── prefers-reduced-motion ───────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .skeleton { animation: none; background: var(--surface-3); }
+}
+
+/* CalendarPage — custom layout (headerToolbar=false) */
+.fc .fc-view-harness { height: 100% !important; }
+.fc-daygrid-event { background: var(--surface-2) !important; border-color: var(--border) !important; }
+.fc-daygrid-event:hover { background: var(--surface-3) !important; border-color: var(--border-2) !important; }
+.fc .fc-daygrid-day-frame { padding: 2px 3px; }
+.fc .fc-daygrid-event-harness { margin-top: 1px; }
