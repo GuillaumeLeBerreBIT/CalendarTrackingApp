@@ -27,7 +27,8 @@
     "fullcalendar": "^6.1.18",
     "helmet": "^8.2.0",
     "node-cron": "^4.2.1",
-    "resend": "^6.12.3"
+    "resend": "^6.12.3",
+    "rrule": "^2.8.1"
   },
   "devDependencies": {
     "vitest": "^4.1.0"
