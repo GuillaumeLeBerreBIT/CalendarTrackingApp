@@ -1,6 +1,7 @@
 import express from "express";
-import supabase from "../db/supabase.js";
+import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire ,{retrieveEvents, retrieveTodoLists, retrieveAllTasks } from "../utils/utils.js"
+import { notifyUsers } from "../utils/notifications.js";
 import { format } from "date-fns";
 const router = express.Router();
 
@@ -55,6 +56,7 @@ router.get("/groups", authRequire, async (req, res) => {
       const members =
         group.profiles_groups?.map((pg) => {
           return {
+            user_id: pg.user_id,
             profile: pg.profiles,
             role: pg.role,
           };
@@ -72,6 +74,7 @@ router.get("/groups", authRequire, async (req, res) => {
           title: group.groups_title,
           description: group.groups_description,
           tag: group.tag_name,
+          tag_name: group.tag_name,
           groupId: group.groups_id,
           created_at: format(new Date(group.created_at), 'dd-MM-yyyy'),
           created_at_raw: group.created_at,
@@ -123,28 +126,57 @@ router.get("/groups", authRequire, async (req, res) => {
 router.post('/checkUser', authRequire ,async (req, res) => {
 
   try {
+    const callerId = req.cookies.userId;
+
     const {data: isUserFound, error: noUser} = await req.supabase
     .from('profiles')
-    .select('username, user_id, email')
+    .select('username, user_id, email, searchable')
     .or(`username.ilike.${req.body.isUser},email.ilike.${req.body.isUser}`)
     .limit(1)
 
     if (noUser) {
-      res.status(400).json({success: false, error: noUser.message})
-    } else if (isUserFound.length === 0) {
-      res.json({success: true, match: false})
-    } else {
-      res.json({success: true, match: true, user: {
-        username: isUserFound[0].username,
-        user_id: isUserFound[0].user_id,
-        email: isUserFound[0].email
-      }})
+      return res.status(400).json({success: false, error: noUser.message})
     }
+
+    if (isUserFound.length === 0) {
+      return res.json({success: true, match: false})
+    }
+
+    const found = isUserFound[0];
+
+    // If the found user has opted out of search, check for a shared group before exposing them
+    if (found.searchable === false) {
+      const [{ data: callerGroups }, { data: foundGroups }] = await Promise.all([
+        req.supabase
+          .from('profiles_groups')
+          .select('groups_id')
+          .eq('user_id', callerId)
+          .eq('invite_status', 'accepted'),
+        req.supabase
+          .from('profiles_groups')
+          .select('groups_id')
+          .eq('user_id', found.user_id)
+          .eq('invite_status', 'accepted'),
+      ]);
+
+      const callerGroupIds = new Set((callerGroups || []).map(r => r.groups_id));
+      const sharesGroup = (foundGroups || []).some(r => callerGroupIds.has(r.groups_id));
+
+      if (!sharesGroup) {
+        return res.json({success: true, match: false})
+      }
+    }
+
+    res.json({success: true, match: true, user: {
+      username: found.username,
+      user_id: found.user_id,
+      email: found.email
+    }})
 
   } catch (error) {
     res.status(500).json({success: false, error: `Internal server error occurred.${error.message}`})
   }
-  
+
 });
 
 router.post('/inviteUsers', authRequire, async (req, res) => {
@@ -200,6 +232,19 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
     if (inviteUsersError) {
       return res.status(500).json({success: false, error: inviteUsersError.message})
     }
+
+    // Notify each newly-invited user (respects their notification prefs)
+    const { data: invitedGroup } = await req.supabase
+      .from('groups')
+      .select('groups_title')
+      .eq('groups_id', req.body.groupId)
+      .single();
+    const invitedGroupTitle = invitedGroup?.groups_title || 'a group';
+    await notifyUsers(req.supabase, users2Invite.map(u => u.user_id), 'group_invite', {
+      title: 'New group invite',
+      body: `You've been invited to ${invitedGroupTitle}.`,
+      link: '/groups',
+    });
 
     const emailIdList = inviteUsers.map(u => u.user_id)
 
@@ -425,6 +470,17 @@ router.post('/setGroupSharedColor', authRequire, async (req, res) => {
     return res.status(400).json({ success: false, error: 'groupsId and sharedColor are required' });
   }
 
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('profiles_groups')
+    .select('role')
+    .eq('groups_id', groupsId)
+    .eq('user_id', req.cookies.userId)
+    .single();
+
+  if (membershipError || membership?.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Only group admins can change the shared color.' });
+  }
+
   const { error } = await req.supabase
     .from('groups')
     .update({ shared_color: sharedColor })
@@ -451,6 +507,283 @@ router.post('/setMemberColor', authRequire, async (req, res) => {
   if (error) return res.status(500).json({ success: false, error: error.message });
 
   res.json({ success: true });
+});
+
+// GET /api/groupActivity/:groupId
+// Returns the last 20 activity items across the group, sorted by created_at DESC.
+// Sources: event_added, task_completed, member_joined, rsvp_going.
+// Each source is fetched in parallel; per-source errors are caught and logged
+// individually so a missing column never fails the whole request.
+router.get('/groupActivity/:groupId', authRequire, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.cookies.userId;
+
+  // Security: verify requesting user is an accepted member of this group
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('profiles_groups')
+    .select('user_id')
+    .eq('groups_id', groupId)
+    .eq('user_id', userId)
+    .eq('invite_status', 'accepted')
+    .single();
+
+  if (membershipError || !membership) {
+    return res.status(403).json({ success: false, error: 'You are not a member of this group.' });
+  }
+
+  // Source 1: event_added
+  // events.created_by and events.created_at both confirmed to exist.
+  const fetchEventAdded = async () => {
+    const { data, error } = await req.supabase
+      .from('events')
+      .select('event_id, event_title, created_at, profiles!events_created_by_fkey(username)')
+      .eq('groups_id', groupId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.warn('[groupActivity] event_added query failed:', error.message);
+      return [];
+    }
+
+    return (data || [])
+      .filter(e => e.created_at && e.profiles?.username)
+      .map(e => ({
+        user_id: null,
+        username: e.profiles.username,
+        action_type: 'event_added',
+        object_title: e.event_title,
+        created_at: e.created_at,
+      }));
+  };
+
+  // Source 2: task_completed
+  // task.updated_at does NOT exist in this schema; profiles_task has no timestamp either.
+  // Skipped — would produce items with no sortable created_at.
+  const fetchTaskCompleted = async () => {
+    // Column task.updated_at does not exist in this schema.
+    // Returning empty array to preserve merge logic without erroring.
+    return [];
+  };
+
+  // Source 3: member_joined
+  // profiles_groups.joined_at confirmed to exist.
+  const fetchMemberJoined = async () => {
+    const { data, error } = await req.supabase
+      .from('profiles_groups')
+      .select('user_id, joined_at, profiles(username)')
+      .eq('groups_id', groupId)
+      .eq('invite_status', 'accepted')
+      .order('joined_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.warn('[groupActivity] member_joined query failed:', error.message);
+      return [];
+    }
+
+    return (data || [])
+      .filter(pg => pg.joined_at && pg.profiles?.username)
+      .map(pg => ({
+        user_id: pg.user_id,
+        username: pg.profiles.username,
+        action_type: 'member_joined',
+        object_title: null,
+        created_at: pg.joined_at,
+      }));
+  };
+
+  // Source 4: rsvp_going
+  // profiles_events.created_at does NOT exist in this schema.
+  // Skipped — items would have no created_at and be filtered out anyway.
+  const fetchRsvpGoing = async () => {
+    // Column profiles_events.created_at does not exist in this schema.
+    return [];
+  };
+
+  const [eventAdded, taskCompleted, memberJoined, rsvpGoing] = await Promise.all([
+    fetchEventAdded(),
+    fetchTaskCompleted(),
+    fetchMemberJoined(),
+    fetchRsvpGoing(),
+  ]);
+
+  const merged = [...eventAdded, ...taskCompleted, ...memberJoined, ...rsvpGoing]
+    .filter(item => item.created_at && item.username)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 20);
+
+  res.json({ success: true, activity: merged });
+});
+
+// ─── Shareable group invite links ────────────────────────────────────────────
+
+/**
+ * POST /api/generateInviteLink
+ * Admin-only. Creates a time-limited invite token for a group.
+ * Body: { groupId: number }
+ * Returns: { success: true, token: uuid, url: string }
+ */
+router.post('/generateInviteLink', authRequire, async (req, res) => {
+  const { groupId } = req.body;
+  if (!groupId) {
+    return res.status(400).json({ success: false, error: 'groupId is required.' });
+  }
+
+  // Verify the caller is an admin of this group
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('profiles_groups')
+    .select('role')
+    .eq('groups_id', groupId)
+    .eq('user_id', req.cookies.userId)
+    .single();
+
+  if (membershipError || membership?.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Only group admins can generate invite links.' });
+  }
+
+  // Insert the token row — RLS insert policy checks admin role again server-side
+  const { data: tokenRow, error: tokenError } = await req.supabase
+    .from('group_invite_tokens')
+    .insert({ groups_id: groupId, created_by: req.cookies.userId })
+    .select('token')
+    .single();
+
+  if (tokenError) {
+    return res.status(500).json({ success: false, error: tokenError.message });
+  }
+
+  const base = process.env.APP_URL || 'http://localhost:5173';
+  return res.json({
+    success: true,
+    token: tokenRow.token,
+    url: `${base}/join/${tokenRow.token}`,
+  });
+});
+
+/**
+ * GET /api/joinGroup/:token
+ * PUBLIC — no auth required. Returns a preview of the group behind the link.
+ * Does NOT join the user; the POST below handles that.
+ */
+router.get('/joinGroup/:token', async (req, res) => {
+  const { token } = req.params;
+
+  // Use the anon singleton — this is a public, read-only preview
+  const { data: tokenRow, error: tokenError } = await supabaseAdmin
+    .from('group_invite_tokens')
+    .select('token, groups_id, expires_at, max_uses, use_count')
+    .eq('token', token)
+    .single();
+
+  if (tokenError || !tokenRow) {
+    return res.status(404).json({ success: false, error: 'Invalid or expired invite link.' });
+  }
+
+  const now = new Date();
+  if (new Date(tokenRow.expires_at) < now || tokenRow.use_count >= tokenRow.max_uses) {
+    return res.status(404).json({ success: false, error: 'Invalid or expired invite link.' });
+  }
+
+  // Fetch group info + member count in parallel
+  const [{ data: group, error: groupError }, { count, error: countError }] = await Promise.all([
+    supabaseAdmin
+      .from('groups')
+      .select('groups_title, tag_name')
+      .eq('groups_id', tokenRow.groups_id)
+      .single(),
+    supabaseAdmin
+      .from('profiles_groups')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('groups_id', tokenRow.groups_id)
+      .eq('invite_status', 'accepted'),
+  ]);
+
+  if (groupError) {
+    return res.status(500).json({ success: false, error: groupError.message });
+  }
+
+  return res.json({
+    success: true,
+    groupName: group.groups_title,
+    memberCount: count ?? 0,
+    tag: group.tag_name,
+    token,
+  });
+});
+
+/**
+ * POST /api/joinGroup/:token
+ * AUTHENTICATED. Validates the token and adds the current user as a member.
+ */
+router.post('/joinGroup/:token', authRequire, async (req, res) => {
+  const { token } = req.params;
+  const userId = req.cookies.userId;
+
+  // Validate token (use req.supabase so RLS is enforced with the user's JWT)
+  const { data: tokenRow, error: tokenError } = await req.supabase
+    .from('group_invite_tokens')
+    .select('token, groups_id, expires_at, max_uses, use_count')
+    .eq('token', token)
+    .single();
+
+  if (tokenError || !tokenRow) {
+    return res.status(404).json({ success: false, error: 'Invalid or expired invite link.' });
+  }
+
+  const now = new Date();
+  if (new Date(tokenRow.expires_at) < now || tokenRow.use_count >= tokenRow.max_uses) {
+    return res.status(404).json({ success: false, error: 'Invalid or expired invite link.' });
+  }
+
+  // Check if user is already a member
+  const { data: existing } = await req.supabase
+    .from('profiles_groups')
+    .select('user_id, invite_status')
+    .eq('groups_id', tokenRow.groups_id)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing?.invite_status === 'accepted') {
+    return res.status(409).json({ success: false, error: 'You are already a member of this group.' });
+  }
+
+  // Fetch group name for the response
+  const { data: group, error: groupError } = await supabaseAdmin
+    .from('groups')
+    .select('groups_title')
+    .eq('groups_id', tokenRow.groups_id)
+    .single();
+
+  if (groupError) {
+    return res.status(500).json({ success: false, error: groupError.message });
+  }
+
+  // Add the user as an accepted member
+  const { error: insertError } = await req.supabase
+    .from('profiles_groups')
+    .upsert({
+      groups_id: tokenRow.groups_id,
+      user_id: userId,
+      role: 'member',
+      invite_status: 'accepted',
+    });
+
+  if (insertError) {
+    return res.status(500).json({ success: false, error: insertError.message });
+  }
+
+  // Increment use_count via the admin client (bypasses RLS update restriction)
+  await supabaseAdmin
+    .from('group_invite_tokens')
+    .update({ use_count: tokenRow.use_count + 1 })
+    .eq('token', token);
+
+  return res.json({
+    success: true,
+    groupId: tokenRow.groups_id,
+    groupName: group.groups_title,
+  });
 });
 
 export default router;

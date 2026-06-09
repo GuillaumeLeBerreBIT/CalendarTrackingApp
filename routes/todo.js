@@ -84,13 +84,20 @@ router.get("/todo", authRequire, async (req, res) => {
         idG: tl.groups_id,
       },
       taskItems:
-        tasks.sort(function (x, y) {
-          return x.is_completed === y.is_completed
-            ? 0
-            : x.is_completed
-              ? 1
-              : -1;
-        }) || [],
+        tasks
+          .map((t) => {
+            const assignees = (t.profiles_task || [])
+              .filter((pt) => pt?.user_id)
+              .map((pt) => ({ userId: pt.user_id, username: pt.profiles?.username || null }));
+            return { ...t, assignees };
+          })
+          .sort(function (x, y) {
+            return x.is_completed === y.is_completed
+              ? 0
+              : x.is_completed
+                ? 1
+                : -1;
+          }) || [],
       totalTasks: tasks.length || 0,
       totalCompletedTasks:
         tasks.filter((t) => t.is_completed === true).length || 0,
@@ -195,6 +202,30 @@ router.post("/createTask", authRequire, async (req, res) => {
 router.patch("/updateTaskDetails", authRequire, async (req, res) => {
   const { task_id, task_title, task_description, priority, due_date, members } = req.body;
 
+  // Ownership check: verify the task belongs to a group the requesting user is a member of
+  const { data: taskMeta, error: taskMetaError } = await req.supabase
+    .from("task")
+    .select("task_list_id, task_list(groups_id)")
+    .eq("task_id", task_id)
+    .single();
+
+  if (taskMetaError || !taskMeta) {
+    return res.status(404).json({ success: false, error: 'Task not found.' });
+  }
+
+  const groupsId = taskMeta.task_list?.groups_id;
+  const { data: membership, error: membershipError } = await req.supabase
+    .from("profiles_groups")
+    .select("user_id")
+    .eq("groups_id", groupsId)
+    .eq("user_id", req.cookies.userId)
+    .eq("invite_status", "accepted")
+    .single();
+
+  if (membershipError || !membership) {
+    return res.status(403).json({ success: false, error: 'You do not have access to this task.' });
+  }
+
   const { data: updatedTask, error: updateError } = await req.supabase
     .from("task")
     .update({
@@ -232,6 +263,30 @@ router.patch("/updateTaskDetails", authRequire, async (req, res) => {
 });
 
 router.patch("/updateTask", authRequire, async (req, res) => {
+  // Ownership check: verify the task belongs to a group the requesting user is a member of
+  const { data: taskMeta, error: taskMetaError } = await req.supabase
+    .from("task")
+    .select("task_list_id, task_list(groups_id)")
+    .eq("task_id", req.body.taskId)
+    .single();
+
+  if (taskMetaError || !taskMeta) {
+    return res.status(404).json({ success: false, error: 'Task not found.' });
+  }
+
+  const groupsId = taskMeta.task_list?.groups_id;
+  const { data: membership, error: membershipError } = await req.supabase
+    .from("profiles_groups")
+    .select("user_id")
+    .eq("groups_id", groupsId)
+    .eq("user_id", req.cookies.userId)
+    .eq("invite_status", "accepted")
+    .single();
+
+  if (membershipError || !membership) {
+    return res.status(403).json({ success: false, error: 'You do not have access to this task.' });
+  }
+
   const { data: taskUpdate, error: taskUpdateError } = await req.supabase
     .from("task")
     .update({ is_completed: req.body.isCompleted })
@@ -243,6 +298,74 @@ router.patch("/updateTask", authRequire, async (req, res) => {
   } else {
     res.json({ success: false, message: "Unable to update the task." });
   }
+});
+
+// PUT /task/:taskId/assignees  body: { userIds: string[] }
+// Replaces the task's assignees with the provided set (status 'assigned').
+router.put("/task/:taskId/assignees", authRequire, async (req, res) => {
+  const taskId = parseInt(req.params.taskId, 10);
+  if (isNaN(taskId)) return res.status(400).json({ success: false, error: "Invalid task id." });
+
+  const userIds = req.body?.userIds;
+  if (!Array.isArray(userIds)) {
+    return res.status(400).json({ success: false, error: "userIds must be an array." });
+  }
+
+  // Ownership check: task must belong to a group the requesting user is an accepted member of
+  const { data: taskMeta, error: taskMetaError } = await req.supabase
+    .from("task")
+    .select("task_list_id, task_list(groups_id)")
+    .eq("task_id", taskId)
+    .single();
+
+  if (taskMetaError || !taskMeta) {
+    return res.status(404).json({ success: false, error: "Task not found." });
+  }
+
+  const groupsId = taskMeta.task_list?.groups_id;
+  const { data: membership, error: membershipError } = await req.supabase
+    .from("profiles_groups")
+    .select("user_id")
+    .eq("groups_id", groupsId)
+    .eq("user_id", req.cookies.userId)
+    .eq("invite_status", "accepted")
+    .single();
+
+  if (membershipError || !membership) {
+    return res.status(403).json({ success: false, error: "You do not have access to this task." });
+  }
+
+  // Replace existing assignees
+  const { error: deleteError } = await req.supabase
+    .from("profiles_task")
+    .delete()
+    .eq("task_id", taskId);
+
+  if (deleteError) {
+    return res.status(500).json({ success: false, error: deleteError.message });
+  }
+
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  let assignees = [];
+
+  if (uniqueIds.length > 0) {
+    const { error: insertError } = await req.supabase
+      .from("profiles_task")
+      .insert(uniqueIds.map((user_id) => ({ user_id, task_id: taskId, status: "assigned" })));
+
+    if (insertError) {
+      return res.status(500).json({ success: false, error: insertError.message });
+    }
+
+    const { data: profiles } = await req.supabase
+      .from("profiles")
+      .select("user_id, username")
+      .in("user_id", uniqueIds);
+
+    assignees = (profiles || []).map((p) => ({ userId: p.user_id, username: p.username }));
+  }
+
+  return res.json({ success: true, assignees });
 });
 
 router.get("/membersTaskList/", authRequire, async (req, res) => {

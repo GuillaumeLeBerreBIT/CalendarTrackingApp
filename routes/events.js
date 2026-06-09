@@ -1,8 +1,24 @@
 import express from "express";
-import supabase from "../db/supabase.js";
+import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire, { createEventObj } from "../utils/utils.js";
+import { notifyUsers } from "../utils/notifications.js";
+import { expandRecurringEvent, capRuleUntil } from "../utils/recurrence.js";
 
 const router = express.Router()
+
+// True if the user created the event, or is an admin of the event's group.
+async function canManageEvent(reqSupabase, event, userId) {
+  if (event.created_by === userId) return true;
+  if (!event.groups_id) return false;
+  const { data } = await reqSupabase
+    .from('profiles_groups')
+    .select('user_id')
+    .eq('groups_id', event.groups_id)
+    .eq('user_id', userId)
+    .eq('role', 'admin')
+    .maybeSingle();
+  return !!data;
+}
 
 router.post("/parseEvent", authRequire, async (req, res) => {
 
@@ -21,6 +37,11 @@ router.post("/parseEvent", authRequire, async (req, res) => {
         end_time: insertEventObj.endTime,
         groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : null,
         created_by: req.cookies.userId,
+        location: insertEventObj.location || null,
+        image_url: insertEventObj.image_url || null,
+        event_type: insertEventObj.event_type || 'appointment',
+        recurrence_rule: insertEventObj.recurrence_rule || null,
+        reminder_minutes: insertEventObj.reminder_minutes != null ? parseInt(insertEventObj.reminder_minutes) : null,
       },
     ])
     .select();
@@ -32,69 +53,185 @@ router.post("/parseEvent", authRequire, async (req, res) => {
   if (eventData[0]['start_time']) eventData[0]['start_time'] = eventData[0]['start_time'].slice(0, -3);
   if (eventData[0]['end_time']) eventData[0]['end_time'] = eventData[0]['end_time'].slice(0, -3);
 
-  if (insertEventObj.participants.length !== 0) {
-    const insertUsersArray = insertEventObj.participants.map( (p) => {
-      return {
-        user_id: p.userId, 
-        event_id: eventData[0].event_id,
-        rsvp_status: 'accepted'
-      }
-    })
+  const eventId = eventData[0].event_id;
+  const creatorId = req.cookies.userId;
 
-    const {data: eventUsersInvited, error: eventUsersInvitedError} = await req.supabase
+  // Build the set of rows to upsert into profiles_events.
+  // Use a map keyed by user_id so each user appears exactly once (no PK conflicts).
+  const rsvpByUser = new Map();
+
+  // 1. Social events: auto-invite ALL accepted group members as 'pending'
+  if (req.body.event_type === 'social' && insertEventObj.tagNames) {
+    const groupId = parseInt(insertEventObj.tagNames);
+    if (!isNaN(groupId)) {
+      const { data: groupMembers } = await req.supabase
+        .from('profiles_groups')
+        .select('user_id')
+        .eq('groups_id', groupId)
+        .eq('invite_status', 'accepted');
+
+      (groupMembers || []).forEach(m => rsvpByUser.set(m.user_id, 'pending'));
+    }
+  }
+
+  // 2. Appointment events: explicitly selected participants as 'pending'
+  if (Array.isArray(insertEventObj.participants)) {
+    insertEventObj.participants.forEach(p => {
+      if (p?.userId) rsvpByUser.set(p.userId, 'pending');
+    });
+  }
+
+  // 3. Creator is always 'going' (overrides any pending status set above)
+  rsvpByUser.set(creatorId, 'going');
+
+  // Upsert all rows at once — onConflict avoids duplicate-key errors
+  const upsertRows = Array.from(rsvpByUser.entries()).map(([user_id, rsvp_status]) => ({
+    user_id,
+    event_id: eventId,
+    rsvp_status,
+  }));
+
+  const { error: rsvpError } = await req.supabase
     .from('profiles_events')
-    .insert(insertUsersArray)
-    .select()
+    .upsert(upsertRows, { onConflict: 'user_id,event_id' });
 
-    if (eventUsersInvitedError) {
-      return res.status(500).json({ success: false, error: eventUsersInvitedError.message });
-    } else {
+  if (rsvpError) {
+    return res.status(500).json({ success: false, error: rsvpError.message });
+  }
 
-      const userArray = [];
-      insertEventObj.participants.forEach(u => { userArray.push(u.username)});
-      
-      const participants = eventUsersInvited.map( p => {
+  // Notify everyone invited (except the creator) that they're on a new event
+  const inviteeIds = Array.from(rsvpByUser.keys()).filter((id) => id !== creatorId);
+  await notifyUsers(req.supabase, inviteeIds, 'event_invite', {
+    title: 'New event invite',
+    body: `You're invited to "${eventData[0].event_title}".`,
+    link: '/calendar',
+  });
 
-        const userMatch = insertEventObj.participants.find(u => u.userId === p.user_id);
-        return {username: userMatch.username, userId: p.user_id}
-      })
-
-      res.json({ success: true, eventData: eventData, participants: participants });
-    } 
-
-  } else {
-
-    const insertUsersArray = [{user_id: req.cookies.userId, event_id: eventData[0].event_id, rsvp_status: 'accepted'}];
-    // After adding Event need to update the profiles_event table
-    const {data: eventProfile, error: eventProfileError} = await req.supabase
-    .from('profiles_events')
-    .insert(insertUsersArray)
-    .select()
-
-    const {data: user, error: userError} = await req.supabase
+  // Build participant display list (username + userId) for the response
+  const userIds = Array.from(rsvpByUser.keys());
+  const { data: profiles } = await req.supabase
     .from('profiles')
-    .select('username')
-    .eq('user_id', req.cookies.userId)
-    .limit(1);
+    .select('user_id, username')
+    .in('user_id', userIds);
 
-    if (eventProfileError) {
-      return res.status(500).json({ success: false, error: eventProfileError.message });
-    } else {
+  const participants = (profiles || []).map(pr => ({
+    username: pr.username,
+    userId: pr.user_id,
+    rsvpStatus: rsvpByUser.get(pr.user_id),
+  }));
 
-    res.json({ success: true, eventData, participants: [{
-      username: user[0]?.username,
-      userId: req.cookies.userId
-    }]});
-    } 
-  } 
-
+  return res.json({ success: true, eventData, participants });
 });
 
 router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId);
+    if (isNaN(eventId)) return res.status(400).json({ success: false, error: 'Invalid event ID.' });
+
+    const { data: eventCheck, error: eventCheckError } = await req.supabase
+      .from('events')
+      .select('created_by, recurrence_rule, groups_id')
+      .eq('event_id', eventId)
+      .single();
+
+    if (eventCheckError || !eventCheck) {
+      return res.status(404).json({ success: false, error: 'Event not found.' });
+    }
+
+    if (!(await canManageEvent(req.supabase, eventCheck, req.cookies.userId))) {
+      return res.status(403).json({ success: false, error: 'You can only edit events you created.' });
+    }
+
     const updateEventObj = createEventObj(req.body);
     const newParticipants = updateEventObj.participants || [];
+
+    // Recurring "this occurrence only" → store a per-occurrence override, leave the series intact.
+    const recurrenceScope = req.body.recurrenceScope || 'all';
+
+    // Recurring "this and following" → cap the original series, then split off a new master.
+    if (eventCheck.recurrence_rule && recurrenceScope === 'following' && req.body.occurrenceDate) {
+      const occurrenceDate = req.body.occurrenceDate;
+      const cappedRule = capRuleUntil(eventCheck.recurrence_rule, occurrenceDate);
+
+      const { error: capError } = await req.supabase
+        .from('events')
+        .update({ recurrence_rule: cappedRule })
+        .eq('event_id', eventId);
+      if (capError) return res.status(500).json({ success: false, error: capError.message });
+
+      // Create the new split master, carrying the original rule so the rest of the series continues.
+      const { data: newMaster, error: newMasterError } = await req.supabase
+        .from('events')
+        .insert([
+          {
+            event_title: updateEventObj['calendar-title'],
+            event_description: updateEventObj['calendar-description'],
+            all_day: updateEventObj.allDay,
+            start_date: occurrenceDate,
+            end_date: updateEventObj.endDate,
+            start_time: updateEventObj.startTime,
+            end_time: updateEventObj.endTime,
+            groups_id: updateEventObj.tagNames ? parseInt(updateEventObj.tagNames) : null,
+            location: updateEventObj.location || null,
+            image_url: updateEventObj.image_url || null,
+            event_type: updateEventObj.event_type || 'appointment',
+            recurrence_rule: eventCheck.recurrence_rule,
+            reminder_minutes: updateEventObj.reminder_minutes != null ? parseInt(updateEventObj.reminder_minutes) : null,
+            created_by: req.cookies.userId,
+          },
+        ])
+        .select();
+      if (newMasterError) return res.status(500).json({ success: false, error: newMasterError.message });
+
+      const newEventId = newMaster[0].event_id;
+
+      // Copy participants (with their existing RSVP responses) onto the new master.
+      const { data: masterParts } = await req.supabase
+        .from('profiles_events')
+        .select('user_id, rsvp_status')
+        .eq('event_id', eventId);
+
+      if (masterParts && masterParts.length > 0) {
+        const copyRows = masterParts.map(p => ({
+          user_id: p.user_id,
+          event_id: newEventId,
+          rsvp_status: p.rsvp_status,
+        }));
+        const { error: copyError } = await req.supabase
+          .from('profiles_events')
+          .upsert(copyRows, { onConflict: 'user_id,event_id' });
+        if (copyError) return res.status(500).json({ success: false, error: copyError.message });
+      }
+
+      // Overrides at/after the split date belong to the new series → drop them from the old master.
+      await req.supabase
+        .from('event_overrides')
+        .delete()
+        .eq('event_id', eventId)
+        .gte('occurrence_date', occurrenceDate);
+
+      return res.json({ success: true, scope: 'following' });
+    }
+
+    if (eventCheck.recurrence_rule && recurrenceScope === 'this' && req.body.occurrenceDate) {
+      const { error: ovError } = await req.supabase
+        .from('event_overrides')
+        .upsert({
+          event_id: eventId,
+          occurrence_date: req.body.occurrenceDate,
+          is_cancelled: false,
+          event_title: updateEventObj['calendar-title'],
+          event_description: updateEventObj['calendar-description'],
+          start_date: updateEventObj.startDate,
+          end_date: updateEventObj.endDate,
+          start_time: updateEventObj.startTime,
+          end_time: updateEventObj.endTime,
+          all_day: updateEventObj.allDay,
+        }, { onConflict: 'event_id,occurrence_date' });
+
+      if (ovError) return res.status(500).json({ success: false, error: ovError.message });
+      return res.json({ success: true, scope: 'this' });
+    }
 
     const { data: updateEvent, error: updateEventError } = await req.supabase
       .from('events')
@@ -106,7 +243,12 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
         end_date: updateEventObj.endDate,
         start_time: updateEventObj.startTime,
         end_time: updateEventObj.endTime,
-        groups_id: updateEventObj.tagNames ? parseInt(updateEventObj.tagNames) : null
+        groups_id: updateEventObj.tagNames ? parseInt(updateEventObj.tagNames) : null,
+        location: updateEventObj.location || null,
+        image_url: updateEventObj.image_url || null,
+        event_type: updateEventObj.event_type || 'appointment',
+        recurrence_rule: updateEventObj.recurrence_rule || null,
+        reminder_minutes: updateEventObj.reminder_minutes != null ? parseInt(updateEventObj.reminder_minutes) : null,
       })
       .eq('event_id', eventId)
       .select();
@@ -125,36 +267,36 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     }
 
     const existingIds = (existing || []).map(p => p.user_id);
-    const newIds = newParticipants.map(p => p.userId);
 
-    // Update rsvp_status for everyone already in the table
-    if (existingIds.length > 0) {
-      const updates = existingIds.map(uid => ({
-        user_id: uid,
-        event_id: eventId,
-        rsvp_status: newIds.includes(uid) ? 'accepted' : 'declined'
-      }));
-      const { error: upsertError } = await req.supabase
-        .from('profiles_events')
-        .upsert(updates, { onConflict: 'user_id,event_id' });
-      if (upsertError) {
-        return res.status(500).json({ success: false, error: upsertError.message });
-      }
-    }
-
-    // Insert anyone newly added who wasn't in the table at all
+    // Editing event details must NOT reset anyone's existing RSVP response.
+    // Only ADD newly-invited people (as 'pending'); leave existing rows untouched.
     const toInsert = newParticipants
-      .filter(p => !existingIds.includes(p.userId))
-      .map(p => ({ user_id: p.userId, event_id: eventId, rsvp_status: 'accepted' }));
+      .filter(p => p?.userId && !existingIds.includes(p.userId))
+      .map(p => ({ user_id: p.userId, event_id: eventId, rsvp_status: 'pending' }));
 
     if (toInsert.length > 0) {
       const { error: insertError } = await req.supabase
         .from('profiles_events')
-        .insert(toInsert);
+        .upsert(toInsert, { onConflict: 'user_id,event_id' });
       if (insertError) {
         return res.status(500).json({ success: false, error: insertError.message });
       }
     }
+
+    const editedTitle = updateEvent?.[0]?.event_title || 'an event';
+
+    // Newly-invited people get an invite; existing participants get a change notice.
+    await notifyUsers(req.supabase, toInsert.map((r) => r.user_id), 'event_invite', {
+      title: 'New event invite',
+      body: `You're invited to "${editedTitle}".`,
+      link: '/calendar',
+    });
+    await notifyUsers(
+      req.supabase,
+      existingIds.filter((id) => id !== req.cookies.userId),
+      'event_changed',
+      { title: 'Event updated', body: `"${editedTitle}" was updated.`, link: '/calendar' }
+    );
 
     return res.json({ success: true, eventData: updateEvent, participants: newParticipants });
   } catch (err) {
@@ -172,6 +314,22 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
 router.patch('/parseEvent/:eventId', authRequire, async (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId);
+    if (isNaN(eventId)) return res.status(400).json({ success: false, error: 'Invalid event ID.' });
+
+    const { data: eventCheck, error: eventCheckError } = await req.supabase
+      .from('events')
+      .select('created_by, groups_id')
+      .eq('event_id', eventId)
+      .single();
+
+    if (eventCheckError || !eventCheck) {
+      return res.status(404).json({ success: false, error: 'Event not found.' });
+    }
+
+    if (!(await canManageEvent(req.supabase, eventCheck, req.cookies.userId))) {
+      return res.status(403).json({ success: false, error: 'You can only edit events you created.' });
+    }
+
     const { startDate, endDate, startTime, endTime, allDay } = req.body;
 
     const { data: updatedEvent, error: updateError } = await req.supabase
@@ -199,11 +357,12 @@ router.patch('/parseEvent/:eventId', authRequire, async (req, res) => {
 
 router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
   try {
-    const eventId = parseInt(req.params.eventId)
+    const eventId = parseInt(req.params.eventId);
+    if (isNaN(eventId)) return res.status(400).json({ success: false, error: 'Invalid event ID.' });
 
     const { data: event, error: fetchError } = await req.supabase
       .from('events')
-      .select('created_by')
+      .select('created_by, event_title, recurrence_rule, groups_id')
       .eq('event_id', eventId)
       .single();
 
@@ -211,9 +370,44 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Event not found.' });
     }
 
-    if (event.created_by !== req.cookies.userId) {
+    if (!(await canManageEvent(req.supabase, event, req.cookies.userId))) {
       return res.status(403).json({ success: false, error: 'You can only delete events you created.' });
     }
+
+    const scope = req.query.scope || 'all';
+    const occurrenceDate = req.query.date || null;
+
+    // Recurring "this occurrence" → cancel just that date via an override.
+    if (event.recurrence_rule && scope === 'this' && occurrenceDate) {
+      const { error: ovError } = await req.supabase
+        .from('event_overrides')
+        .upsert({ event_id: eventId, occurrence_date: occurrenceDate, is_cancelled: true },
+          { onConflict: 'event_id,occurrence_date' });
+      if (ovError) return res.status(500).json({ success: false, error: ovError.message });
+      return res.sendStatus(204);
+    }
+
+    // Recurring "this and following" → cap the series to end before this date.
+    if (event.recurrence_rule && scope === 'following' && occurrenceDate) {
+      const newRule = capRuleUntil(event.recurrence_rule, occurrenceDate);
+      const { error: capError } = await req.supabase
+        .from('events')
+        .update({ recurrence_rule: newRule })
+        .eq('event_id', eventId);
+      if (capError) return res.status(500).json({ success: false, error: capError.message });
+      await req.supabase
+        .from('event_overrides')
+        .delete()
+        .eq('event_id', eventId)
+        .gte('occurrence_date', occurrenceDate);
+      return res.sendStatus(204);
+    }
+
+    // Capture participants before deletion so we can notify them
+    const { data: cancelParts } = await req.supabase
+      .from('profiles_events')
+      .select('user_id')
+      .eq('event_id', eventId);
 
     const {error: deleteEventError } = await req.supabase
     .from('events')
@@ -232,6 +426,13 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
     if (deleteProfileError) {
       return res.status(500).json({success: false, error: deleteProfileError.message})
     }
+
+    await notifyUsers(
+      req.supabase,
+      (cancelParts || []).map((p) => p.user_id).filter((id) => id !== req.cookies.userId),
+      'event_cancelled',
+      { title: 'Event cancelled', body: `"${event.event_title}" was cancelled.`, link: '/calendar' }
+    );
 
     res.sendStatus(204);
     
@@ -267,6 +468,16 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
   const groupIdArray = groupsIds.map(g => g.groups_id);
 
+  // Group ids where the viewer is an admin — used to grant manage rights on group events.
+  const { data: adminMemberships } = await req.supabase
+    .from('profiles_groups')
+    .select('groups_id, role')
+    .eq('user_id', req.cookies.userId)
+    .eq('invite_status', 'accepted');
+  const adminGroupSet = new Set(
+    (adminMemberships || []).filter(m => m.role === 'admin').map(m => m.groups_id)
+  );
+
   // Fetch member colors for all groups upfront — avoids N+1 queries
   const { data: memberColors } = await req.supabase
     .from('profiles_groups')
@@ -286,6 +497,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
   .select(`*,
     profiles_events(
       user_id,
+      rsvp_status,
       profiles(
       username
       )
@@ -303,6 +515,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
     *,
     profiles_events(
     user_id,
+    rsvp_status,
     profiles(
     username
     )
@@ -316,8 +529,33 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
   const combinedEvents = [...events, ...(userEvents ?? [])];
 
+  // Expand recurring masters into concrete occurrences within a bounded window.
+  const recurringIds = combinedEvents.filter(e => e.recurrence_rule).map(e => e.event_id);
+  let overridesByEvent = {};
+  if (recurringIds.length > 0) {
+    const { data: overrides } = await req.supabase
+      .from('event_overrides')
+      .select('*')
+      .in('event_id', recurringIds);
+    (overrides || []).forEach(o => {
+      (overridesByEvent[o.event_id] ||= []).push(o);
+    });
+  }
+
+  const windowStart = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
+  const expandedEvents = [];
+  for (const e of combinedEvents) {
+    if (e.recurrence_rule) {
+      expandedEvents.push(...expandRecurringEvent(e, windowStart, windowEnd, overridesByEvent[e.event_id] || []));
+    } else {
+      expandedEvents.push(e);
+    }
+  }
+
   try {
-      const filteredEvents = combinedEvents.map((e) => {
+      const filteredEvents = expandedEvents.map((e) => {
         let start_date, end_date;
 
         const hasStartTime = e.start_time != null && e.start_time.trim().length >= 5;
@@ -336,7 +574,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
         }
 
         const participants = e.profiles_events.map((p) => {
-          return {username: p.profiles.username, userId: p.user_id};
+          return {username: p.profiles.username, userId: p.user_id, rsvpStatus: p.rsvp_status};
         });
 
         let eventColor;
@@ -349,18 +587,33 @@ router.get('/renderEvents', authRequire, async (req, res) => {
           eventColor = groupSharedColorMap[e.groups_id] || '#6B7280';
         }
 
+        const isRecurringInstance = !!e._isRecurringInstance;
+
         return {
-          id: e.event_id,
+          // Occurrences need a unique id; the master id is kept separately for editing
+          id: isRecurringInstance ? `${e.event_id}::${e._occurrenceDate}` : e.event_id,
           title: e.event_title,
           start: start_date,
           end: end_date ?? undefined,
           backgroundColor: eventColor,
           borderColor: eventColor,
+          // Recurring instances aren't drag/resizable (ambiguous which occurrences to move)
+          editable: !isRecurringInstance,
           extendedProps : {
             description: e.event_description,
             participants: participants,
             groupName: groupsTagNames?.[e.groups_id] || '',
             groupsId: e.groups_id || '',
+            location: e.location || null,
+            imageUrl: e.image_url || null,
+            eventType: e.event_type || 'appointment',
+            createdBy: e.created_by || null,
+            recurrenceRule: e.recurrence_rule || null,
+            isRecurring: !!e.recurrence_rule,
+            recurringEventId: e.event_id,
+            occurrenceDate: e._occurrenceDate || null,
+            canManage: e.created_by === req.cookies.userId || adminGroupSet.has(e.groups_id),
+            reminderMinutes: e.reminder_minutes ?? null,
           }
         }
       })
@@ -372,7 +625,9 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 });
 
 router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
-  console.log(parseInt(req.query.groupId))
+  const groupId = parseInt(req.query.groupId);
+  if (isNaN(groupId)) return res.status(400).json({ success: false, error: 'Invalid group ID.' });
+
   const {data: groupUsers, error: groupUsersError } = await req.supabase
   .from('profiles_groups')
   .select(
@@ -382,7 +637,7 @@ router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
     username
     )
   `)
-  .eq('groups_id', parseInt(req.query.groupId));
+  .eq('groups_id', groupId);
 
   if (groupUsersError) {
     return res.status(500).json({success: false, error: groupUsersError.message})
@@ -397,5 +652,124 @@ router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
 
   return res.json({success: true, selectUser: selectUser});
 })
+
+/**
+ * PATCH /api/rsvp/:eventId
+ * Updates the current user's RSVP status for an event.
+ * Body: { status: 'going' | 'maybe' | 'no' }
+ */
+router.patch('/rsvp/:eventId', authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId)
+  if (isNaN(eventId)) return res.status(400).json({ success: false, error: 'Invalid event ID.' })
+
+  const { status } = req.body
+  if (!['going', 'maybe', 'no'].includes(status)) {
+    return res.status(400).json({ success: false, error: 'Invalid RSVP status.' })
+  }
+
+  const { data, error } = await req.supabase
+    .from('profiles_events')
+    .update({ rsvp_status: status })
+    .eq('event_id', eventId)
+    .eq('user_id', req.cookies.userId)
+    .select()
+
+  if (error) return res.status(500).json({ success: false, error: error.message })
+  if (!data || data.length === 0) {
+    // User not yet a participant — insert them
+    const { error: insertError } = await req.supabase
+      .from('profiles_events')
+      .insert({ event_id: eventId, user_id: req.cookies.userId, rsvp_status: status })
+    if (insertError) return res.status(500).json({ success: false, error: insertError.message })
+  }
+
+  // Notify the event's creator that someone responded (not for your own events)
+  const { data: ev } = await req.supabase
+    .from('events')
+    .select('created_by, event_title')
+    .eq('event_id', eventId)
+    .single();
+
+  if (ev?.created_by && ev.created_by !== req.cookies.userId) {
+    const { data: me } = await req.supabase
+      .from('profiles')
+      .select('username')
+      .eq('user_id', req.cookies.userId)
+      .single();
+    const label = status === 'no' ? "can't go" : status;
+    await notifyUsers(req.supabase, [ev.created_by], 'rsvp_reply', {
+      title: 'RSVP update',
+      body: `${me?.username || 'Someone'} replied "${label}" to "${ev.event_title}".`,
+      link: '/calendar',
+    });
+  }
+
+  return res.json({ success: true, status })
+})
+
+/**
+ * GET /api/e/:eventId
+ * PUBLIC — no auth required. Returns non-sensitive event details for sharing.
+ * Uses supabaseAdmin to bypass RLS (the events table requires auth.uid()).
+ */
+router.get('/e/:eventId', async (req, res) => {
+  const eventId = parseInt(req.params.eventId);
+  if (isNaN(eventId)) {
+    return res.status(400).json({ success: false, error: 'Invalid event ID.' });
+  }
+
+  const { data: event, error: eventError } = await supabaseAdmin
+    .from('events')
+    .select('event_id, event_title, event_description, start_date, start_time, end_date, end_time, all_day, location, groups_id, created_by')
+    .eq('event_id', eventId)
+    .single();
+
+  if (eventError || !event) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
+
+  // Fetch group name, organiser username, and going-count in parallel
+  const [groupResult, organiserResult, rsvpResult] = await Promise.all([
+    event.groups_id
+      ? supabaseAdmin
+          .from('groups')
+          .select('groups_title')
+          .eq('groups_id', event.groups_id)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+
+    event.created_by
+      ? supabaseAdmin
+          .from('profiles')
+          .select('username')
+          .eq('user_id', event.created_by)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+
+    supabaseAdmin
+      .from('profiles_events')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('rsvp_status', 'going'),
+  ]);
+
+  return res.json({
+    success: true,
+    event: {
+      eventId: event.event_id,
+      title: event.event_title,
+      description: event.event_description || null,
+      startDate: event.start_date,
+      startTime: event.start_time ? event.start_time.slice(0, 5) : null,
+      endDate: event.end_date,
+      endTime: event.end_time ? event.end_time.slice(0, 5) : null,
+      allDay: event.all_day,
+      location: event.location || null,
+      groupName: groupResult.data?.groups_title || null,
+      organiserUsername: organiserResult.data?.username || null,
+      goingCount: rsvpResult.count ?? 0,
+    },
+  });
+});
 
 export default router;
