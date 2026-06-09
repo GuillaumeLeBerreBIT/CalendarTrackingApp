@@ -13,6 +13,10 @@ import groupsRouter from "./routes/groups.js"
 import eventsRouter from "./routes/events.js"
 import todoRouter from "./routes/todo.js"
 import emailRouter from "./routes/email.js"
+import discoveryRouter from "./routes/discovery.js"
+import notificationsRouter from "./routes/notifications.js"
+import savedRouter from "./routes/saved.js"
+import icalRouter from "./routes/ical.js"
 import { startScheduler } from "./utils/scheduler.js"
 
 const app = express();
@@ -46,6 +50,10 @@ app.use('/api', groupsRouter);
 app.use('/api', eventsRouter);
 app.use('/api', todoRouter);
 app.use('/api', emailRouter);
+app.use('/api', discoveryRouter);
+app.use('/api', notificationsRouter);
+app.use('/api', savedRouter);
+app.use('/api', icalRouter);
 
 app.post('/api/refresh-session', authRequire, (req, res) => {
   return res.json({ success: true });
