@@ -137,7 +137,7 @@ router.get('/profile', authRequire, async (req, res) => {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('username, email, created_at, email_digest_enabled, city, has_completed_onboarding, searchable')
+    .select('username, email, created_at, email_digest_enabled, city, has_completed_onboarding, searchable, total_xp')
     .eq('user_id', userId)
     .single();
 
@@ -159,6 +159,7 @@ router.get('/profile', authRequire, async (req, res) => {
     city: profile.city || '',
     hasCompletedOnboarding: profile.has_completed_onboarding === true,
     searchable: profile.searchable !== false,
+    total_xp: profile.total_xp || 0,
   });
 });
 
@@ -287,6 +288,11 @@ router.get('/profile/stats', authRequire, async (req, res) => {
   } catch (_) { saved = 0; }
 
   return res.json({ success: true, eventsThisMonth, groups, saved });
+});
+
+// GET /push/vapid-public-key — returns the VAPID public key so the frontend can subscribe
+router.get("/push/vapid-public-key", (req, res) => {
+  res.json({ success: true, key: process.env.VAPID_PUBLIC_KEY ?? "" });
 });
 
 export default router

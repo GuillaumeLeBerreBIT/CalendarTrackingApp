@@ -1,6 +1,9 @@
 // Notification creation helper. Respects each recipient's notification_prefs and
 // never throws — a failed notification must not break the main request flow.
 
+import webpush from "web-push";
+import { supabaseAdmin } from "../db/supabase.js";
+
 // Maps a notification type to the profiles.notification_prefs key that gates it.
 const TYPE_PREF_KEY = {
   group_invite: "group_invites",
@@ -8,6 +11,7 @@ const TYPE_PREF_KEY = {
   rsvp_reply: "rsvp_replies",
   event_changed: "event_changes",
   event_cancelled: "event_changes",
+  event_comment: "event_comments",
 };
 
 /**
@@ -53,6 +57,42 @@ export async function notifyUsers(client, recipients, type, buildPayload) {
 
     if (rows.length > 0) {
       await client.from("notifications").insert(rows);
+
+      // Fire-and-forget web push to all recipients who have subscriptions
+      try {
+        const recipientIds = rows.map(r => r.user_id);
+        const { data: subs } = await supabaseAdmin
+          .from("push_subscriptions")
+          .select("user_id, endpoint, p256dh, auth")
+          .in("user_id", recipientIds);
+
+        if (subs && subs.length > 0) {
+          const pushJobs = subs.map(sub => {
+            const row = rows.find(r => r.user_id === sub.user_id);
+            if (!row) return Promise.resolve();
+            const pushPayload = JSON.stringify({ title: row.title, body: row.body ?? "", link: row.link ?? "/" });
+            return webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+              pushPayload,
+              {
+                vapidDetails: {
+                  subject: "mailto:leberreguillaume.glb@gmail.com",
+                  publicKey: process.env.VAPID_PUBLIC_KEY,
+                  privateKey: process.env.VAPID_PRIVATE_KEY,
+                },
+              }
+            ).catch(err => {
+              // 410 Gone = subscription expired, clean it up
+              if (err.statusCode === 410) {
+                supabaseAdmin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint).catch(() => {});
+              }
+            });
+          });
+          await Promise.allSettled(pushJobs);
+        }
+      } catch (pushErr) {
+        console.warn("Push delivery error:", pushErr.message);
+      }
     }
   } catch (err) {
     console.warn("notifyUsers failed:", err.message);

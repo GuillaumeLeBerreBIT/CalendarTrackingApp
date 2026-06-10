@@ -5,6 +5,8 @@ import { useNotificationStore } from '@/store/notificationStore'
 import Icon from '@/components/ui/Icon'
 import { Avatar } from '@/components/ui/Avatar'
 import { IconButton } from '@/components/ui/Button'
+import CountdownPill from '@/components/CountdownPill'
+import PWAInstallBanner from '@/components/PWAInstallBanner'
 import api from '@/api/client'
 import type { CalEvent } from '@/types'
 
@@ -45,11 +47,12 @@ function Logo() {
 
 // ── Nav items config ──────────────────────────────────────────
 const NAV_ITEMS = [
-  { to: '/',          label: 'Discover',  icon: 'discover',  exact: true },
-  { to: '/calendar',  label: 'Calendar',  icon: 'calendar',  exact: false },
-  { to: '/groups',    label: 'Groups',    icon: 'groups',    exact: false },
-  { to: '/todo',      label: 'Tasks',     icon: 'task',      exact: false },
-  { to: '/profile',   label: 'Profile',   icon: 'profile',   exact: false },
+  { to: '/calendar',  label: 'Calendar', icon: 'calendar', exact: false },
+  { to: '/groups',    label: 'Groups',   icon: 'groups',   exact: false },
+  { to: '/todo',      label: 'Tasks',    icon: 'task',     exact: false },
+  { to: '/habits',    label: 'Habits',   icon: 'flame',    exact: false },
+  { to: '/timers',    label: 'Timers',   icon: 'timer',    exact: false },
+  { to: '/discovery', label: 'Discover', icon: 'discover', exact: false },
 ] as const
 
 // ── Format time for "Up Next" card ───────────────────────────
@@ -99,9 +102,11 @@ function UpNextCard({ event }: { event: CalEvent }) {
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
+        marginBottom: 6,
       }}>
         {time} · {venue}
       </p>
+      <CountdownPill targetDate={event.start} />
     </div>
   )
 }
@@ -116,6 +121,53 @@ function useIsMobile(): boolean {
     return () => mq.removeEventListener('change', handler)
   }, [])
   return isMobile
+}
+
+// ── Offline banner ────────────────────────────────────────────
+function OfflineBanner() {
+  const [offline, setOffline] = useState(!navigator.onLine)
+  const [visible, setVisible] = useState(!navigator.onLine)
+
+  useEffect(() => {
+    const goOffline = () => { setOffline(true); setVisible(true) }
+    const goOnline  = () => {
+      setOffline(false)
+      // keep banner briefly to show "back online" state, then hide
+      setTimeout(() => setVisible(false), 2000)
+    }
+    window.addEventListener('offline', goOffline)
+    window.addEventListener('online',  goOnline)
+    return () => {
+      window.removeEventListener('offline', goOffline)
+      window.removeEventListener('online',  goOnline)
+    }
+  }, [])
+
+  if (!visible) return null
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 9999,
+      padding: '10px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      fontSize: 13,
+      fontWeight: 600,
+      background: offline ? 'hsl(0 0% 14%)' : 'hsl(152 60% 22%)',
+      color: offline ? 'var(--text-2)' : 'hsl(152 80% 70%)',
+      borderBottom: `1px solid ${offline ? 'var(--border)' : 'hsl(152 60% 30%)'}`,
+      transition: 'background 0.3s, color 0.3s',
+    }}>
+      <Icon name={offline ? 'wifi-off' : 'check'} size={15} />
+      {offline ? "You're offline · Changes won't save" : 'Back online'}
+    </div>
+  )
 }
 
 // ── AppShell ──────────────────────────────────────────────────
@@ -156,7 +208,7 @@ export default function AppShell() {
       flexDirection: 'column',
       padding: '18px 12px 14px',
       gap: 0,
-      height: '100vh',
+      height: '100dvh',
       position: 'sticky',
       top: 0,
     }}>
@@ -255,7 +307,7 @@ export default function AppShell() {
       <Logo />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <IconButton name="bell" badge={unread > 0} title="Notifications" onClick={() => navigate('/notifications')} />
-        <IconButton name="discover" title="Discover" onClick={() => navigate('/')} />
+        <IconButton name="discover" title="Discover" onClick={() => navigate('/discovery')} />
       </div>
     </header>
   )
@@ -314,18 +366,21 @@ export default function AppShell() {
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: '100dvh',
         background: 'var(--bg)',
         overflow: 'hidden',
       }}>
+        <OfflineBanner />
         {MobileTopBar}
         <main className="app-scroll" style={{
           flex: 1,
           overflowY: 'auto',
+          paddingBottom: 'calc(65px + env(safe-area-inset-bottom, 0px))',
         }}>
           <Outlet />
         </main>
         {MobileBottomNav}
+        <PWAInstallBanner />
       </div>
     )
   }
@@ -333,10 +388,11 @@ export default function AppShell() {
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      height: '100dvh',
       background: 'var(--bg)',
       overflow: 'hidden',
     }}>
+      <OfflineBanner />
       {Sidebar}
       <main className="app-scroll" style={{
         flex: 1,
@@ -345,6 +401,7 @@ export default function AppShell() {
       }}>
         <Outlet />
       </main>
+      <PWAInstallBanner />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import { Section } from '@/components/ui/Primitives'
+import { subscribeToPush } from '@/lib/pushNotifications'
 import type { NotificationPrefs, ProfileStats } from '@/types'
 
 // ── Toggle switch ───────────────────────────────────────────────────────────────
@@ -114,6 +115,7 @@ function SettingsRow({ icon, title, subtitle, first = false }: SettingsRowProps)
         alignItems: 'center',
         gap: 14,
         padding: '13px 16px',
+        minHeight: 44,
         borderTop: first ? 'none' : '1px solid var(--border)',
         cursor: 'pointer',
         background: hover ? 'var(--surface-2)' : 'transparent',
@@ -153,6 +155,12 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [isError, setIsError] = useState(false)
+
+  // ── iCal import ──────────────────────────────────────────────────────────────
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<string | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
 
   const [editingCity, setEditingCity] = useState(false)
   const [city, setCity] = useState(user?.city ?? '')
@@ -211,6 +219,60 @@ export default function ProfilePage() {
       setTimeout(() => setCopied(false), 1800)
     } catch {
       // clipboard unavailable
+    }
+  }
+
+  async function handleCalendarImport(e: FormEvent) {
+    e.preventDefault()
+    if (!importFile) return
+    setImporting(true)
+    setImportResult(null)
+    setImportError(null)
+    try {
+      const form = new FormData()
+      form.append('ics', importFile)
+      const { data } = await api.post('/calendar/import', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      if (data.success) {
+        const count = data.imported ?? 0
+        setImportResult(`Imported ${count} event${count === 1 ? '' : 's'}`)
+        setImportFile(null)
+        ;(document.getElementById('ics-file-input') as HTMLInputElement | null)?.value === '' ||
+          ((document.getElementById('ics-file-input') as HTMLInputElement).value = '')
+        setTimeout(() => setImportResult(null), 4000)
+      } else {
+        setImportError(data.error ?? 'Import failed.')
+      }
+    } catch {
+      setImportError('Import failed. Please check the file and try again.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+  useEffect(() => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.ready
+        .then(reg => reg.pushManager.getSubscription())
+        .then(sub => setPushEnabled(!!sub))
+        .catch(() => {})
+    }
+  }, [])
+
+  async function handleEnablePush() {
+    setPushLoading(true)
+    try {
+      await subscribeToPush()
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.getSubscription()
+      setPushEnabled(!!sub)
+    } catch {
+      // ignore — subscribeToPush handles its own errors
+    } finally {
+      setPushLoading(false)
     }
   }
 
@@ -290,7 +352,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div style={{ padding: '28px 24px', maxWidth: 520, margin: '0 auto' }}>
+    <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 520, margin: '0 auto' }}>
       {/* Avatar + name hero */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32, textAlign: 'center' }}>
         <div style={{
@@ -470,6 +532,30 @@ export default function ProfilePage() {
           borderRadius: 'var(--r-lg)',
           overflow: 'hidden',
         }}>
+          {/* Push subscription row */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: '13px 16px',
+            minHeight: 44,
+            borderBottom: '1px solid var(--border)',
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Push notifications</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>
+                {pushEnabled ? 'Enabled on this device' : 'Get alerts on this device'}
+              </p>
+            </div>
+            {pushEnabled ? (
+              <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--g-work)', flexShrink: 0 }}>Enabled ✓</span>
+            ) : (
+              <Button variant="primary" size="sm" onClick={handleEnablePush} disabled={pushLoading}>
+                {pushLoading ? 'Enabling…' : 'Enable'}
+              </Button>
+            )}
+          </div>
+
           {NOTIF_PREF_ROWS.map((row, i) => (
             <div
               key={row.key}
@@ -478,6 +564,7 @@ export default function ProfilePage() {
                 alignItems: 'center',
                 gap: 14,
                 padding: '13px 16px',
+                minHeight: 44,
                 borderTop: i === 0 ? 'none' : '1px solid var(--border)',
               }}
             >
@@ -556,6 +643,118 @@ export default function ProfilePage() {
               </Button>
             </div>
           )}
+
+          {/* ── Import calendar divider ── */}
+          <div style={{
+            borderTop: '1px solid var(--border)',
+            marginTop: 16,
+            paddingTop: 16,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: 'var(--r-sm)',
+                background: 'var(--surface-3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                color: 'var(--accent)',
+              }}>
+                <Icon name="arrowR" size={17} sw={1.8} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Import Calendar</p>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0', lineHeight: 1.5 }}>
+                  Import events from Google Calendar, Apple Calendar, or Outlook (.ics files)
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCalendarImport} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-2)',
+                borderRadius: 'var(--r-sm)',
+                padding: '8px 10px',
+              }}>
+                <Icon name="calendar" size={14} sw={1.8} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+                <span style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  color: importFile ? 'var(--text-1)' : 'var(--text-3)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {importFile ? importFile.name : 'No file chosen'}
+                </span>
+                <label style={{
+                  cursor: 'pointer',
+                  fontSize: 12.5,
+                  fontWeight: 650,
+                  color: 'var(--accent)',
+                  padding: '4px 6px',
+                  borderRadius: 'var(--r-sm)',
+                  transition: 'var(--transition)',
+                  flexShrink: 0,
+                }}>
+                  Browse
+                  <input
+                    id="ics-file-input"
+                    type="file"
+                    accept=".ics"
+                    style={{ display: 'none' }}
+                    onChange={e => setImportFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
+
+              <div>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={!importFile || importing}
+                >
+                  {importing ? 'Importing…' : 'Import'}
+                </Button>
+              </div>
+            </form>
+
+            {importResult && (
+              <p style={{
+                marginTop: 10,
+                fontSize: 13,
+                padding: '9px 13px',
+                borderRadius: 'var(--r-sm)',
+                background: 'rgba(34,211,170,0.1)',
+                color: 'var(--g-work)',
+                border: '1px solid rgba(34,211,170,0.2)',
+              }}>
+                ✓ {importResult}
+              </p>
+            )}
+
+            {importError && (
+              <p style={{
+                marginTop: 10,
+                fontSize: 13,
+                padding: '9px 13px',
+                borderRadius: 'var(--r-sm)',
+                background: 'rgba(244,63,94,0.1)',
+                color: '#fb7185',
+                border: '1px solid rgba(244,63,94,0.2)',
+              }}>
+                {importError}
+              </p>
+            )}
+          </div>
         </div>
       </Section>
 
@@ -585,6 +784,7 @@ export default function ProfilePage() {
                 alignItems: 'center',
                 gap: 14,
                 padding: '13px 16px',
+                minHeight: 44,
                 borderTop: '1px solid var(--border)',
                 cursor: 'pointer',
                 transition: 'var(--transition)',

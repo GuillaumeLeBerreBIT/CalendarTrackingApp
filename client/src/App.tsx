@@ -15,11 +15,20 @@ import NotificationsPage from '@/pages/NotificationsPage'
 import PricingPage from '@/pages/PricingPage'
 import JoinGroupPage from '@/pages/JoinGroupPage'
 import PublicEventPage from '@/pages/PublicEventPage'
+import HabitsPage from '@/pages/HabitsPage'
+import TimersPage from '@/pages/TimersPage'
 import { useAuthStore } from '@/store/authStore'
+import { subscribeToPush } from '@/lib/pushNotifications'
 
 // ── Inner app — reads auth store after ProtectedRoute has populated it ────────
 function AppInner() {
   const { user } = useAuthStore()
+
+  // Silently subscribe to push once the user is authenticated.
+  // subscribeToPush() is idempotent — it checks for an existing subscription first.
+  useEffect(() => {
+    if (user) subscribeToPush()
+  }, [user])
 
   // Show onboarding only when the field is explicitly false (new users).
   // undefined or true means existing/completed user → skip wizard.
@@ -53,11 +62,14 @@ function AppInner() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<DiscoveryPage />} />
+          <Route index element={<CalendarPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/discovery" element={<DiscoveryPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/groups/:groupId" element={<GroupDetailPage />} />
           <Route path="/todo" element={<TodoPage />} />
+          <Route path="/habits" element={<HabitsPage />} />
+          <Route path="/timers" element={<TimersPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
         </Route>

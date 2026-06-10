@@ -1,5 +1,12 @@
 import express from "express";
 import authRequire from "../utils/utils.js";
+import webpush from "web-push";
+
+webpush.setVapidDetails(
+  "mailto:leberreguillaume.glb@gmail.com",
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY,
+);
 
 const router = express.Router();
 
@@ -99,6 +106,41 @@ router.patch("/notification-prefs", authRequire, async (req, res) => {
 
   if (error) return res.status(500).json({ success: false, error: error.message });
   return res.json({ success: true, prefs: merged });
+});
+
+// POST /push/subscribe — save (or refresh) a push subscription for the current user
+router.post("/push/subscribe", authRequire, async (req, res) => {
+  const { endpoint, keys } = req.body || {};
+  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    return res.status(400).json({ success: false, error: "endpoint, keys.p256dh, and keys.auth are required." });
+  }
+
+  const { error } = await req.supabase
+    .from("push_subscriptions")
+    .upsert(
+      { user_id: req.cookies.userId, endpoint, p256dh: keys.p256dh, auth: keys.auth },
+      { onConflict: "user_id,endpoint" },
+    );
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  return res.json({ success: true });
+});
+
+// DELETE /push/unsubscribe — remove a push subscription
+router.delete("/push/unsubscribe", authRequire, async (req, res) => {
+  const { endpoint } = req.body || {};
+  if (!endpoint) {
+    return res.status(400).json({ success: false, error: "endpoint is required." });
+  }
+
+  const { error } = await req.supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("user_id", req.cookies.userId)
+    .eq("endpoint", endpoint);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  return res.json({ success: true });
 });
 
 export default router;
