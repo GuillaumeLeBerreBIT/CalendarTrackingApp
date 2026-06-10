@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
 import { Empty } from '@/components/ui/Primitives'
 import { groupColorByIndex } from './GroupsPage'
+import EventFormModal from '@/components/EventFormModal'
 
 type Assignee = { userId: string; username: string | null }
 type ListMember = { userId: string; username: string }
@@ -19,9 +20,10 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid var(--border-2)',
   borderRadius: 'var(--r-sm)',
   padding: '9px 12px',
-  fontSize: 13.5,
+  fontSize: 16,
   color: 'var(--text-1)',
   outline: 'none',
+  minHeight: 44,
 }
 
 const labelStyle: React.CSSProperties = {
@@ -218,12 +220,13 @@ function AssigneeEditor({
 }
 
 // ── Task item ─────────────────────────────────────────────────────────────────
-function TaskItem({ task, color, taskListId, onToggle, onAssign }: {
+function TaskItem({ task, color, taskListId, onToggle, onAssign, onSchedule }: {
   task: Task
   color: string
   taskListId: string
   onToggle: () => void
   onAssign: (userIds: string[]) => Promise<void>
+  onSchedule: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const assignees = task.assignees ?? []
@@ -237,6 +240,7 @@ function TaskItem({ task, color, taskListId, onToggle, onAssign }: {
       alignItems: 'flex-start',
       gap: 12,
       padding: '11px 16px',
+      minHeight: 44,
     }}>
       <div style={{ paddingTop: 1, flexShrink: 0 }}>
         <TaskCheckbox done={task.is_completed} color={color} onClick={onToggle} />
@@ -282,6 +286,30 @@ function TaskItem({ task, color, taskListId, onToggle, onAssign }: {
           />
         )}
       </div>
+      {/* Schedule on calendar */}
+      <button
+        onClick={onSchedule}
+        title="Schedule on calendar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 28,
+          height: 28,
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'var(--text-3)',
+          borderRadius: 'var(--r-sm)',
+          flexShrink: 0,
+          transition: 'color 0.15s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-3)' }}
+      >
+        <Icon name="cal" size={15} sw={1.8} />
+      </button>
+
       {/* Assignee avatars + assign trigger */}
       <button
         onClick={() => setEditing((v) => !v)}
@@ -327,10 +355,11 @@ interface TaskListCardProps {
   onAddTask: () => void
   onToggleTask: (id: string, done: boolean) => void
   onAssign: (taskId: string, userIds: string[]) => Promise<void>
+  onScheduleTask: (task: Task, groupsId: string) => void
 }
 
-function TaskListCard({ tl, groupIndex, isExpanded, onToggleExpand, onAddTask, onToggleTask, onAssign }: TaskListCardProps) {
-  const { idTl, title, tag_group } = tl.taskListInfo
+function TaskListCard({ tl, groupIndex, isExpanded, onToggleExpand, onAddTask, onToggleTask, onAssign, onScheduleTask }: TaskListCardProps) {
+  const { idTl, idG, title, tag_group } = tl.taskListInfo
   const color = groupColorByIndex(groupIndex)
   const pct = tl.totalTasks > 0 ? Math.round((tl.totalCompletedTasks / tl.totalTasks) * 100) : 0
 
@@ -442,6 +471,7 @@ function TaskListCard({ tl, groupIndex, isExpanded, onToggleExpand, onAddTask, o
                   taskListId={idTl}
                   onToggle={() => onToggleTask(task.task_id, task.is_completed)}
                   onAssign={(userIds) => onAssign(task.task_id, userIds)}
+                  onSchedule={() => onScheduleTask(task, idG)}
                 />
               </div>
             ))
@@ -467,6 +497,7 @@ export default function TodoPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [createListOpen, setCreateListOpen] = useState(false)
   const [createTaskOpen, setCreateTaskOpen] = useState<string | null>(null)
+  const [scheduleTask, setScheduleTask] = useState<{ task: Task; groupsId: string } | null>(null)
   const [listForm, setListForm] = useState({ title: '', description: '', groups_id: '' })
   const [taskForm, setTaskForm] = useState({ task_title: '', task_description: '', priority: 'medium', due_date: '' })
   const [saving, setSaving] = useState(false)
@@ -538,7 +569,7 @@ export default function TodoPage() {
   const tagIndexMap = buildTagIndexMap(groups)
 
   return (
-    <div style={{ padding: '28px 24px', maxWidth: 760, margin: '0 auto' }}>
+    <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 760, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
@@ -571,6 +602,7 @@ export default function TodoPage() {
                 onAddTask={() => setCreateTaskOpen(idTl)}
                 onToggleTask={toggleTask}
                 onAssign={assignTask}
+                onScheduleTask={(task, groupsId) => setScheduleTask({ task, groupsId })}
               />
             )
           })}
@@ -673,6 +705,21 @@ export default function TodoPage() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {scheduleTask && (
+        <EventFormModal
+          event={null}
+          selectInfo={null}
+          groups={groups}
+          prefill={{
+            title: scheduleTask.task.task_title,
+            date: scheduleTask.task.due_date ?? undefined,
+            location: undefined,
+          }}
+          onClose={() => setScheduleTask(null)}
+          onSaved={() => setScheduleTask(null)}
+        />
       )}
     </div>
   )
