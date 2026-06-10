@@ -67,7 +67,6 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
   const calEvent = isCalEvent ? (data as CalEvent) : null
   const isGroupEvent = isCalEvent && !!(calEvent?.extendedProps?.groupsId)
   const participants = calEvent?.extendedProps?.participants ?? []
-  const eventType = calEvent?.extendedProps?.eventType
   const isMultiPerson = participants.length > 1
   // Color: 1 participant → their avatar hue, 2+ → group color (matches calendar pill logic)
   const groupHex = resolveEventHex(
@@ -445,7 +444,7 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
             </div>
             {isCalEvent && data.extendedProps?.groupName && (
               <div
-                onClick={() => { if ((data as CalEvent).extendedProps?.groupsId) { navigate(`/groups/${(data as CalEvent).extendedProps.groupsId}`); onClose() } }}
+                onClick={() => { if ((data as CalEvent).extendedProps?.groupsId) { navigate(`/groups/${(data as CalEvent).extendedProps?.groupsId}`); onClose() } }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   cursor: (data as CalEvent).extendedProps?.groupsId ? 'pointer' : 'default',

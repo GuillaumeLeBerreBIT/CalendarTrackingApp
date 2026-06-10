@@ -44,7 +44,7 @@ self.addEventListener('push', (event) => {
       badge: '/icons/icon-192.png',
       data: { link: data.link ?? '/' },
       vibrate: [100, 50, 100],
-    })
+    } as NotificationOptions & { vibrate?: number[] })
   )
 })
 

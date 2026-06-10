@@ -101,6 +101,7 @@ export interface CalEvent {
     dateOptions?: DateOption[]
     myVote?: number | null
     totalGroupMembers?: number
+    resolvedHex?: string | null
   }
 }
 
