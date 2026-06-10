@@ -123,11 +123,12 @@ export default function DiscoveryPage() {
         background: 'color-mix(in srgb, var(--bg) 86%, transparent)',
         backdropFilter: 'blur(16px)',
         borderBottom: '1px solid var(--border)',
-        padding: '18px 28px 0',
+        padding: '18px clamp(16px, 4vw, 28px) 0',
         flexShrink: 0,
       }}>
-        {/* Title row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+        {/* Title row — wraps on narrow screens so the location pill drops
+            to a second line instead of overflowing off-screen */}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, rowGap: 10, marginBottom: 10 }}>
           <h1 style={{ fontSize: 27, color: 'var(--text-1)', flex: 1 }}>Discover</h1>
           <Segmented
             options={[
@@ -272,7 +273,7 @@ export default function DiscoveryPage() {
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '22px 28px 60px',
+          padding: '22px clamp(16px, 4vw, 28px) 40px',
         }}
       >
         <div style={{

@@ -372,10 +372,12 @@ export default function AppShell() {
       }}>
         <OfflineBanner />
         {MobileTopBar}
+        {/* Bottom nav is a flex sibling (not an overlay), so the scroll area
+            needs no padding compensation — it would render as dead space. */}
         <main className="app-scroll" style={{
           flex: 1,
           overflowY: 'auto',
-          paddingBottom: 'calc(65px + env(safe-area-inset-bottom, 0px))',
+          minHeight: 0,
         }}>
           <Outlet />
         </main>

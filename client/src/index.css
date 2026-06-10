@@ -305,10 +305,61 @@ input, textarea, select {
 .fc .fc-daygrid-day-frame { padding: 2px 3px; }
 .fc .fc-daygrid-event-harness { margin-top: 1px; }
 
+/* "+N more" link + its popover (dayMaxEvents) — dark theme overrides,
+   FullCalendar defaults to a white popover */
+.fc .fc-daygrid-more-link {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 0 3px;
+  border-radius: var(--r-xs);
+}
+.fc .fc-daygrid-more-link:hover { background: var(--accent-soft); }
+.fc-theme-standard .fc-popover {
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm, 10px);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+}
+.fc-theme-standard .fc-popover-header {
+  background: var(--surface-3);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+}
+.fc .fc-popover-close { color: var(--text-3); opacity: 1; }
+
 /* ── Mobile page padding reduction ───────────────────────── */
 @media (max-width: 767px) {
   .page-content {
     padding-left: 16px;
     padding-right: 16px;
   }
+
+  /* Compact month grid: tighter cells, smaller day numbers, slimmer pills */
+  .fc .fc-daygrid-day-frame { padding: 1px 2px; }
+  .fc .fc-daygrid-day-number { font-size: 11px; padding: 2px 4px; }
+  .fc .fc-col-header-cell-cushion { font-size: 9.5px; }
+  .fc-daygrid-event { border-left-width: 2px !important; }
+
+  /* ── Mobile detailed layout: Klender-style readable rows ──
+     Text runs nearly edge-to-edge: no pill side margins, minimal
+     cell padding, fine type that clips at the cell boundary. */
+  .mobile-detailed .fc .fc-daygrid-day-frame {
+    padding: 1px 1px;
+    min-height: 64px;
+  }
+  .mobile-detailed .fc .fc-daygrid-day-number {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+  .mobile-detailed .fc-daygrid-event {
+    overflow: hidden;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 4px !important;
+    letter-spacing: -0.01em;
+  }
+  .mobile-detailed .fc .fc-daygrid-event-harness { margin-top: 2px; }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -10,11 +10,15 @@ import api from '@/api/client'
 import type { CalEvent, Group } from '@/types'
 import EventModal from '@/components/EventModal'
 import EventFormModal from '@/components/EventFormModal'
+import MobileMonthGrid from '@/components/MobileMonthGrid'
 import { parseNL, type ParsedEvent } from '@/lib/nlParser'
 import Button, { IconButton } from '@/components/ui/Button'
 import { Segmented, RsvpPill } from '@/components/ui/Primitives'
 import Icon from '@/components/ui/Icon'
 import { useAuthStore } from '@/store/authStore'
+
+const MOBILE_LAYOUT_KEY = 'eventli.mobileMonthLayout'
+type MobileLayout = 'compact' | 'detailed'
 
 /* ─── Group color resolution ─────────────────────────────── */
 const GROUP_COLORS: Record<string, string> = {
@@ -94,12 +98,20 @@ interface AgendaListProps {
   onEventClick: (ev: CalEvent) => void
 }
 
+// Local-time YYYY-MM-DD (toISOString would shift the date around midnight)
+function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function AgendaList({ events, onEventClick }: AgendaListProps) {
-  // Group by date string (YYYY-MM-DD)
+  // Group by date string (YYYY-MM-DD), today and onwards only — the agenda
+  // is a "what's coming" view; past events live in the month grid.
   const byDay = useMemo(() => {
+    const todayKey = localDateKey(new Date())
     const map = new Map<string, CalEvent[]>()
     for (const ev of events) {
       const day = ev.start.split('T')[0]
+      if (day < todayKey) continue
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(ev)
     }
@@ -117,7 +129,7 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
         color: 'var(--text-3)',
         fontSize: 14,
       }}>
-        No events to show. Toggle a calendar group or add a new event.
+        No upcoming events. Toggle a calendar group or add a new event.
       </div>
     )
   }
@@ -128,7 +140,7 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
         const date = new Date(dateStr + 'T00:00:00')
         const dow = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
         const day = date.getDate()
-        const isToday = dateStr === new Date().toISOString().split('T')[0]
+        const isToday = dateStr === localDateKey(new Date())
 
         return (
           <div key={dateStr} style={{
@@ -425,6 +437,13 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['self']))
   const [isMobile, setIsMobile] = useState(false)
+  const [mobileLayout, setMobileLayout] = useState<MobileLayout>(() => {
+    try {
+      const stored = localStorage.getItem(MOBILE_LAYOUT_KEY)
+      if (stored === 'compact' || stored === 'detailed') return stored
+    } catch { /* ignore */ }
+    return 'compact'
+  })
   const calRef = useRef<FullCalendar>(null)
 
   useEffect(() => {
@@ -433,6 +452,23 @@ export default function CalendarPage() {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  // Persist mobileLayout to localStorage
+  useEffect(() => {
+    try { localStorage.setItem(MOBILE_LAYOUT_KEY, mobileLayout) } catch { /* ignore */ }
+  }, [mobileLayout])
+
+  // Listen for swipe events from MobileMonthGrid
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { direction } = (e as CustomEvent<{ direction: 'prev' | 'next' }>).detail
+      if (direction === 'prev') navPrev()
+      else navNext()
+    }
+    window.addEventListener('mobileGridSwipe', handler)
+    return () => window.removeEventListener('mobileGridSwipe', handler)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calView, currentDate])
 
   async function loadEvents() {
     setLoading(true)
@@ -583,8 +619,11 @@ export default function CalendarPage() {
   const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long' })
   const yearLabel = currentDate.getFullYear()
 
+  // Whether the compact grid is mounted (no calRef available)
+  const isCompactGridActive = isMobile && calView === 'month' && mobileLayout === 'compact'
+
   function navPrev() {
-    if (calView === 'month') {
+    if (calView === 'month' && !isCompactGridActive) {
       calRef.current?.getApi().prev()
       setCurrentDate(calRef.current?.getApi().getDate() ?? currentDate)
     } else {
@@ -597,7 +636,7 @@ export default function CalendarPage() {
   }
 
   function navNext() {
-    if (calView === 'month') {
+    if (calView === 'month' && !isCompactGridActive) {
       calRef.current?.getApi().next()
       setCurrentDate(calRef.current?.getApi().getDate() ?? currentDate)
     } else {
@@ -610,11 +649,30 @@ export default function CalendarPage() {
   }
 
   function navToday() {
-    if (calView === 'month') {
+    if (calView === 'month' && !isCompactGridActive) {
       calRef.current?.getApi().today()
     }
     setCurrentDate(new Date())
   }
+
+  // Stable callback for MobileMonthGrid "add event" — creates a synthetic DateSelectArg-like object
+  const handleGridAddEvent = useCallback((dateStr: string) => {
+    // Build a minimal synthetic selectInfo that EventFormModal understands
+    const start = new Date(dateStr + 'T00:00:00')
+    const end = new Date(dateStr + 'T00:00:00')
+    end.setDate(end.getDate() + 1)
+    setSelectedEvent(null)
+    setSelectInfo({
+      start,
+      end,
+      startStr: dateStr,
+      endStr: dateStr,
+      allDay: true,
+      jsEvent: null as never,
+      view: null as never,
+    })
+    setModalMode('create')
+  }, [])
 
   // Sync currentDate when FullCalendar nav fires internally
   function handleDatesSet() {
@@ -698,7 +756,7 @@ export default function CalendarPage() {
               </h1>
               <IconButton name="chevR" size={40} isz={16} onClick={navNext} title="Next" />
             </div>
-            {/* Row 2: Today · · · [Month|Agenda] [+] */}
+            {/* Row 2: Today · · · [Month|Agenda] [layout toggle] [+] */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
               <div style={{ flex: 1 }} />
@@ -711,6 +769,64 @@ export default function CalendarPage() {
                 onChange={v => setCalView(v as CalView)}
                 size="sm"
               />
+              {/* Layout toggle — only visible when showing month on mobile */}
+              {calView === 'month' && (
+                <div
+                  role="group"
+                  aria-label="Calendar layout"
+                  style={{
+                    display: 'inline-flex',
+                    gap: 2,
+                    padding: 3,
+                    background: 'var(--surface-3)',
+                    borderRadius: 'var(--r-sm)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {/* Compact: dot-grid icon */}
+                  <button
+                    aria-label="Compact layout"
+                    aria-pressed={mobileLayout === 'compact'}
+                    onClick={() => setMobileLayout('compact')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 32,
+                      height: 32,
+                      borderRadius: 'calc(var(--r-sm) - 3px)',
+                      border: 'none',
+                      background: mobileLayout === 'compact' ? 'var(--surface-hi)' : 'transparent',
+                      color: mobileLayout === 'compact' ? 'var(--accent)' : 'var(--text-3)',
+                      cursor: 'pointer',
+                      transition: 'var(--transition)',
+                    }}
+                  >
+                    <Icon name="grid" size={14} />
+                  </button>
+                  {/* Detailed: pills / list icon */}
+                  <button
+                    aria-label="Detailed layout"
+                    aria-pressed={mobileLayout === 'detailed'}
+                    onClick={() => setMobileLayout('detailed')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 32,
+                      height: 32,
+                      borderRadius: 'calc(var(--r-sm) - 3px)',
+                      border: 'none',
+                      background: mobileLayout === 'detailed' ? 'var(--surface-hi)' : 'transparent',
+                      color: mobileLayout === 'detailed' ? 'var(--accent)' : 'var(--text-3)',
+                      cursor: 'pointer',
+                      transition: 'var(--transition)',
+                    }}
+                  >
+                    <Icon name="list" size={14} />
+                  </button>
+                </div>
+              )}
               <IconButton
                 name="plus"
                 size={36}
@@ -863,44 +979,61 @@ export default function CalendarPage() {
 
         {/* Calendar area */}
         {!loading && (calView === 'month' ? (
-          <div style={{ flex: 1, overflow: 'hidden', padding: '0 0 16px' }}>
-            <FullCalendar
-              ref={calRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-              initialView="dayGridMonth"
-              headerToolbar={false}
-              firstDay={1}
+          isCompactGridActive ? (
+            /* ── Compact dot-grid layout ── */
+            <MobileMonthGrid
+              currentDate={currentDate}
               events={filteredEvents}
-              selectable
-              editable
-              droppable
-              select={handleDateSelect}
-              eventClick={handleEventClick}
-              eventDrop={handleEventDrop}
-              eventResize={handleEventResize}
-              datesSet={handleDatesSet}
-              height="100%"
-              eventContent={makeRenderEventContent(currentUserId)}
-              eventClassNames={(arg) => {
-                if (arg.event.extendedProps?.status === 'tentative') return ['fc-event-tentative']
-                return []
-              }}
-              eventDidMount={(info) => {
-                const hex = eventHex(info.event.extendedProps as Record<string, unknown>)
-                const isTentative = info.event.extendedProps?.status === 'tentative'
-                // Compute transparent bg — handle both #rrggbb and hsl(...) formats
-                const bgAlpha = hex.startsWith('hsl(') && hex.endsWith(')')
-                  ? hex.slice(0, -1) + ' / 0.12)'
-                  : hex + '1e'
-                // Feed CSS custom properties — index.css reads these on .fc-daygrid-event
-                info.el.style.setProperty('--fc-event-bg-color', bgAlpha)
-                info.el.style.setProperty('--fc-event-border-color', hex)
-                if (isTentative) {
-                  info.el.classList.add('fc-event-tentative')
-                }
-              }}
+              onEventClick={handleAgendaEventClick}
+              onAddEvent={handleGridAddEvent}
+              currentUserId={currentUserId}
+              eventHex={eventHex}
             />
-          </div>
+          ) : (
+            /* ── FullCalendar month view (desktop + mobile-detailed) ── */
+            <div
+              className={isMobile && mobileLayout === 'detailed' ? 'mobile-detailed' : undefined}
+              style={{ flex: 1, overflow: 'hidden', padding: '0 0 16px' }}
+            >
+              <FullCalendar
+                ref={calRef}
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+                initialView="dayGridMonth"
+                headerToolbar={false}
+                firstDay={1}
+                events={filteredEvents}
+                selectable
+                editable
+                droppable
+                select={handleDateSelect}
+                eventClick={handleEventClick}
+                eventDrop={handleEventDrop}
+                eventResize={handleEventResize}
+                datesSet={handleDatesSet}
+                height="100%"
+                dayMaxEvents={isMobile ? 4 : false}
+                eventContent={makeRenderEventContent(isMobile, mobileLayout)}
+                eventClassNames={(arg) => {
+                  if (arg.event.extendedProps?.status === 'tentative') return ['fc-event-tentative']
+                  return []
+                }}
+                eventDidMount={(info) => {
+                  const hex = eventHex(info.event.extendedProps as Record<string, unknown>)
+                  const isTentative = info.event.extendedProps?.status === 'tentative'
+                  // Compute transparent bg — handle both #rrggbb and hsl(...) formats
+                  const bgAlpha = hex.startsWith('hsl(') && hex.endsWith(')')
+                    ? hex.slice(0, -1) + ' / 0.12)'
+                    : hex + '1e'
+                  // Feed CSS custom properties — index.css reads these on .fc-daygrid-event
+                  info.el.style.setProperty('--fc-event-bg-color', bgAlpha)
+                  info.el.style.setProperty('--fc-event-border-color', hex)
+                  if (isTentative) {
+                    info.el.classList.add('fc-event-tentative')
+                  }
+                }}
+              />
+            </div>
+          )
         ) : (
           <AgendaList
             events={filteredEvents}
@@ -946,46 +1079,34 @@ export default function CalendarPage() {
 }
 
 /* ─── Custom FullCalendar event renderer factory ─────────── */
-function makeRenderEventContent(currentUserId: string | null | undefined) {
+export function makeRenderEventContent(
+  isMobile = false,
+  mobileLayout: MobileLayout = 'compact',
+) {
   return function renderEventContent(info: { event: { id: string; title: string; allDay: boolean; startStr: string; extendedProps: Record<string, unknown> } }) {
     const { event } = info
-    const hex = eventHex(event.extendedProps as Record<string, unknown>)
-    const timeStr = (!event.allDay && event.startStr.includes('T'))
+    // On phones the cell is too narrow for time + title — the title is the
+    // information that matters, the time lives in the event modal/agenda.
+    // In detailed mode on mobile we also skip the time prefix.
+    const timeStr = (!isMobile && !event.allDay && event.startStr.includes('T'))
       ? event.startStr.split('T')[1].slice(0, 5)
       : ''
-    const participants = event.extendedProps?.participants as Array<{ userId: string; rsvpStatus: string }> | undefined
-    const myRsvp = participants?.find(p => p.userId === currentUserId)?.rsvpStatus
-    const isMultiPerson = (participants?.length ?? 0) > 1
     const isRecurring = !!event.extendedProps?.isRecurring
-    const isTentative = event.extendedProps?.status === 'tentative'
+
+    // No leading type indicator on any size: the colored left border on
+    // .fc-daygrid-event conveys the event color, and tentative events keep
+    // their dashed border styling via CSS.
+    const isDetailedMobile = isMobile && mobileLayout === 'detailed'
 
     return (
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 4,
-        padding: '1px 5px',
+        gap: isDetailedMobile ? 0 : isMobile ? 3 : 4,
+        padding: isDetailedMobile ? '1px 0 1px 2px' : isMobile ? '1px 3px' : '1px 5px',
         overflow: 'hidden',
         width: '100%',
       }}>
-        {/* Event type indicator */}
-        {isTentative ? (
-          <Icon name="clock" size={8} sw={2.5} style={{ color: '#f59e0b', flexShrink: 0 }} />
-        ) : isMultiPerson ? (
-          <Icon name="users" size={8} sw={2.5} style={{ color: hex, flexShrink: 0 }} />
-        ) : (
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: hex, flexShrink: 0 }} />
-        )}
-
-        {/* RSVP status dot (only if not 'going') */}
-        {myRsvp && myRsvp !== 'going' && (
-          <span style={{
-            width: 4, height: 4, borderRadius: '50%', flexShrink: 0,
-            background: myRsvp === 'maybe' ? '#f59e0b' : 'var(--text-3)',
-            opacity: myRsvp === 'pending' ? 0.5 : 1,
-          }} />
-        )}
-
         {/* Time */}
         {timeStr && (
           <span style={{
@@ -994,15 +1115,21 @@ function makeRenderEventContent(currentUserId: string | null | undefined) {
           }}>{timeStr}</span>
         )}
 
-        {/* Title */}
+        {/* Title — detailed mobile mimics Klender: fine regular-weight type
+            that clips at the cell edge (no ellipsis stealing characters) */}
         <span style={{
-          fontSize: 11.5, fontWeight: 600, color: 'var(--text-1)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontSize: isDetailedMobile ? 9.5 : isMobile ? 10.5 : 11.5,
+          fontWeight: isDetailedMobile ? 500 : 600,
+          lineHeight: isDetailedMobile ? 1.5 : undefined,
+          color: 'var(--text-1)',
+          overflow: 'hidden',
+          textOverflow: 'clip',
+          whiteSpace: 'nowrap',
           flex: 1,
         }}>{event.title}</span>
 
         {/* Recurring indicator — 'refresh' not in IconPaths, use a dot */}
-        {isRecurring && (
+        {isRecurring && !isMobile && (
           <span style={{ color: 'var(--text-3)', flexShrink: 0, opacity: 0.7, fontSize: 9 }}>↻</span>
         )}
       </div>

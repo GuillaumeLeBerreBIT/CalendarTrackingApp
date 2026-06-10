@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -19,6 +19,11 @@ import HabitsPage from '@/pages/HabitsPage'
 import TimersPage from '@/pages/TimersPage'
 import { useAuthStore } from '@/store/authStore'
 import { subscribeToPush } from '@/lib/pushNotifications'
+
+// DEV-only harness — not bundled in production
+const MobileCalendarHarness = import.meta.env.DEV
+  ? lazy(() => import('@/pages/dev/MobileCalendarHarness'))
+  : null
 
 // ── Inner app — reads auth store after ProtectedRoute has populated it ────────
 function AppInner() {
@@ -47,6 +52,18 @@ function AppInner() {
       )}
 
       <Routes>
+        {/* DEV-only harness */}
+        {import.meta.env.DEV && MobileCalendarHarness && (
+          <Route
+            path="/dev/mobile-calendar"
+            element={
+              <Suspense fallback={<div style={{ color: 'var(--text-3)', padding: 24 }}>Loading dev harness…</div>}>
+                <MobileCalendarHarness />
+              </Suspense>
+            }
+          />
+        )}
+
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
