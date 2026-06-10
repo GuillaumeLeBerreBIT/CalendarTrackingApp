@@ -101,7 +101,7 @@ function GroupCard({ group, index, onClick }: GroupCardProps) {
       </div>
 
       {/* Body */}
-      <div style={{ padding: '0 17px 16px', marginTop: -22, flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '12px 17px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Icon row */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           {/* Group icon square */}
@@ -338,6 +338,10 @@ export default function GroupsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState({ 'group-title': '', 'group-description': '', 'tag-name': '' })
   const [creating, setCreating] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   async function load() {
     setError(null)
@@ -405,19 +409,63 @@ export default function GroupsPage() {
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true)
+    await Promise.allSettled([...selectedIds].map(id => api.delete(`/groups/${id}`)))
+    setBulkDeleting(false)
+    setShowDeleteConfirm(false)
+    exitSelectMode()
+    load()
+  }
+
   return (
-    <div style={{ padding: '28px 24px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 900, margin: '0 auto' }}>
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.03em' }}>Groups</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '4px 0 0' }}>
-            {groups.length} group{groups.length !== 1 ? 's' : ''}
+            {selectMode
+              ? `${selectedIds.size} selected`
+              : `${groups.length} group${groups.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <Button variant="primary" icon="plus" size="md" onClick={() => setCreateOpen(true)}>
-          New group
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {selectMode ? (
+            <>
+              <Button variant="ghost" size="md" onClick={exitSelectMode}>Cancel</Button>
+              <Button
+                variant="danger"
+                size="md"
+                icon="trash"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={selectedIds.size === 0}
+              >
+                Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="md" onClick={() => setSelectMode(true)}>Select</Button>
+              <Button variant="primary" icon="plus" size="md" onClick={() => setCreateOpen(true)}>
+                New group
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Pending invites */}
@@ -480,15 +528,53 @@ export default function GroupsPage() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))',
           gap: 16,
         }}>
-          {groups.map((g, i) => (
-            <GroupCard
-              key={g.groups_id}
-              group={g}
-              index={i}
-              onClick={() => navigate(`/groups/${g.groups_id}`)}
-            />
-          ))}
-          <CreateCard onClick={() => setCreateOpen(true)} />
+          {groups.map((g, i) => {
+            const isSelected = selectedIds.has(g.groups_id)
+            return (
+              <div key={g.groups_id} style={{ position: 'relative' }}>
+                <GroupCard
+                  group={g}
+                  index={i}
+                  onClick={() => selectMode ? toggleSelect(g.groups_id) : navigate(`/groups/${g.groups_id}`)}
+                />
+                {selectMode && (
+                  <div
+                    onClick={() => toggleSelect(g.groups_id)}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: 'var(--r-lg)',
+                      border: isSelected ? '2px solid #ef4444' : '2px solid transparent',
+                      background: isSelected ? 'rgba(239,68,68,0.10)' : 'transparent',
+                      transition: 'var(--transition)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'flex-end',
+                      padding: 10,
+                    }}
+                  >
+                    <div style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      border: isSelected ? '2px solid #ef4444' : '2px solid rgba(255,255,255,0.5)',
+                      background: isSelected ? '#ef4444' : 'rgba(0,0,0,0.4)',
+                      backdropFilter: 'blur(4px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      transition: 'var(--transition)',
+                    }}>
+                      {isSelected && <Icon name="check" size={12} sw={2.5} style={{ color: '#fff' }} />}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {!selectMode && <CreateCard onClick={() => setCreateOpen(true)} />}
         </div>
       )}
 
@@ -536,6 +622,93 @@ export default function GroupsPage() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {/* Bulk delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div
+          onClick={() => !bulkDeleting && setShowDeleteConfirm(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 60,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)',
+              borderRadius: 'var(--r-lg)',
+              border: '1px solid var(--border)',
+              padding: 28,
+              maxWidth: 420,
+              width: '100%',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+            }}
+          >
+            {/* Icon */}
+            <div style={{
+              width: 48, height: 48, borderRadius: 'var(--r-md)',
+              background: 'rgba(239,68,68,0.12)',
+              border: '1px solid rgba(239,68,68,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: 20,
+            }}>
+              <Icon name="trash" size={22} style={{ color: '#ef4444' }} />
+            </div>
+
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+              Delete {selectedIds.size} group{selectedIds.size !== 1 ? 's' : ''}?
+            </h3>
+            <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 24px', lineHeight: 1.6 }}>
+              This will permanently delete {selectedIds.size === 1 ? 'this group' : 'these groups'} along with
+              all their events, tasks, and members. <strong style={{ color: 'var(--text-1)' }}>This cannot be undone.</strong>
+            </p>
+
+            {/* Group names list */}
+            <div style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-md)',
+              padding: '10px 14px',
+              marginBottom: 24,
+              maxHeight: 140,
+              overflowY: 'auto',
+            }}>
+              {groups.filter(g => selectedIds.has(g.groups_id)).map(g => (
+                <div key={g.groups_id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '4px 0',
+                  fontSize: 13.5, color: 'var(--text-1)',
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                  {g.groups_title}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button
+                variant="danger"
+                full
+                disabled={bulkDeleting}
+                onClick={handleBulkDelete}
+              >
+                {bulkDeleting ? 'Deleting…' : `Yes, delete ${selectedIds.size > 1 ? 'all' : 'it'}`}
+              </Button>
+              <Button
+                variant="ghost"
+                full
+                disabled={bulkDeleting}
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

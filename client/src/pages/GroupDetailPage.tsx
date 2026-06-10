@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/api/client'
-import type { Member, CalEvent, TaskList, Task } from '@/types'
+import CountdownPill from '@/components/CountdownPill'
+import type { Member, CalEvent, TaskList, Task, GroupChallenge, Pact } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import Icon from '@/components/ui/Icon'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
@@ -9,6 +10,9 @@ import Button from '@/components/ui/Button'
 import { Tag, Section, Empty, Progress } from '@/components/ui/Primitives'
 import { groupColorByIndex } from './GroupsPage'
 import EventFormModal from '@/components/EventFormModal'
+import GroupChallengeCard from '@/components/GroupChallengeCard'
+import PactModal from '@/components/PactModal'
+import PactCelebration from '@/components/PactCelebration'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -133,11 +137,50 @@ export default function GroupDetailPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [groupTitle, setGroupTitle] = useState('')
   const [groupTag, setGroupTag] = useState('')
+  const [groupDescription, setGroupDescription] = useState('')
   const [sharedColor, setSharedColor] = useState('#3b82f6')
   const [myColor, setMyColor] = useState('#3b82f6')
   const [loading, setLoading] = useState(true)
   const [groupIndex] = useState(() => Math.abs((groupId?.charCodeAt(0) ?? 0) % 6))
   const groupColor = groupColorByIndex(groupIndex)
+
+  // ── Edit group modal state ───────────────────────────────────────────────────
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editTag, setEditTag] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
+  // ── Delete group state ───────────────────────────────────────────────────────
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // ── Leave group state ────────────────────────────────────────────────────────
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
+
+  // ── Kick member state ────────────────────────────────────────────────────────
+  const [kickConfirmId, setKickConfirmId] = useState<string | null>(null)
+  const [kicking, setKicking] = useState(false)
+
+  // Pacts
+  const [activePact, setActivePact] = useState<Pact | null>(null)
+  const [pastPacts, setPastPacts] = useState<Pact[]>([])
+  const [showPastPacts, setShowPastPacts] = useState(false)
+  const [showPactModal, setShowPactModal] = useState(false)
+  const [celebratePactId, setCelebratePactId] = useState<number | null>(null)
+
+  // Challenges
+  const [challenges, setChallenges] = useState<GroupChallenge[]>([])
+  const [showCreateChallenge, setShowCreateChallenge] = useState(false)
+  const [challengeTitle, setChallengeTitle] = useState('')
+  const [challengeTarget, setChallengeTarget] = useState('')
+  const [challengeUnit, setChallengeUnit] = useState('completions')
+  const [challengeStartDate, setChallengeStartDate] = useState('')
+  const [challengeEndDate, setChallengeEndDate] = useState('')
+  const [challengeDesc, setChallengeDesc] = useState('')
+  const [savingChallenge, setSavingChallenge] = useState(false)
 
   // Task completion toggle state
   const [taskDone, setTaskDone] = useState<Record<string, boolean>>({})
@@ -145,6 +188,43 @@ export default function GroupDetailPage() {
   // Event creation modal
   const [showEventModal, setShowEventModal] = useState(false)
   const [eventsPage, setEventsPage] = useState(0)
+
+  // Tentative voting
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
+  const [votingEventId, setVotingEventId] = useState<string | null>(null)
+  const [confirmingEventId, setConfirmingEventId] = useState<string | null>(null)
+
+  async function handleVote(eventId: string, optionId: number) {
+    setVotingEventId(eventId)
+    try {
+      await api.post('/voteEventDate', { eventId, optionId })
+      // Reload events for this group
+      const { data } = await api.get('/renderEvents')
+      if (data.success && Array.isArray(data.events)) {
+        setEvents(data.events.filter((e: CalEvent) => String(e.extendedProps?.groupsId) === String(groupId)))
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setVotingEventId(null)
+    }
+  }
+
+  async function handleConfirmDate(eventId: string, optionId: number) {
+    setConfirmingEventId(eventId)
+    try {
+      await api.post('/confirmEventDate', { eventId, optionId })
+      const { data } = await api.get('/renderEvents')
+      if (data.success && Array.isArray(data.events)) {
+        setEvents(data.events.filter((e: CalEvent) => String(e.extendedProps?.groupsId) === String(groupId)))
+      }
+      setExpandedEventId(null)
+    } catch {
+      // silently fail
+    } finally {
+      setConfirmingEventId(null)
+    }
+  }
 
   const [shareLink, setShareLink] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
@@ -187,6 +267,7 @@ export default function GroupDetailPage() {
           if (match) {
             setGroupTitle(match.groupInfo.title)
             setGroupTag(match.groupInfo.tag)
+            setGroupDescription(match.groupInfo.description ?? '')
           }
         }
       }).catch(() => {})
@@ -220,6 +301,29 @@ export default function GroupDetailPage() {
       // 5. Activity feed for this group
       api.get(`/groupActivity/${groupId}`).then(({ data }) => {
         if (data.success) setActivity(data.activity ?? [])
+      }).catch(() => {})
+
+      // 6. Active pact + full history for this group
+      api.get(`/groups/${groupId}/pacts/active`).then(({ data }) => {
+        if (data.success) {
+          const pact = data.pact as Pact | null
+          if (pact && pact.status === 'succeeded' && !sessionStorage.getItem(`pact_celebrated_${pact.pact_id}`)) {
+            setCelebratePactId(pact.pact_id)
+          }
+          setActivePact(pact)
+        }
+      }).catch(() => {})
+
+      api.get(`/groups/${groupId}/pacts`).then(({ data }) => {
+        if (data.success) {
+          const all = (data.pacts ?? []) as Pact[]
+          setPastPacts(all.filter((p) => p.status !== 'active'))
+        }
+      }).catch(() => {})
+
+      // 7. Challenges for this group
+      api.get(`/groups/${groupId}/challenges`).then(({ data }) => {
+        if (data.success) setChallenges(data.challenges ?? [])
       }).catch(() => {})
 
     } finally {
@@ -297,6 +401,71 @@ export default function GroupDetailPage() {
     }
   }
 
+  // ── Edit group ───────────────────────────────────────────────────────────────
+  function openEditModal() {
+    setEditTitle(groupTitle)
+    setEditDescription(groupDescription)
+    setEditTag(groupTag)
+    setShowEditModal(true)
+  }
+
+  async function saveGroupEdits() {
+    if (!editTitle.trim()) return
+    setEditSaving(true)
+    try {
+      await api.patch(`/groups/${groupId}`, {
+        groups_title: editTitle.trim(),
+        groups_description: editDescription.trim(),
+        tag_name: editTag,
+      })
+      await loadAll()
+      setShowEditModal(false)
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  // ── Delete group ─────────────────────────────────────────────────────────────
+  async function deleteGroup() {
+    setDeleting(true)
+    try {
+      await api.delete(`/groups/${groupId}`)
+      navigate('/groups')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // ── Leave group ──────────────────────────────────────────────────────────────
+  async function leaveGroup() {
+    setLeaving(true)
+    setLeaveError(null)
+    try {
+      await api.post(`/groups/${groupId}/leave`)
+      navigate('/groups')
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Could not leave group.'
+          : 'Could not leave group.'
+      setLeaveError(msg)
+    } finally {
+      setLeaving(false)
+    }
+  }
+
+  // ── Kick member ──────────────────────────────────────────────────────────────
+  async function kickMember(memberId: string) {
+    setKicking(true)
+    try {
+      await api.delete(`/groups/${groupId}/members/${memberId}`)
+      setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+      setKickConfirmId(null)
+    } finally {
+      setKicking(false)
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)', fontSize: 14 }}>
@@ -355,8 +524,7 @@ export default function GroupDetailPage() {
 
       {/* Hero row */}
       <div style={{
-        padding: '0 24px 20px',
-        marginTop: -40,
+        padding: `16px clamp(16px, 4vw, 24px) 20px`,
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'space-between',
@@ -388,6 +556,21 @@ export default function GroupDetailPage() {
                 {groupName}
               </h1>
               {groupTag && <Tag tone="neutral">#{groupTag}</Tag>}
+              {isCurrentUserAdmin && (
+                <button
+                  onClick={openEditModal}
+                  title="Edit group"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 30, height: 30, borderRadius: 'var(--r-sm)',
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    color: 'var(--text-3)', cursor: 'pointer',
+                    transition: 'var(--transition)',
+                  }}
+                >
+                  <Icon name="edit" size={14} sw={1.8} />
+                </button>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
               <AvatarStack ids={memberIds} size={22} max={5} ringColor="var(--bg)" names={memberNames} />
@@ -473,17 +656,53 @@ export default function GroupDetailPage() {
                     </p>
                   </div>
                 </div>
-                {isAdmin && (
-                  <span style={{
-                    fontSize: 11.5, fontWeight: 650, padding: '3px 9px',
-                    borderRadius: 'var(--r-full)',
-                    background: `color-mix(in srgb, ${groupColor} 15%, transparent)`,
-                    color: groupColor,
-                    border: `1px solid color-mix(in srgb, ${groupColor} 30%, transparent)`,
-                  }}>
-                    Organiser
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {isAdmin && (
+                    <span style={{
+                      fontSize: 11.5, fontWeight: 650, padding: '3px 9px',
+                      borderRadius: 'var(--r-full)',
+                      background: `color-mix(in srgb, ${groupColor} 15%, transparent)`,
+                      color: groupColor,
+                      border: `1px solid color-mix(in srgb, ${groupColor} 30%, transparent)`,
+                    }}>
+                      Organiser
+                    </span>
+                  )}
+                  {isCurrentUserAdmin && !isYou && (
+                    kickConfirmId === m.user_id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={kicking}
+                          onClick={() => kickMember(m.user_id)}
+                        >
+                          {kicking ? '…' : 'Remove'}
+                        </Button>
+                        <button
+                          onClick={() => setKickConfirmId(null)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 12 }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setKickConfirmId(m.user_id)}
+                        title={`Remove ${m.username}`}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 28, height: 28, borderRadius: 'var(--r-sm)',
+                          background: 'none', border: '1px solid transparent',
+                          color: 'var(--text-3)', cursor: 'pointer',
+                          transition: 'var(--transition)',
+                        }}
+                      >
+                        <Icon name="close" size={14} sw={2} />
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             )
           })
@@ -518,12 +737,14 @@ export default function GroupDetailPage() {
   // ── Events section ───────────────────────────────────────────────────────────
   const EVENTS_PAGE_SIZE = 10
   const now = new Date()
-  const allUpcoming = events
+  const tentativeEvents = events.filter(e => e.extendedProps?.status === 'tentative')
+  const confirmedEvents = events.filter(e => e.extendedProps?.status !== 'tentative')
+  const allUpcoming = confirmedEvents
     .filter(e => new Date(e.start) >= now)
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
   const totalPages = Math.ceil(allUpcoming.length / EVENTS_PAGE_SIZE)
   const upcomingEvents = allUpcoming.slice(eventsPage * EVENTS_PAGE_SIZE, (eventsPage + 1) * EVENTS_PAGE_SIZE)
-  const pastEvents = events
+  const pastEvents = confirmedEvents
     .filter(e => new Date(e.start) < now)
     .sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime())
     .slice(0, 3)
@@ -539,6 +760,202 @@ export default function GroupDetailPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+          {/* ── Tentative events (voting open) ── */}
+          {tentativeEvents.length > 0 && (
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#f59e0b', marginBottom: 10 }}>
+                Voting open
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {tentativeEvents.map(ev => {
+                  const isExpanded = expandedEventId === ev.id
+                  const opts = ev.extendedProps?.dateOptions ?? []
+                  const myVote = ev.extendedProps?.myVote ?? null
+                  const totalMembers = ev.extendedProps?.totalGroupMembers ?? members.length
+                  const totalVoters = new Set(opts.flatMap(o => o.votes.map(v => v.userId))).size
+                  const isCreator = ev.extendedProps?.createdBy === currentUserId
+                  const isVoting = votingEventId === ev.id
+                  const isConfirming = confirmingEventId === ev.id
+                  // Leading option by vote count
+                  const leadingOption = opts.length > 0
+                    ? opts.reduce((best, o) => o.voteCount > best.voteCount ? o : best, opts[0])
+                    : null
+
+                  return (
+                    <div key={ev.id} style={{
+                      borderRadius: 'var(--r-md)',
+                      background: 'var(--surface)',
+                      border: '1px dashed var(--border-2)',
+                      overflow: 'hidden',
+                    }}>
+                      {/* Card header — clickable to expand */}
+                      <button
+                        onClick={() => setExpandedEventId(isExpanded ? null : ev.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '12px 14px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          width: '100%',
+                          textAlign: 'left',
+                        }}
+                      >
+                        {/* Date placeholder block (amber) */}
+                        <div style={{
+                          width: 46, flexShrink: 0, textAlign: 'center',
+                          padding: '5px 0',
+                          borderRadius: 'var(--r-sm)',
+                          background: 'rgba(245,158,11,0.10)',
+                        }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: '#f59e0b' }}>TBD</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b', lineHeight: 1.2 }}>?</div>
+                        </div>
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                            <p style={{ fontSize: 14, fontWeight: 650, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ev.title}
+                            </p>
+                            {/* Amber "Voting open" pill */}
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '2px 8px', borderRadius: 'var(--r-full)',
+                              background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                              fontSize: 11, fontWeight: 700, flexShrink: 0,
+                            }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                              Voting open
+                            </span>
+                          </div>
+                          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
+                            {totalVoters} of {totalMembers} voted · {opts.length} option{opts.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <Icon
+                          name={isExpanded ? 'chevD' : 'chevR'}
+                          size={14}
+                          sw={2.2}
+                          style={{ color: 'var(--text-3)', flexShrink: 0, transform: isExpanded ? 'rotate(180deg) scaleX(-1)' : 'none' }}
+                        />
+                      </button>
+
+                      {/* Expanded voting rows */}
+                      {isExpanded && (
+                        <div style={{
+                          borderTop: '1px solid var(--border)',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}>
+                          {opts.length === 0 ? (
+                            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>No date options yet.</p>
+                          ) : (
+                            opts
+                              .sort((a, b) => a.position - b.position)
+                              .map(opt => {
+                                const hasVoted = myVote === opt.optionId
+                                const isLeading = leadingOption?.optionId === opt.optionId && opt.voteCount > 0
+                                // Format date label
+                                const dateObj = new Date(opt.startDate + 'T00:00:00')
+                                const dateLbl = dateObj.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+                                const timeLbl = opt.startTime ? opt.startTime.slice(0, 5) : ''
+                                const label = timeLbl ? `${dateLbl} · ${timeLbl}` : dateLbl
+
+                                return (
+                                  <div key={opt.optionId} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    padding: '8px 0',
+                                  }}>
+                                    {/* Date label */}
+                                    <span style={{
+                                      fontSize: 13,
+                                      fontWeight: 700,
+                                      color: 'var(--text-1)',
+                                      width: 160,
+                                      flexShrink: 0,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}>
+                                      {label}
+                                    </span>
+                                    {/* Progress bar */}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <Progress
+                                        value={opt.voteCount}
+                                        total={Math.max(1, totalMembers)}
+                                        color={isLeading ? 'var(--accent)' : 'var(--surface-3)'}
+                                        height={6}
+                                      />
+                                    </div>
+                                    {/* Vote count */}
+                                    <span style={{
+                                      fontSize: 12,
+                                      color: 'var(--text-3)',
+                                      width: 48,
+                                      textAlign: 'right',
+                                      flexShrink: 0,
+                                      fontVariantNumeric: 'tabular-nums',
+                                    }}>
+                                      {opt.voteCount} vote{opt.voteCount !== 1 ? 's' : ''}
+                                    </span>
+                                    {/* Vote button */}
+                                    {hasVoted ? (
+                                      <div style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                                        padding: '5px 10px',
+                                        borderRadius: 'var(--r-sm)',
+                                        background: 'rgba(34,211,170,0.12)',
+                                        color: 'var(--g-work)',
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        flexShrink: 0,
+                                      }}>
+                                        <Icon name="check" size={12} sw={2.5} />
+                                        Voted
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        variant="soft"
+                                        size="sm"
+                                        disabled={isVoting}
+                                        onClick={() => handleVote(ev.id, opt.optionId)}
+                                      >
+                                        Vote
+                                      </Button>
+                                    )}
+                                  </div>
+                                )
+                              })
+                          )}
+
+                          {/* Creator-only: Confirm leading date */}
+                          {isCreator && leadingOption && (
+                            <div style={{ marginTop: 4, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isConfirming}
+                                onClick={() => handleConfirmDate(ev.id, leadingOption.optionId)}
+                              >
+                                {isConfirming ? 'Confirming…' : 'Confirm this date ↗'}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {allUpcoming.length > 0 && (
             <div>
               <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 10 }}>Upcoming</p>
@@ -582,6 +999,7 @@ export default function GroupDetailPage() {
                           )}
                         </p>
                       </div>
+                      <CountdownPill targetDate={ev.start} />
                     </div>
                   )
                 })}
@@ -759,6 +1177,426 @@ export default function GroupDetailPage() {
     </Section>
   )
 
+  // ── Pact banner section ────────────────────────────────────────────────────────
+  const pactSection = (
+    <div style={{ marginBottom: 24 }}>
+      {/* Section label */}
+      <div style={{ marginBottom: 10 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Group Pact</p>
+        <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
+          Bet a real calendar event on the group's habit completions — hit the target and it unlocks for everyone.
+        </p>
+      </div>
+      {activePact && activePact.status === 'active' ? (
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border-2)',
+          borderRadius: 'var(--r-lg)',
+          padding: '16px 18px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Accent accent strip */}
+          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: 'var(--accent)', borderRadius: '3px 0 0 3px' }} />
+          <div style={{ paddingLeft: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Icon name="trophy" size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Group Pact</span>
+              <span style={{
+                marginLeft: 'auto', fontSize: 11, fontWeight: 650,
+                color: 'var(--text-3)',
+                padding: '2px 8px', borderRadius: 'var(--r-full)',
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+              }}>
+                ends {new Date(activePact.ends_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 5 }}>
+                <span>{activePact.completions_count} completions</span>
+                <span>{activePact.target_completions} target</span>
+              </div>
+              <Progress value={activePact.completions_count} total={activePact.target_completions} color="var(--accent)" height={6} />
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
+              Hit the target to unlock the reward event.
+            </p>
+          </div>
+        </div>
+      ) : activePact && activePact.status === 'succeeded' ? (
+        <div style={{
+          background: 'color-mix(in srgb, #22d3aa 8%, var(--surface))',
+          border: '1px solid color-mix(in srgb, #22d3aa 25%, transparent)',
+          borderRadius: 'var(--r-lg)',
+          padding: '13px 16px',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 18 }}>🎉</span>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#22d3aa', margin: 0 }}>Pact Complete!</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>Your reward event is now on the calendar.</p>
+          </div>
+        </div>
+      ) : activePact && activePact.status === 'failed' ? (
+        <div style={{
+          background: 'color-mix(in srgb, #ef4444 6%, var(--surface))',
+          border: '1px solid color-mix(in srgb, #ef4444 18%, transparent)',
+          borderRadius: 'var(--r-lg)',
+          padding: '13px 16px',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <Icon name="close" size={15} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#fb7185', margin: 0 }}>Pact Failed</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>The group didn't hit the target in time.</p>
+          </div>
+        </div>
+      ) : null}
+
+      {isCurrentUserAdmin && (!activePact || activePact.status !== 'active') && (
+        <button
+          onClick={() => setShowPactModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginTop: activePact ? 10 : 0,
+            width: '100%',
+            padding: '11px 14px',
+            background: 'var(--accent-soft)',
+            border: '1px dashed color-mix(in srgb, var(--accent) 40%, transparent)',
+            borderRadius: 'var(--r-lg)',
+            color: 'var(--accent)',
+            fontSize: 13.5, fontWeight: 650,
+            cursor: 'pointer',
+            transition: 'var(--transition)',
+          }}
+        >
+          <Icon name="trophy" size={15} />
+          Start a Group Pact
+        </button>
+      )}
+
+      {/* Past pacts history */}
+      {pastPacts.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={() => setShowPastPacts(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-3)', fontSize: 12, fontWeight: 600, padding: 0,
+            }}
+          >
+            <Icon name="chevD" size={13} style={{ transform: showPastPacts ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            {pastPacts.length} past pact{pastPacts.length !== 1 ? 's' : ''}
+          </button>
+
+          {showPastPacts && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {pastPacts.map((p) => {
+                const succeeded = p.status === 'succeeded'
+                const pct = p.target_completions > 0
+                  ? Math.min(100, Math.round((p.completions_count / p.target_completions) * 100))
+                  : 0
+                return (
+                  <div key={p.pact_id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px',
+                    background: 'var(--surface-2)',
+                    border: `1px solid ${succeeded ? 'color-mix(in srgb, #22d3aa 20%, transparent)' : 'var(--border)'}`,
+                    borderRadius: 'var(--r-md)',
+                  }}>
+                    <span style={{ fontSize: 15, flexShrink: 0 }}>{succeeded ? '✅' : '❌'}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {succeeded ? 'Completed' : 'Failed'}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+                          {p.completions_count}/{p.target_completions} · {pct}%
+                        </span>
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+                          ended {new Date(p.ends_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 5, height: 3, background: 'var(--surface-3)', borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', width: `${pct}%`,
+                          background: succeeded ? '#22d3aa' : '#6b7280',
+                          borderRadius: 99,
+                        }} />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
+  // ── Challenges section ────────────────────────────────────────────────────────
+  async function createChallenge(e: FormEvent) {
+    e.preventDefault()
+    if (!challengeTitle.trim() || !challengeTarget || !challengeStartDate) return
+    setSavingChallenge(true)
+    try {
+      const { data } = await api.post(`/groups/${groupId}/challenges`, {
+        title: challengeTitle.trim(),
+        description: challengeDesc.trim() || undefined,
+        target_value: parseInt(challengeTarget, 10),
+        unit: challengeUnit,
+        start_date: challengeStartDate,
+        end_date: challengeEndDate || undefined,
+      })
+      if (data.success) {
+        setChallenges((prev) => [data.challenge, ...prev])
+        setShowCreateChallenge(false)
+        setChallengeTitle('')
+        setChallengeTarget('')
+        setChallengeDesc('')
+        setChallengeEndDate('')
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setSavingChallenge(false)
+    }
+  }
+
+  function deleteChallenge(id: number) {
+    api.delete(`/groups/${groupId}/challenges/${id}`).catch(() => {})
+    setChallenges((prev) => prev.filter((c) => c.challenge_id !== id))
+  }
+
+  const challengeInputStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    background: 'var(--surface-2)', border: '1px solid var(--border-2)',
+    borderRadius: 'var(--r-sm)', padding: '8px 11px',
+    fontSize: 13.5, color: 'var(--text-1)', outline: 'none',
+  }
+
+  const challengesSection = (
+    <Section title="Challenges" count={challenges.length || undefined}>
+      <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '0 0 12px', lineHeight: 1.5 }}>
+        Track a shared group goal — workouts logged, books read, steps walked. Different from a pact: no reward event, just collective progress.
+      </p>
+      {challenges.length === 0 && !isCurrentUserAdmin ? (
+        <Empty text="No challenges yet." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {challenges.map((c) => (
+            <GroupChallengeCard
+              key={c.challenge_id}
+              challenge={c}
+              groupId={groupId ?? ''}
+              isAdmin={isCurrentUserAdmin}
+              onDelete={deleteChallenge}
+            />
+          ))}
+          {challenges.length === 0 && isCurrentUserAdmin && (
+            <Empty text="No challenges yet — create the first one!" />
+          )}
+        </div>
+      )}
+      {isCurrentUserAdmin && (
+        <div style={{ marginTop: challenges.length > 0 ? 12 : 0 }}>
+          {showCreateChallenge ? (
+            <form onSubmit={createChallenge} style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-2)',
+              borderRadius: 'var(--r-lg)',
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}>
+              <p style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>New Challenge</p>
+              <input
+                style={challengeInputStyle}
+                placeholder="Title"
+                value={challengeTitle}
+                onChange={(e) => setChallengeTitle(e.target.value)}
+                required
+                autoFocus
+              />
+              <textarea
+                style={{ ...challengeInputStyle, minHeight: 60, resize: 'vertical' }}
+                placeholder="Description (optional)"
+                value={challengeDesc}
+                onChange={(e) => setChallengeDesc(e.target.value)}
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>Target</label>
+                  <input
+                    style={challengeInputStyle}
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 100"
+                    value={challengeTarget}
+                    onChange={(e) => setChallengeTarget(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>Unit</label>
+                  <input
+                    style={challengeInputStyle}
+                    placeholder="completions"
+                    value={challengeUnit}
+                    onChange={(e) => setChallengeUnit(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>Start date</label>
+                  <input
+                    style={challengeInputStyle}
+                    type="date"
+                    value={challengeStartDate}
+                    onChange={(e) => setChallengeStartDate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>End date</label>
+                  <input
+                    style={challengeInputStyle}
+                    type="date"
+                    value={challengeEndDate}
+                    onChange={(e) => setChallengeEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <Button variant="ghost" size="sm" type="button" onClick={() => setShowCreateChallenge(false)}>Cancel</Button>
+                <Button variant="primary" size="sm" type="submit" disabled={savingChallenge}>
+                  {savingChallenge ? 'Creating…' : 'Create'}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => {
+                setChallengeStartDate(new Date().toISOString().slice(0, 10))
+                setShowCreateChallenge(true)
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'none', border: '1px dashed var(--border-2)',
+                borderRadius: 'var(--r-md)', padding: '10px 14px',
+                color: 'var(--accent)', cursor: 'pointer', width: '100%',
+                fontSize: 13.5, fontWeight: 650,
+              }}
+            >
+              <Icon name="plus" size={15} />
+              New challenge
+            </button>
+          )}
+        </div>
+      )}
+    </Section>
+  )
+
+  // ── Danger zone + leave ──────────────────────────────────────────────────────
+  const dangerZone = (
+    <div style={{
+      background: 'color-mix(in srgb, #ef4444 6%, var(--surface))',
+      border: '1px solid color-mix(in srgb, #ef4444 20%, transparent)',
+      borderRadius: 'var(--r-lg)',
+      padding: 16,
+      marginTop: 32,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 16,
+    }}>
+      <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#fb7185', margin: 0 }}>
+        Danger zone
+      </p>
+
+      {/* Leave group (visible to all members) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {showLeaveConfirm ? (
+          <div style={{
+            background: 'var(--surface-2)', borderRadius: 'var(--r-md)',
+            padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10,
+          }}>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+              Leave this group? You will lose access to all its events and tasks.
+            </p>
+            {leaveError && (
+              <p style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{leaveError}</p>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Button variant="danger" size="sm" disabled={leaving} onClick={leaveGroup}>
+                {leaving ? 'Leaving…' : 'Yes, leave'}
+              </Button>
+              <button
+                onClick={() => { setShowLeaveConfirm(false); setLeaveError(null) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Leave group</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>
+                You will no longer have access to this group's events and tasks.
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowLeaveConfirm(true)}>
+              Leave group
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Delete group (admin only) */}
+      {isCurrentUserAdmin && (
+        <div style={{ borderTop: '1px solid color-mix(in srgb, #ef4444 20%, transparent)', paddingTop: 16 }}>
+          {showDeleteConfirm ? (
+            <div style={{
+              background: 'var(--surface-2)', borderRadius: 'var(--r-md)',
+              padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+                Are you sure? This permanently deletes all events and tasks in this group and cannot be undone.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Button variant="danger" size="sm" disabled={deleting} onClick={deleteGroup}>
+                  {deleting ? 'Deleting…' : 'Yes, delete'}
+                </Button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Delete group</p>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>
+                  Permanently remove this group, all its events and tasks.
+                </p>
+              </div>
+              <Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+                Delete group
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
   // ── Mobile tabs ──────────────────────────────────────────────────────────────
   const TABS: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
@@ -802,22 +1640,25 @@ export default function GroupDetailPage() {
     <div style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 48, height: '100%', overflowY: 'auto' }} className="scroll">
       {coverSection}
 
-      <div style={{ padding: '0 24px' }}>
+      <div style={{ padding: `0 clamp(16px, 4vw, 24px)` }}>
         {colorSettings}
 
         {isMobile ? (
           <>
             {tabBar}
-            {activeTab === 'overview' && <>{eventsSection}{tasksSection}</>}
+            {activeTab === 'overview' && <>{pactSection}{eventsSection}{tasksSection}{challengesSection}{dangerZone}</>}
             {activeTab === 'events'   && eventsSection}
             {activeTab === 'tasks'    && tasksSection}
-            {activeTab === 'members'  && membersSection}
+            {activeTab === 'members'  && <>{membersSection}{dangerZone}</>}
           </>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 32 }}>
             <div>
+              {pactSection}
               {eventsSection}
               {tasksSection}
+              {challengesSection}
+              {dangerZone}
             </div>
             <div>
               {membersSection}
@@ -900,6 +1741,117 @@ export default function GroupDetailPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Edit group modal */}
+      {showEditModal && (
+        <Modal title="Edit group" onClose={() => setShowEditModal(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Title */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--text-2)' }}>Group name</label>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Group name"
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text-1)',
+                  padding: '10px 12px', fontSize: 14, outline: 'none',
+                }}
+              />
+            </div>
+
+            {/* Description */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--text-2)' }}>Description</label>
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="What's this group about?"
+                rows={3}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text-1)',
+                  padding: '10px 12px', fontSize: 14, outline: 'none',
+                  resize: 'vertical', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+
+            {/* Tag selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--text-2)' }}>Tag</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {([
+                  { value: 'family',  color: '#f59e0b' },
+                  { value: 'friends', color: '#ec4899' },
+                  { value: 'work',    color: '#22d3aa' },
+                  { value: 'climb',   color: '#38bdf8' },
+                  { value: 'book',    color: '#c084fc' },
+                ] as const).map(({ value, color }) => {
+                  const selected = editTag === value
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setEditTag(selected ? '' : value)}
+                      style={{
+                        padding: '5px 14px',
+                        borderRadius: 'var(--r-full)',
+                        fontSize: 12.5, fontWeight: 650,
+                        cursor: 'pointer',
+                        transition: 'var(--transition)',
+                        background: selected
+                          ? `color-mix(in srgb, ${color} 20%, transparent)`
+                          : `color-mix(in srgb, ${color} 10%, transparent)`,
+                        border: selected
+                          ? `1.5px solid ${color}`
+                          : `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+                        color: selected ? color : 'var(--text-2)',
+                      }}
+                    >
+                      #{value}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+              <Button
+                variant="primary"
+                full
+                disabled={editSaving || !editTitle.trim()}
+                onClick={saveGroupEdits}
+              >
+                {editSaving ? 'Saving…' : 'Save changes'}
+              </Button>
+              <Button variant="secondary" full onClick={() => setShowEditModal(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Pact creation modal */}
+      {showPactModal && (
+        <PactModal
+          groupId={Number(groupId)}
+          onClose={() => setShowPactModal(false)}
+          onCreated={(pact) => setActivePact(pact)}
+        />
+      )}
+
+      {/* Pact celebration */}
+      {celebratePactId && (
+        <PactCelebration
+          pactId={celebratePactId}
+          onDone={() => setCelebratePactId(null)}
+        />
       )}
 
       {/* Event creation modal — pre-selects this group */}

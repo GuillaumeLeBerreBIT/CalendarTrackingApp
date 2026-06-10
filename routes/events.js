@@ -23,6 +23,8 @@ async function canManageEvent(reqSupabase, event, userId) {
 router.post("/parseEvent", authRequire, async (req, res) => {
 
   const insertEventObj = createEventObj(req.body)
+  const eventStatus = req.body.status === 'tentative' ? 'tentative' : 'confirmed';
+  const dateOptions = Array.isArray(req.body.dateOptions) ? req.body.dateOptions : [];
 
   const { data: eventData, error: eventDataError } = await req.supabase
     .from("events")
@@ -42,6 +44,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
         event_type: insertEventObj.event_type || 'appointment',
         recurrence_rule: insertEventObj.recurrence_rule || null,
         reminder_minutes: insertEventObj.reminder_minutes != null ? parseInt(insertEventObj.reminder_minutes) : null,
+        status: eventStatus,
       },
     ])
     .select();
@@ -55,6 +58,24 @@ router.post("/parseEvent", authRequire, async (req, res) => {
 
   const eventId = eventData[0].event_id;
   const creatorId = req.cookies.userId;
+
+  // Insert candidate date options for tentative events
+  if (eventStatus === 'tentative' && dateOptions.length > 0) {
+    const optionRows = dateOptions.slice(0, 4).map((opt, i) => ({
+      event_id: eventId,
+      start_date: opt.startDate,
+      start_time: opt.startTime || null,
+      end_date: opt.endDate || null,
+      end_time: opt.endTime || null,
+      position: i,
+    }));
+    const { error: optionsError } = await supabaseAdmin
+      .from('event_date_options')
+      .insert(optionRows);
+    if (optionsError) {
+      return res.status(500).json({ success: false, error: optionsError.message });
+    }
+  }
 
   // Build the set of rows to upsert into profiles_events.
   // Use a map keyed by user_id so each user appears exactly once (no PK conflicts).
@@ -554,6 +575,78 @@ router.get('/renderEvents', authRequire, async (req, res) => {
     }
   }
 
+  // Fetch pact data for locked events
+  let pactByEventId = {};
+  const lockedEvents = combinedEvents.filter(e => e.status === 'locked' && e.pact_id);
+  if (lockedEvents.length > 0) {
+    const pactIds = [...new Set(lockedEvents.map(e => e.pact_id))];
+    const { data: pactsData } = await supabaseAdmin
+      .from('pacts')
+      .select('pact_id, completions_count, target_completions, ends_at, status')
+      .in('pact_id', pactIds);
+    (pactsData || []).forEach(p => {
+      lockedEvents.filter(e => e.pact_id === p.pact_id).forEach(e => {
+        pactByEventId[e.event_id] = p;
+      });
+    });
+  }
+
+  // Collect tentative event IDs so we can batch-fetch their options and votes
+  const tentativeEventIds = combinedEvents
+    .filter(e => e.status === 'tentative')
+    .map(e => e.event_id);
+
+  // Fetch date options and votes for all tentative events in parallel
+  let optionsByEvent = {};
+  let votesByEvent = {};
+  let voterProfileMap = {};
+
+  if (tentativeEventIds.length > 0) {
+    const [optionsResult, votesResult] = await Promise.all([
+      supabaseAdmin
+        .from('event_date_options')
+        .select('*')
+        .in('event_id', tentativeEventIds)
+        .order('position'),
+      supabaseAdmin
+        .from('event_date_votes')
+        .select('*')
+        .in('event_id', tentativeEventIds),
+    ]);
+
+    (optionsResult.data || []).forEach(o => {
+      (optionsByEvent[o.event_id] ||= []).push(o);
+    });
+
+    const allVotes = votesResult.data || [];
+    allVotes.forEach(v => {
+      (votesByEvent[v.event_id] ||= []).push(v);
+    });
+
+    // Fetch usernames for all voters at once
+    const voterIds = [...new Set(allVotes.map(v => v.user_id))];
+    if (voterIds.length > 0) {
+      const { data: voterProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('user_id, username')
+        .in('user_id', voterIds);
+      (voterProfiles || []).forEach(p => { voterProfileMap[p.user_id] = p.username; });
+    }
+  }
+
+  // Fetch accepted member counts per group (for totalGroupMembers)
+  let groupMemberCountMap = {};
+  if (groupIdArray.length > 0) {
+    const { data: memberCounts } = await supabaseAdmin
+      .from('profiles_groups')
+      .select('groups_id, user_id')
+      .in('groups_id', groupIdArray)
+      .eq('invite_status', 'accepted');
+    (memberCounts || []).forEach(m => {
+      groupMemberCountMap[m.groups_id] = (groupMemberCountMap[m.groups_id] || 0) + 1;
+    });
+  }
+
   try {
       const filteredEvents = expandedEvents.map((e) => {
         let start_date, end_date;
@@ -589,6 +682,37 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
         const isRecurringInstance = !!e._isRecurringInstance;
 
+        // Build tentative voting data when applicable
+        const isTentative = e.status === 'tentative';
+        let dateOptionsData = undefined;
+        let myVote = null;
+
+        if (isTentative) {
+          const eventVotes = votesByEvent[e.event_id] || [];
+          const eventOptions = optionsByEvent[e.event_id] || [];
+
+          // Find this user's current vote
+          const myVoteRow = eventVotes.find(v => v.user_id === req.cookies.userId);
+          myVote = myVoteRow ? myVoteRow.option_id : null;
+
+          dateOptionsData = eventOptions.map(opt => {
+            const optVotes = eventVotes.filter(v => v.option_id === opt.option_id);
+            return {
+              optionId: opt.option_id,
+              startDate: opt.start_date,
+              startTime: opt.start_time ? opt.start_time.slice(0, 5) : null,
+              endDate: opt.end_date || null,
+              endTime: opt.end_time ? opt.end_time.slice(0, 5) : null,
+              position: opt.position,
+              votes: optVotes.map(v => ({
+                userId: v.user_id,
+                username: voterProfileMap[v.user_id] || null,
+              })),
+              voteCount: optVotes.length,
+            };
+          });
+        }
+
         return {
           // Occurrences need a unique id; the master id is kept separately for editing
           id: isRecurringInstance ? `${e.event_id}::${e._occurrenceDate}` : e.event_id,
@@ -614,6 +738,18 @@ router.get('/renderEvents', authRequire, async (req, res) => {
             occurrenceDate: e._occurrenceDate || null,
             canManage: e.created_by === req.cookies.userId || adminGroupSet.has(e.groups_id),
             reminderMinutes: e.reminder_minutes ?? null,
+            status: e.status || 'confirmed',
+            ...(isTentative && {
+              dateOptions: dateOptionsData,
+              myVote,
+              totalGroupMembers: groupMemberCountMap[e.groups_id] || 0,
+            }),
+            ...(e.status === 'locked' && pactByEventId[e.event_id] && {
+              pactId: pactByEventId[e.event_id].pact_id,
+              pactCompletionsCount: pactByEventId[e.event_id].completions_count,
+              pactTargetCompletions: pactByEventId[e.event_id].target_completions,
+              pactEndsAt: pactByEventId[e.event_id].ends_at,
+            }),
           }
         }
       })
@@ -770,6 +906,377 @@ router.get('/e/:eventId', async (req, res) => {
       goingCount: rsvpResult.count ?? 0,
     },
   });
+});
+
+/**
+ * POST /api/voteEventDate
+ * Cast or change a vote for a candidate date slot on a tentative event.
+ * Body: { eventId: number, optionId: number }
+ */
+router.post('/voteEventDate', authRequire, async (req, res) => {
+  const eventId = parseInt(req.body.eventId);
+  const optionId = parseInt(req.body.optionId);
+
+  if (isNaN(eventId) || isNaN(optionId)) {
+    return res.status(400).json({ success: false, error: 'Invalid eventId or optionId.' });
+  }
+
+  // Verify event exists and is tentative
+  const { data: event, error: eventError } = await req.supabase
+    .from('events')
+    .select('event_id, status, groups_id')
+    .eq('event_id', eventId)
+    .single();
+
+  if (eventError || !event) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
+  if (event.status !== 'tentative') {
+    return res.status(400).json({ success: false, error: 'Event is not tentative.' });
+  }
+
+  // Verify caller is an accepted group member
+  if (event.groups_id) {
+    const { data: membership } = await req.supabase
+      .from('profiles_groups')
+      .select('user_id')
+      .eq('groups_id', event.groups_id)
+      .eq('user_id', req.cookies.userId)
+      .eq('invite_status', 'accepted')
+      .maybeSingle();
+
+    if (!membership) {
+      return res.status(403).json({ success: false, error: 'You are not a member of this group.' });
+    }
+  }
+
+  // Upsert vote — one per user per event, option can change
+  const { error: voteError } = await supabaseAdmin
+    .from('event_date_votes')
+    .upsert(
+      { event_id: eventId, option_id: optionId, user_id: req.cookies.userId },
+      { onConflict: 'event_id,user_id' }
+    );
+
+  if (voteError) {
+    return res.status(500).json({ success: false, error: voteError.message });
+  }
+
+  return res.json({ success: true, optionId });
+});
+
+/**
+ * POST /api/confirmEventDate
+ * Creator confirms a winning date option, locking the event as confirmed.
+ * Body: { eventId: number, optionId: number }
+ */
+router.post('/confirmEventDate', authRequire, async (req, res) => {
+  const eventId = parseInt(req.body.eventId);
+  const optionId = parseInt(req.body.optionId);
+
+  if (isNaN(eventId) || isNaN(optionId)) {
+    return res.status(400).json({ success: false, error: 'Invalid eventId or optionId.' });
+  }
+
+  // Verify caller is the event creator
+  const { data: event, error: eventError } = await req.supabase
+    .from('events')
+    .select('event_id, event_title, status, groups_id, created_by')
+    .eq('event_id', eventId)
+    .single();
+
+  if (eventError || !event) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
+  if (event.created_by !== req.cookies.userId) {
+    return res.status(403).json({ success: false, error: 'Only the event creator can confirm a date.' });
+  }
+  if (event.status !== 'tentative') {
+    return res.status(400).json({ success: false, error: 'Event is already confirmed.' });
+  }
+
+  // Fetch the winning option
+  const { data: winningOption, error: optionError } = await supabaseAdmin
+    .from('event_date_options')
+    .select('*')
+    .eq('option_id', optionId)
+    .eq('event_id', eventId)
+    .single();
+
+  if (optionError || !winningOption) {
+    return res.status(404).json({ success: false, error: 'Date option not found.' });
+  }
+
+  // Update the event to confirmed with the winning dates
+  const { error: updateError } = await req.supabase
+    .from('events')
+    .update({
+      status: 'confirmed',
+      start_date: winningOption.start_date,
+      start_time: winningOption.start_time,
+      end_date: winningOption.end_date,
+      end_time: winningOption.end_time,
+    })
+    .eq('event_id', eventId);
+
+  if (updateError) {
+    return res.status(500).json({ success: false, error: updateError.message });
+  }
+
+  // Notify all accepted group members
+  if (event.groups_id) {
+    const { data: members } = await supabaseAdmin
+      .from('profiles_groups')
+      .select('user_id')
+      .eq('groups_id', event.groups_id)
+      .eq('invite_status', 'accepted');
+
+    const memberIds = (members || [])
+      .map(m => m.user_id)
+      .filter(id => id !== req.cookies.userId);
+
+    await notifyUsers(req.supabase, memberIds, 'event_changed', {
+      title: 'Date confirmed',
+      body: `"${event.event_title}" has been confirmed.`,
+      link: '/calendar',
+    });
+  }
+
+  return res.json({ success: true });
+});
+
+// ---------------------------------------------------------------------------
+// Reactions
+// ---------------------------------------------------------------------------
+
+const ALLOWED_EMOJIS = new Set(["👍", "❤️", "🎉", "😂", "😮", "👎"]);
+
+/**
+ * GET /api/events/:eventId/reactions
+ * Returns aggregated reaction counts and whether the current user reacted.
+ */
+router.get("/events/:eventId/reactions", authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  if (isNaN(eventId)) {
+    return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+
+  const userId = req.cookies.userId;
+
+  const { data: rows, error } = await req.supabase
+    .from("event_reactions")
+    .select("emoji, user_id")
+    .eq("event_id", eventId);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  // Group by emoji
+  const byEmoji = {};
+  for (const row of rows || []) {
+    if (!byEmoji[row.emoji]) byEmoji[row.emoji] = { count: 0, iMine: false };
+    byEmoji[row.emoji].count++;
+    if (row.user_id === userId) byEmoji[row.emoji].iMine = true;
+  }
+
+  const reactions = Object.entries(byEmoji).map(([emoji, { count, iMine }]) => ({
+    emoji,
+    count,
+    iMine,
+  }));
+
+  return res.json({ reactions });
+});
+
+/**
+ * POST /api/events/:eventId/reactions
+ * Toggle a reaction (insert if absent, delete if present).
+ * Body: { emoji }
+ */
+router.post("/events/:eventId/reactions", authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  if (isNaN(eventId)) {
+    return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+
+  const { emoji } = req.body;
+  if (!emoji || !ALLOWED_EMOJIS.has(emoji)) {
+    return res.status(400).json({ success: false, error: "Invalid emoji." });
+  }
+
+  const userId = req.cookies.userId;
+
+  // Check for existing reaction
+  const { data: existing, error: fetchError } = await req.supabase
+    .from("event_reactions")
+    .select("reaction_id")
+    .eq("event_id", eventId)
+    .eq("user_id", userId)
+    .eq("emoji", emoji)
+    .maybeSingle();
+
+  if (fetchError) return res.status(500).json({ success: false, error: fetchError.message });
+
+  if (existing) {
+    // Toggle off — delete
+    const { error: deleteError } = await req.supabase
+      .from("event_reactions")
+      .delete()
+      .eq("reaction_id", existing.reaction_id);
+
+    if (deleteError) return res.status(500).json({ success: false, error: deleteError.message });
+    return res.json({ success: true, iMine: false });
+  }
+
+  // Toggle on — insert
+  const { error: insertError } = await req.supabase
+    .from("event_reactions")
+    .insert({ event_id: eventId, user_id: userId, emoji });
+
+  if (insertError) return res.status(500).json({ success: false, error: insertError.message });
+  return res.json({ success: true, iMine: true });
+});
+
+// ---------------------------------------------------------------------------
+// Comments
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/events/:eventId/comments
+ * Returns the 20 most recent comments for an event, oldest first.
+ */
+router.get("/events/:eventId/comments", authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  if (isNaN(eventId)) {
+    return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+
+  const { data: rows, error } = await req.supabase
+    .from("event_comments")
+    .select("comment_id, body, user_id, created_at, profiles(username)")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const comments = (rows || []).map((r) => ({
+    commentId: r.comment_id,
+    body: r.body,
+    userId: r.user_id,
+    username: r.profiles?.username || null,
+    createdAt: r.created_at,
+  }));
+
+  return res.json({ comments });
+});
+
+/**
+ * POST /api/events/:eventId/comments
+ * Post a comment and notify other participants.
+ * Body: { body }
+ */
+router.post("/events/:eventId/comments", authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  if (isNaN(eventId)) {
+    return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+
+  const { body } = req.body;
+  if (!body || typeof body !== "string" || body.trim().length === 0) {
+    return res.status(400).json({ success: false, error: "Comment body is required." });
+  }
+  if (body.length > 1000) {
+    return res.status(400).json({ success: false, error: "Comment must be 1000 characters or fewer." });
+  }
+
+  const userId = req.cookies.userId;
+  const trimmedBody = body.trim();
+
+  // Fetch event to get title and groups_id for notifications
+  const { data: event, error: eventError } = await req.supabase
+    .from("events")
+    .select("event_id, event_title, groups_id")
+    .eq("event_id", eventId)
+    .single();
+
+  if (eventError || !event) {
+    return res.status(404).json({ success: false, error: "Event not found." });
+  }
+
+  // Insert comment
+  const { data: inserted, error: insertError } = await req.supabase
+    .from("event_comments")
+    .insert({ event_id: eventId, user_id: userId, body: trimmedBody })
+    .select("comment_id, body, user_id, created_at, profiles(username)")
+    .single();
+
+  if (insertError) return res.status(500).json({ success: false, error: insertError.message });
+
+  // Collect notification recipients: event participants + group members (if any), minus current user
+  const recipientSet = new Set();
+
+  const { data: participants } = await req.supabase
+    .from("profiles_events")
+    .select("user_id")
+    .eq("event_id", eventId);
+
+  (participants || []).forEach((p) => {
+    if (p.user_id !== userId) recipientSet.add(p.user_id);
+  });
+
+  if (event.groups_id) {
+    const { data: members } = await req.supabase
+      .from("profiles_groups")
+      .select("user_id")
+      .eq("groups_id", event.groups_id)
+      .eq("invite_status", "accepted");
+
+    (members || []).forEach((m) => {
+      if (m.user_id !== userId) recipientSet.add(m.user_id);
+    });
+  }
+
+  if (recipientSet.size > 0) {
+    await notifyUsers(req.supabase, [...recipientSet], "event_comment", {
+      title: `New comment on "${event.event_title}"`,
+      body: trimmedBody.slice(0, 80),
+      link: "/calendar",
+    });
+  }
+
+  return res.json({
+    success: true,
+    comment: {
+      commentId: inserted.comment_id,
+      body: inserted.body,
+      userId: inserted.user_id,
+      username: inserted.profiles?.username || null,
+      createdAt: inserted.created_at,
+    },
+  });
+});
+
+/**
+ * DELETE /api/events/:eventId/comments/:commentId
+ * Delete a comment the current user owns.
+ */
+router.delete("/events/:eventId/comments/:commentId", authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  const commentId = parseInt(req.params.commentId, 10);
+  if (isNaN(eventId) || isNaN(commentId)) {
+    return res.status(400).json({ success: false, error: "Invalid event or comment ID." });
+  }
+
+  const { error } = await req.supabase
+    .from("event_comments")
+    .delete()
+    .eq("comment_id", commentId)
+    .eq("event_id", eventId)
+    .eq("user_id", req.cookies.userId);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  return res.sendStatus(204);
 });
 
 export default router;
