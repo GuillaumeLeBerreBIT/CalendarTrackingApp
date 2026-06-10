@@ -7,12 +7,14 @@ import {
   type RecurrenceState, type RepeatFreq, type EndMode,
   WEEKDAYS, WEEKDAY_LABEL, parseRRule, buildRRule, summarize,
 } from '@/lib/recurrence'
+import type { ParsedEvent } from '@/lib/nlParser'
 
 interface Props {
   event: CalEvent | null
   selectInfo: DateSelectArg | null
   groups: Group[]
   currentUserId?: string | null
+  prefill?: ParsedEvent
   onClose: () => void
   onSaved: () => void
 }
@@ -61,20 +63,20 @@ function resolveInitialEventType(event: CalEvent | null): EventType {
   return 'appointment'
 }
 
-export default function EventFormModal({ event, selectInfo, groups, currentUserId, onClose, onSaved }: Props) {
+export default function EventFormModal({ event, selectInfo, groups, currentUserId, prefill, onClose, onSaved }: Props) {
   const isEdit = !!event
 
   const [eventType, setEventType] = useState<EventType>(resolveInitialEventType(event))
 
   const [form, setForm] = useState({
-    title: event?.title ?? '',
+    title: event?.title ?? prefill?.title ?? '',
     description: event?.extendedProps?.description ?? '',
-    location: (event?.extendedProps?.location as string | undefined) ?? '',
+    location: (event?.extendedProps?.location as string | undefined) ?? prefill?.location ?? '',
     imageUrl: (event?.extendedProps?.imageUrl as string | undefined) ?? '',
-    allDay: event?.allDay ?? (selectInfo?.allDay ?? true),
-    startDate: event?.start?.split('T')[0] ?? selectInfo?.startStr?.split('T')[0] ?? '',
-    endDate: (event?.end ?? event?.start ?? '')?.split('T')[0] ?? selectInfo?.endStr?.split('T')[0] ?? '',
-    startTime: event?.start?.includes('T') ? event.start.split('T')[1].slice(0, 5) : '',
+    allDay: event?.allDay ?? (selectInfo?.allDay ?? !prefill?.time),
+    startDate: event?.start?.split('T')[0] ?? selectInfo?.startStr?.split('T')[0] ?? prefill?.date ?? '',
+    endDate: (event?.end ?? event?.start ?? '')?.split('T')[0] ?? selectInfo?.endStr?.split('T')[0] ?? prefill?.date ?? '',
+    startTime: event?.start?.includes('T') ? event.start.split('T')[1].slice(0, 5) : (prefill?.time ?? ''),
     endTime: event?.end?.includes('T') ? event.end.split('T')[1].slice(0, 5) : '',
     groupsId: String(event?.extendedProps?.groupsId ?? ''),
   })
@@ -86,6 +88,34 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+
+  // Tentative mode — group votes on the date
+  const [isTentative, setIsTentative] = useState(false)
+  const emptyOption = () => ({ startDate: '', startTime: '', endDate: '', endTime: '' })
+  const [dateOptions, setDateOptions] = useState<{ startDate: string; startTime: string; endDate: string; endTime: string }[]>(
+    [emptyOption(), emptyOption()]
+  )
+
+  function toggleTentative() {
+    setIsTentative(prev => {
+      if (!prev) setDateOptions([emptyOption(), emptyOption()])
+      return !prev
+    })
+  }
+
+  function setDateOption(index: number, field: string, value: string) {
+    setDateOptions(prev => prev.map((o, i) => i === index ? { ...o, [field]: value } : o))
+  }
+
+  function addDateOption() {
+    if (dateOptions.length >= 4) return
+    setDateOptions(prev => [...prev, emptyOption()])
+  }
+
+  function removeDateOption(index: number) {
+    if (dateOptions.length <= 2) return
+    setDateOptions(prev => prev.filter((_, i) => i !== index))
+  }
 
   // Per-event reminder (minutes before; null = off). Pre-filled when editing.
   const [reminderMinutes, setReminderMinutes] = useState<number | null>(
@@ -152,18 +182,25 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   }
 
   function buildPayload(): Record<string, unknown> {
+    const filledOptions = dateOptions.filter(o => o.startDate)
+    // When tentative, use first option's date as the canonical start (backend ignores it anyway)
+    const startDate = isTentative ? (filledOptions[0]?.startDate ?? '') : form.startDate
+    const endDate = isTentative ? (filledOptions[0]?.endDate ?? startDate) : (form.endDate || form.startDate)
+
     const payload: Record<string, unknown> = {
       'calendar-title': form.title,
       'calendar-description': form.description,
       location: form.location || null,
       image_url: form.imageUrl || null,
-      allDay: form.allDay,
-      startDate: form.startDate,
-      endDate: form.endDate || form.startDate,
-      startTime: form.allDay ? '' : form.startTime,
-      endTime: form.allDay ? '' : form.endTime,
+      allDay: isTentative ? true : form.allDay,
+      startDate,
+      endDate,
+      startTime: (isTentative || form.allDay) ? '' : form.startTime,
+      endTime: (isTentative || form.allDay) ? '' : form.endTime,
       recurrence_rule: buildRRule(rec),
       reminder_minutes: reminderMinutes,
+      status: isTentative ? 'tentative' : 'confirmed',
+      dateOptions: isTentative ? filledOptions : undefined,
     }
 
     if (eventType === 'personal') {
@@ -411,6 +448,52 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
             </>
           )}
 
+          {/* ── Tentative toggle (group events only, new events only) ── */}
+          {!isEdit && isGroupType && (
+            <button
+              type="button"
+              aria-pressed={isTentative}
+              onClick={toggleTentative}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 14px',
+                borderRadius: 'var(--r-md)',
+                border: isTentative ? '1px solid rgba(245,158,11,0.4)' : '1px solid var(--border)',
+                background: isTentative ? 'rgba(245,158,11,0.07)' : 'var(--surface-2)',
+                cursor: 'pointer',
+                transition: 'var(--transition)',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              {/* Custom checkbox */}
+              <div style={{
+                width: 18,
+                height: 18,
+                borderRadius: 5,
+                border: isTentative ? '2px solid #f59e0b' : '2px solid var(--border-2)',
+                background: isTentative ? '#f59e0b' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'var(--transition)',
+              }}>
+                {isTentative && <Icon name="check" size={11} sw={3} style={{ color: '#0b0b12' }} />}
+              </div>
+              <div>
+                <span style={{ fontSize: 13.5, fontWeight: 650, color: isTentative ? '#f59e0b' : 'var(--text-2)' }}>
+                  Tentative
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 6 }}>
+                  — let the group vote on the date
+                </span>
+              </div>
+            </button>
+          )}
+
           {/* ── Title ── */}
           <div>
             <label style={labelStyle}>Title</label>
@@ -488,34 +571,38 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
             )}
           </div>
 
-          {/* ── All day ── */}
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 9,
-            cursor: 'pointer', fontSize: 13.5, color: 'var(--text-2)', userSelect: 'none',
-          }}>
-            <input
-              type="checkbox"
-              checked={form.allDay}
-              onChange={e => set('allDay', e.target.checked)}
-              style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
-            />
-            All day
-          </label>
+          {/* ── All day (hidden when tentative) ── */}
+          {!isTentative && (
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 9,
+              cursor: 'pointer', fontSize: 13.5, color: 'var(--text-2)', userSelect: 'none',
+            }}>
+              <input
+                type="checkbox"
+                checked={form.allDay}
+                onChange={e => set('allDay', e.target.checked)}
+                style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
+              />
+              All day
+            </label>
+          )}
 
-          {/* ── Dates ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={labelStyle}>Start date</label>
-              <input type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={inputStyle} />
+          {/* ── Normal dates (hidden when tentative) ── */}
+          {!isTentative && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Start date</label>
+                <input type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>End date</label>
+                <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={inputStyle} />
+              </div>
             </div>
-            <div>
-              <label style={labelStyle}>End date</label>
-              <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={inputStyle} />
-            </div>
-          </div>
+          )}
 
-          {/* ── Times ── */}
-          {!form.allDay && (
+          {/* ── Normal times (hidden when tentative) ── */}
+          {!isTentative && !form.allDay && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start time</label>
@@ -525,6 +612,106 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                 <label style={labelStyle}>End time</label>
                 <input type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} style={inputStyle} />
               </div>
+            </div>
+          )}
+
+          {/* ── Tentative date options ── */}
+          {isTentative && (
+            <div>
+              <label style={labelStyle}>Date options</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {dateOptions.map((opt, idx) => (
+                  <div key={idx} style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--r-sm)',
+                    border: '1px dashed var(--border-2)',
+                    background: 'var(--surface-2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-3)' }}>
+                        Option {idx + 1}
+                      </span>
+                      {dateOptions.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => removeDateOption(idx)}
+                          title="Remove option"
+                          style={{
+                            width: 22, height: 22,
+                            borderRadius: 'var(--r-sm)',
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--text-3)',
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: 0,
+                          }}
+                        >
+                          <Icon name="close" size={13} sw={2} />
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <label style={{ ...labelStyle, marginBottom: 4 }}>Date</label>
+                        <input
+                          type="date"
+                          value={opt.startDate}
+                          onChange={e => setDateOption(idx, 'startDate', e.target.value)}
+                          style={{ ...inputStyle, minHeight: 38 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ ...labelStyle, marginBottom: 4 }}>Start time</label>
+                        <input
+                          type="time"
+                          value={opt.startTime}
+                          onChange={e => setDateOption(idx, 'startTime', e.target.value)}
+                          style={{ ...inputStyle, minHeight: 38 }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, marginBottom: 4 }}>
+                        End time <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={opt.endTime}
+                        onChange={e => setDateOption(idx, 'endTime', e.target.value)}
+                        style={{ ...inputStyle, minHeight: 38 }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addDateOption}
+                disabled={dateOptions.length >= 4}
+                style={{
+                  marginTop: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '7px 12px',
+                  borderRadius: 'var(--r-sm)',
+                  border: '1px solid var(--border-2)',
+                  background: 'transparent',
+                  color: dateOptions.length >= 4 ? 'var(--text-3)' : 'var(--accent)',
+                  fontSize: 12.5,
+                  fontWeight: 650,
+                  cursor: dateOptions.length >= 4 ? 'not-allowed' : 'pointer',
+                  opacity: dateOptions.length >= 4 ? 0.5 : 1,
+                  transition: 'var(--transition)',
+                }}
+              >
+                <Icon name="plus" size={13} sw={2.2} />
+                Add option
+              </button>
             </div>
           )}
 

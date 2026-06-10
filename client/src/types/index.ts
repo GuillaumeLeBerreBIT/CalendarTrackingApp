@@ -7,6 +7,36 @@ export interface Profile {
   city?: string
   hasCompletedOnboarding?: boolean
   searchable?: boolean
+  total_xp?: number
+}
+
+export interface Pact {
+  pact_id: number
+  groups_id: number
+  created_by: string
+  target_completions: number
+  completions_count: number
+  starts_at: string
+  ends_at: string
+  reward_event_id?: number | null
+  status: 'active' | 'succeeded' | 'failed'
+  created_at?: string
+  reward_title?: string
+}
+
+export interface GroupChallenge {
+  challenge_id: number
+  groups_id: number
+  created_by: string
+  title: string
+  description?: string | null
+  target_value: number
+  current_value: number
+  unit: string
+  start_date: string
+  end_date?: string | null
+  is_active: boolean
+  created_at?: string
 }
 
 export interface Member {
@@ -29,6 +59,17 @@ export interface Group {
   totalTasks?: { all: number; completed: number }
 }
 
+export interface DateOption {
+  optionId: number
+  startDate: string
+  startTime?: string
+  endDate?: string
+  endTime?: string
+  position: number
+  votes: { userId: string; username: string }[]
+  voteCount: number
+}
+
 export interface CalEvent {
   id: string
   title: string
@@ -36,6 +77,7 @@ export interface CalEvent {
   end?: string
   allDay?: boolean
   backgroundColor?: string
+  borderColor?: string
   extendedProps?: {
     description?: string
     location?: string
@@ -51,6 +93,14 @@ export interface CalEvent {
     occurrenceDate?: string | null
     canManage?: boolean
     reminderMinutes?: number | null
+    status?: 'confirmed' | 'tentative' | 'locked' | 'failed'
+    pactId?: number
+    pactCompletionsCount?: number
+    pactTargetCompletions?: number
+    pactEndsAt?: string
+    dateOptions?: DateOption[]
+    myVote?: number | null
+    totalGroupMembers?: number
   }
 }
 

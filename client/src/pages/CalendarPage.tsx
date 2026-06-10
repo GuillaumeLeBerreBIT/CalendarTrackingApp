@@ -10,6 +10,7 @@ import api from '@/api/client'
 import type { CalEvent, Group } from '@/types'
 import EventModal from '@/components/EventModal'
 import EventFormModal from '@/components/EventFormModal'
+import { parseNL, type ParsedEvent } from '@/lib/nlParser'
 import Button, { IconButton } from '@/components/ui/Button'
 import { Segmented, RsvpPill } from '@/components/ui/Primitives'
 import Icon from '@/components/ui/Icon'
@@ -25,10 +26,66 @@ const GROUP_COLORS: Record<string, string> = {
   self:    'var(--accent)',
 }
 
-function groupColor(tagName?: string): string {
-  if (!tagName) return 'var(--accent)'
-  const key = tagName.toLowerCase().replace(/[^a-z]/g, '')
-  return GROUP_COLORS[key] ?? 'var(--accent)'
+function groupColor(tagName?: string, groupId?: string | number): string {
+  if (!tagName && !groupId) return 'var(--accent)'
+  const key = (tagName ?? '').toLowerCase().replace(/[^a-z]/g, '')
+  if (GROUP_COLORS[key]) return GROUP_COLORS[key]
+  // Custom group → use hex fallback (CSS vars can't be generated dynamically)
+  if (groupId) {
+    const hash = String(groupId).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+    return EXTRA_GROUP_PALETTE[hash % EXTRA_GROUP_PALETTE.length]
+  }
+  return 'var(--accent)'
+}
+
+/* ─── Hex group color lookup (for FullCalendar backgroundColor) ── */
+const HEX_GROUP_COLORS: Record<string, string> = {
+  family:  '#f59e0b',
+  friends: '#ec4899',
+  work:    '#22d3aa',
+  climb:   '#38bdf8',
+  book:    '#c084fc',
+  self:    '#7c6ef2',
+}
+
+// Palette for custom group names not in the standard map
+const EXTRA_GROUP_PALETTE = [
+  '#f97316', '#a855f7', '#06b6d4', '#84cc16', '#eab308', '#f43f5e',
+]
+
+function hexGroupColor(groupName?: string, groupId?: string | number): string {
+  if (!groupId && !groupName) return '#7c6ef2'
+  const key = (groupName ?? '').toLowerCase().replace(/[^a-z]/g, '')
+  if (HEX_GROUP_COLORS[key]) return HEX_GROUP_COLORS[key]
+  if (groupId) {
+    const hash = String(groupId).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+    return EXTRA_GROUP_PALETTE[hash % EXTRA_GROUP_PALETTE.length]
+  }
+  return '#7c6ef2'
+}
+
+// Deterministic hue from userId — same algorithm as Avatar.tsx so colors match.
+function hashHue(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) | 0
+  return Math.abs(hash) % 360
+}
+
+// Returns the resolved hex for an event. After loadEvents() the color is stored as
+// extendedProps.resolvedHex so all renderers stay in sync with the DB-stored member color.
+function eventHex(extendedProps?: Record<string, unknown>): string {
+  if (!extendedProps) return '#7c6ef2'
+  if (extendedProps.resolvedHex) return extendedProps.resolvedHex as string
+  // Fallback for events not yet remapped (e.g. newly added before reload)
+  const participants = extendedProps.participants as Array<{ userId: string }> | undefined
+  if (participants && participants.length > 1) {
+    return hexGroupColor(
+      extendedProps.groupName as string | undefined,
+      extendedProps.groupsId as string | undefined
+    )
+  }
+  const hue = extendedProps.createdBy ? hashHue(extendedProps.createdBy as string) : 252
+  return `hsl(${hue} 62% 56%)`
 }
 
 /* ─── AgendaList ─────────────────────────────────────────── */
@@ -107,7 +164,7 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
             {/* Events */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {dayEvents.map(ev => {
-                const color = groupColor(ev.extendedProps?.groupName)
+                const color = eventHex(ev.extendedProps as Record<string, unknown>)
                 const rawRsvp = ev.extendedProps?.participants?.[0]?.rsvpStatus
                 const rsvp = (['going', 'maybe', 'no'] as const).find(v => v === rawRsvp)
                 const timeStr = ev.allDay
@@ -116,6 +173,10 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
                     ? ev.start.split('T')[1].slice(0, 5)
                     : ''
 
+                const isTentative = ev.extendedProps?.status === 'tentative'
+                const isLocked = ev.extendedProps?.status === 'locked'
+                const pactCount = ev.extendedProps?.pactCompletionsCount as number | undefined
+                const pactTarget = ev.extendedProps?.pactTargetCompletions as number | undefined
                 return (
                   <button
                     key={ev.id}
@@ -124,14 +185,15 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 10,
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
+                      background: isLocked ? 'var(--surface-2)' : 'var(--surface)',
+                      border: isTentative ? '1px dashed var(--border-2)' : isLocked ? '1px dashed var(--border-2)' : '1px solid var(--border)',
                       borderRadius: 'var(--r-md)',
                       padding: '11px 13px',
                       cursor: 'pointer',
                       textAlign: 'left',
                       transition: 'var(--transition)',
                       width: '100%',
+                      opacity: isTentative ? 0.75 : isLocked ? 0.7 : 1,
                     }}
                     onMouseEnter={e => {
                       ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'
@@ -139,7 +201,7 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
                     }}
                     onMouseLeave={e => {
                       ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'
-                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = isTentative ? 'var(--border-2)' : 'var(--border)'
                     }}
                   >
                     {/* Color bar */}
@@ -162,12 +224,51 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
 
                     {/* Title + group */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {ev.title}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        {isLocked && <span style={{ fontSize: 13, flexShrink: 0 }}>🔒</span>}
+                        <span style={{ fontSize: 14, fontWeight: 600, color: isLocked ? 'var(--text-2)' : 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ev.title}
+                        </span>
+                        {isTentative && (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '1px 6px', borderRadius: 'var(--r-full)',
+                            background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                            fontSize: 10, fontWeight: 700, flexShrink: 0,
+                          }}>
+                            Voting
+                          </span>
+                        )}
+                        {isLocked && (
+                          <span style={{
+                            padding: '1px 6px', borderRadius: 'var(--r-full)',
+                            background: 'var(--surface-3)', color: 'var(--text-3)',
+                            fontSize: 10, fontWeight: 700, flexShrink: 0,
+                          }}>
+                            Locked
+                          </span>
+                        )}
                       </div>
                       {ev.extendedProps?.groupName && (
                         <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                           {ev.extendedProps.groupName}
+                        </div>
+                      )}
+                      {isLocked && pactTarget != null && (
+                        <div style={{ marginTop: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: 'var(--text-3)', marginBottom: 3 }}>
+                            <span>Pact progress</span>
+                            <span>{pactCount ?? 0}/{pactTarget}</span>
+                          </div>
+                          <div style={{ height: 3, background: 'var(--surface-3)', borderRadius: 99, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${pactTarget > 0 ? Math.min(100, ((pactCount ?? 0) / pactTarget) * 100) : 0}%`,
+                              background: color,
+                              borderRadius: 99,
+                              transition: 'width 0.4s ease',
+                            }} />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -318,6 +419,8 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null)
   const [editEvent, setEditEvent] = useState<CalEvent | null>(null)
   const [selectInfo, setSelectInfo] = useState<DateSelectArg | null>(null)
+  const [nlPrefill, setNlPrefill] = useState<ParsedEvent | null>(null)
+  const [quickAddText, setQuickAddText] = useState('')
   const [calView, setCalView] = useState<CalView>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['self']))
@@ -336,7 +439,29 @@ export default function CalendarPage() {
     try {
       const { data } = await api.get('/renderEvents')
       if (data.success) {
-        setEvents(data.events)
+        const remapped = (data.events as CalEvent[]).map((ev) => {
+          const parts = (ev.extendedProps?.participants as Array<{ userId: string }> | undefined) ?? []
+          let hex: string
+          if (parts.length <= 1) {
+            // Use the DB-stored per-member color (profiles_groups.color) returned by backend
+            hex = ev.backgroundColor && ev.backgroundColor !== '#3D82F6' && ev.backgroundColor !== '#6B7280'
+              ? ev.backgroundColor
+              : eventHex(ev.extendedProps as Record<string, unknown>)
+          } else {
+            // Multi-person → group color from our design system
+            hex = hexGroupColor(
+              ev.extendedProps?.groupName as string | undefined,
+              ev.extendedProps?.groupsId as string | undefined
+            )
+          }
+          return {
+            ...ev,
+            backgroundColor: hex + '22',
+            borderColor: hex,
+            extendedProps: { ...(ev.extendedProps ?? {}), resolvedHex: hex },
+          }
+        })
+        setEvents(remapped)
         if (data.groupsTagNames && typeof data.groupsTagNames === 'object' && !Array.isArray(data.groupsTagNames)) {
           setActiveGroups(prev => {
             const next = new Set(prev)
@@ -505,6 +630,14 @@ export default function CalendarPage() {
       overflow: 'hidden',
       background: 'var(--bg)',
     }}>
+      <style>{`
+        .fc-event-tentative {
+          opacity: 0.6 !important;
+          border-style: dashed !important;
+          background: transparent !important;
+          border-width: 2px !important;
+        }
+      `}</style>
       {/* ── Left panel (desktop only) ─────────────────────── */}
       {!isMobile && (
         <aside style={{
@@ -542,50 +675,140 @@ export default function CalendarPage() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
         {/* Header */}
-        <div style={{
-          padding: '18px 24px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-          gap: 12,
-        }}>
-          {/* Left: title + nav */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
-              {monthLabel}{' '}
-              <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>{yearLabel}</span>
-            </h1>
-            <div style={{ display: 'flex', gap: 2, marginLeft: 6 }}>
-              <IconButton name="chevL" size={34} isz={15} onClick={navPrev} title="Previous" />
-              <IconButton name="chevR" size={34} isz={15} onClick={navNext} title="Next" />
+        {isMobile ? (
+          /* ── Mobile: 2-row layout so controls aren't clipped ── */
+          <div style={{
+            padding: '10px 16px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            flexShrink: 0,
+          }}>
+            {/* Row 1: prev ← Month Year → next */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <IconButton name="chevL" size={40} isz={16} onClick={navPrev} title="Previous" />
+              <h1 style={{
+                flex: 1, textAlign: 'center',
+                fontSize: 17, fontWeight: 700, color: 'var(--text-1)',
+                margin: 0, letterSpacing: '-0.02em',
+              }}>
+                {monthLabel}{' '}
+                <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>{yearLabel}</span>
+              </h1>
+              <IconButton name="chevR" size={40} isz={16} onClick={navNext} title="Next" />
             </div>
-            <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
-          </div>
-
-          {/* Right: view toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Mobile: new event button */}
-            {isMobile && (
+            {/* Row 2: Today · · · [Month|Agenda] [+] */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
+              <div style={{ flex: 1 }} />
+              <Segmented
+                options={[
+                  { value: 'month', label: 'Month', icon: 'grid' },
+                  { value: 'agenda', label: 'Agenda', icon: 'list' },
+                ]}
+                value={calView}
+                onChange={v => setCalView(v as CalView)}
+                size="sm"
+              />
               <IconButton
                 name="plus"
                 size={36}
                 onClick={() => { setSelectedEvent(null); setSelectInfo(null); setModalMode('create') }}
                 title="New event"
               />
-            )}
-            <Segmented
-              options={[
-                { value: 'month', label: 'Month', icon: 'grid' },
-                { value: 'agenda', label: 'Agenda', icon: 'list' },
-              ]}
-              value={calView}
-              onChange={v => setCalView(v as CalView)}
-              size="sm"
-            />
+            </div>
           </div>
-        </div>
+        ) : (
+          /* ── Desktop: original single-row layout ── */
+          <div style={{
+            padding: '18px 24px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+            gap: 12,
+          }}>
+            {/* Left: title + nav */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
+                {monthLabel}{' '}
+                <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>{yearLabel}</span>
+              </h1>
+              <div style={{ display: 'flex', gap: 2, marginLeft: 6 }}>
+                <IconButton name="chevL" size={34} isz={15} onClick={navPrev} title="Previous" />
+                <IconButton name="chevR" size={34} isz={15} onClick={navNext} title="Next" />
+              </div>
+              <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
+            </div>
+
+            {/* Right: view toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Segmented
+                options={[
+                  { value: 'month', label: 'Month', icon: 'grid' },
+                  { value: 'agenda', label: 'Agenda', icon: 'list' },
+                ]}
+                value={calView}
+                onChange={v => setCalView(v as CalView)}
+                size="sm"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Quick-add bar */}
+        {!isMobile && (
+          <form
+            onSubmit={e => {
+              e.preventDefault()
+              if (!quickAddText.trim()) return
+              const parsed = parseNL(quickAddText)
+              setNlPrefill(parsed)
+              setSelectInfo(null)
+              setModalMode('create')
+              setQuickAddText('')
+            }}
+            style={{
+              padding: '10px 24px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              gap: 8,
+              flexShrink: 0,
+            }}
+          >
+            <input
+              value={quickAddText}
+              onChange={e => setQuickAddText(e.target.value)}
+              placeholder="Quick add: &quot;Lunch Friday 1pm at Marco's&quot;"
+              style={{
+                flex: 1,
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-2)',
+                borderRadius: 'var(--r-sm)',
+                padding: '9px 14px',
+                fontSize: 13.5,
+                color: 'var(--text-1)',
+                outline: 'none',
+                minHeight: 40,
+              }}
+            />
+            <button type="submit" style={{
+              padding: '0 16px',
+              borderRadius: 'var(--r-sm)',
+              background: 'var(--accent)',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: 13.5,
+              border: 'none',
+              cursor: 'pointer',
+              minHeight: 40,
+            }}>
+              Add
+            </button>
+          </form>
+        )}
 
         {/* Mobile: group filter pills */}
         {isMobile && (
@@ -646,6 +869,7 @@ export default function CalendarPage() {
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
               initialView="dayGridMonth"
               headerToolbar={false}
+              firstDay={1}
               events={filteredEvents}
               selectable
               editable
@@ -657,6 +881,24 @@ export default function CalendarPage() {
               datesSet={handleDatesSet}
               height="100%"
               eventContent={makeRenderEventContent(currentUserId)}
+              eventClassNames={(arg) => {
+                if (arg.event.extendedProps?.status === 'tentative') return ['fc-event-tentative']
+                return []
+              }}
+              eventDidMount={(info) => {
+                const hex = eventHex(info.event.extendedProps as Record<string, unknown>)
+                const isTentative = info.event.extendedProps?.status === 'tentative'
+                // Compute transparent bg — handle both #rrggbb and hsl(...) formats
+                const bgAlpha = hex.startsWith('hsl(') && hex.endsWith(')')
+                  ? hex.slice(0, -1) + ' / 0.12)'
+                  : hex + '1e'
+                // Feed CSS custom properties — index.css reads these on .fc-daygrid-event
+                info.el.style.setProperty('--fc-event-bg-color', bgAlpha)
+                info.el.style.setProperty('--fc-event-border-color', hex)
+                if (isTentative) {
+                  info.el.classList.add('fc-event-tentative')
+                }
+              }}
             />
           </div>
         ) : (
@@ -673,8 +915,9 @@ export default function CalendarPage() {
           selectInfo={selectInfo}
           groups={groups}
           currentUserId={currentUserId}
-          onClose={closeModal}
-          onSaved={() => { closeModal(); loadEvents() }}
+          prefill={nlPrefill ?? undefined}
+          onClose={() => { setNlPrefill(null); closeModal() }}
+          onSaved={() => { setNlPrefill(null); closeModal(); loadEvents() }}
         />
       )}
 
@@ -704,67 +947,64 @@ export default function CalendarPage() {
 
 /* ─── Custom FullCalendar event renderer factory ─────────── */
 function makeRenderEventContent(currentUserId: string | null | undefined) {
-  return function renderEventContent(info: { event: { title: string; allDay: boolean; startStr: string; extendedProps: Record<string, unknown> } }) {
+  return function renderEventContent(info: { event: { id: string; title: string; allDay: boolean; startStr: string; extendedProps: Record<string, unknown> } }) {
     const { event } = info
-    const color = groupColor(event.extendedProps?.groupName as string | undefined)
+    const hex = eventHex(event.extendedProps as Record<string, unknown>)
     const timeStr = (!event.allDay && event.startStr.includes('T'))
       ? event.startStr.split('T')[1].slice(0, 5)
       : ''
-
     const participants = event.extendedProps?.participants as Array<{ userId: string; rsvpStatus: string }> | undefined
     const myRsvp = participants?.find(p => p.userId === currentUserId)?.rsvpStatus
-    const eventType = event.extendedProps?.eventType as string | undefined
+    const isMultiPerson = (participants?.length ?? 0) > 1
+    const isRecurring = !!event.extendedProps?.isRecurring
+    const isTentative = event.extendedProps?.status === 'tentative'
 
     return (
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 4,
-        padding: '1px 4px',
+        padding: '1px 5px',
         overflow: 'hidden',
         width: '100%',
-        transition: 'transform var(--transition)',
-      }}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateX(1px)' }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'none' }}
-      >
-        {eventType === 'social' ? (
-          <Icon name="users" size={9} sw={2} style={{ color, flexShrink: 0 }} />
+      }}>
+        {/* Event type indicator */}
+        {isTentative ? (
+          <Icon name="clock" size={8} sw={2.5} style={{ color: '#f59e0b', flexShrink: 0 }} />
+        ) : isMultiPerson ? (
+          <Icon name="users" size={8} sw={2.5} style={{ color: hex, flexShrink: 0 }} />
         ) : (
-          <span style={{
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            background: color,
-            flexShrink: 0,
-          }} />
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: hex, flexShrink: 0 }} />
         )}
+
+        {/* RSVP status dot (only if not 'going') */}
         {myRsvp && myRsvp !== 'going' && (
           <span style={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            flexShrink: 0,
+            width: 4, height: 4, borderRadius: '50%', flexShrink: 0,
             background: myRsvp === 'maybe' ? '#f59e0b' : 'var(--text-3)',
-            opacity: myRsvp === 'pending' ? 0.6 : 1,
+            opacity: myRsvp === 'pending' ? 0.5 : 1,
           }} />
         )}
+
+        {/* Time */}
         {timeStr && (
           <span style={{
-            fontSize: 10.5,
-            fontVariantNumeric: 'tabular-nums',
-            color: 'var(--text-3)',
-            flexShrink: 0,
+            fontSize: 10, fontVariantNumeric: 'tabular-nums',
+            color: 'var(--text-3)', flexShrink: 0,
           }}>{timeStr}</span>
         )}
+
+        {/* Title */}
         <span style={{
-          fontSize: 11.5,
-          fontWeight: 600,
-          color: 'var(--text-1)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          fontSize: 11.5, fontWeight: 600, color: 'var(--text-1)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          flex: 1,
         }}>{event.title}</span>
+
+        {/* Recurring indicator — 'refresh' not in IconPaths, use a dot */}
+        {isRecurring && (
+          <span style={{ color: 'var(--text-3)', flexShrink: 0, opacity: 0.7, fontSize: 9 }}>↻</span>
+        )}
       </div>
     )
   }

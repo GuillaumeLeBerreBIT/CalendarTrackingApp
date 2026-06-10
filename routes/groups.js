@@ -786,4 +786,252 @@ router.post('/joinGroup/:token', authRequire, async (req, res) => {
   });
 });
 
+// PATCH /api/groups/:groupId — edit group metadata (admin only)
+router.patch('/groups/:groupId', authRequire, async (req, res) => {
+  const { groupId } = req.params;
+  const callerId = req.cookies.userId;
+
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('profiles_groups')
+    .select('role')
+    .eq('groups_id', groupId)
+    .eq('user_id', callerId)
+    .eq('role', 'admin')
+    .maybeSingle();
+
+  if (membershipError) {
+    return res.status(500).json({ success: false, error: membershipError.message });
+  }
+  if (!membership) {
+    return res.status(403).json({ success: false, error: 'Only group admins can edit the group.' });
+  }
+
+  const updates = {};
+  if (req.body.groups_title !== undefined)       updates.groups_title       = req.body.groups_title;
+  if (req.body.groups_description !== undefined) updates.groups_description = req.body.groups_description;
+  if (req.body.tag_name !== undefined)           updates.tag_name           = req.body.tag_name;
+
+  const { data: updatedGroup, error: updateError } = await req.supabase
+    .from('groups')
+    .update(updates)
+    .eq('groups_id', groupId)
+    .select()
+    .single();
+
+  if (updateError) {
+    return res.status(500).json({ success: false, error: updateError.message });
+  }
+
+  return res.json({ success: true, group: updatedGroup });
+});
+
+// DELETE /api/groups/:groupId — delete group and all associated data (admin only)
+router.delete('/groups/:groupId', authRequire, async (req, res) => {
+  const { groupId } = req.params;
+  const callerId = req.cookies.userId;
+
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('profiles_groups')
+    .select('role')
+    .eq('groups_id', groupId)
+    .eq('user_id', callerId)
+    .eq('role', 'admin')
+    .maybeSingle();
+
+  if (membershipError) {
+    return res.status(500).json({ success: false, error: membershipError.message });
+  }
+  if (!membership) {
+    return res.status(403).json({ success: false, error: 'Only group admins can delete the group.' });
+  }
+
+  // 1. Fetch task_list IDs for this group so we can delete child tasks first
+  const { data: taskLists, error: taskListFetchError } = await req.supabase
+    .from('task_list')
+    .select('task_list_id')
+    .eq('groups_id', groupId);
+
+  if (taskListFetchError) {
+    return res.status(500).json({ success: false, error: taskListFetchError.message });
+  }
+
+  if (taskLists && taskLists.length > 0) {
+    const taskListIds = taskLists.map(tl => tl.task_list_id);
+
+    const { error: taskDeleteError } = await req.supabase
+      .from('task')
+      .delete()
+      .in('task_list_id', taskListIds);
+
+    if (taskDeleteError) {
+      return res.status(500).json({ success: false, error: taskDeleteError.message });
+    }
+  }
+
+  // 2. Delete task_list rows
+  const { error: taskListDeleteError } = await req.supabase
+    .from('task_list')
+    .delete()
+    .eq('groups_id', groupId);
+
+  if (taskListDeleteError) {
+    return res.status(500).json({ success: false, error: taskListDeleteError.message });
+  }
+
+  // 3. Fetch event IDs for this group so we can delete profiles_events first
+  const { data: events, error: eventFetchError } = await req.supabase
+    .from('events')
+    .select('event_id')
+    .eq('groups_id', groupId);
+
+  if (eventFetchError) {
+    return res.status(500).json({ success: false, error: eventFetchError.message });
+  }
+
+  if (events && events.length > 0) {
+    const eventIds = events.map(e => e.event_id);
+
+    const { error: profilesEventsDeleteError } = await req.supabase
+      .from('profiles_events')
+      .delete()
+      .in('event_id', eventIds);
+
+    if (profilesEventsDeleteError) {
+      return res.status(500).json({ success: false, error: profilesEventsDeleteError.message });
+    }
+  }
+
+  // 4. Delete events
+  const { error: eventsDeleteError } = await req.supabase
+    .from('events')
+    .delete()
+    .eq('groups_id', groupId);
+
+  if (eventsDeleteError) {
+    return res.status(500).json({ success: false, error: eventsDeleteError.message });
+  }
+
+  // 5. Delete group_invite_tokens
+  const { error: tokensDeleteError } = await req.supabase
+    .from('group_invite_tokens')
+    .delete()
+    .eq('groups_id', groupId);
+
+  if (tokensDeleteError) {
+    return res.status(500).json({ success: false, error: tokensDeleteError.message });
+  }
+
+  // 6. Delete profiles_groups
+  const { error: profilesGroupsDeleteError } = await req.supabase
+    .from('profiles_groups')
+    .delete()
+    .eq('groups_id', groupId);
+
+  if (profilesGroupsDeleteError) {
+    return res.status(500).json({ success: false, error: profilesGroupsDeleteError.message });
+  }
+
+  // 7. Delete the group itself
+  const { error: groupDeleteError } = await req.supabase
+    .from('groups')
+    .delete()
+    .eq('groups_id', groupId);
+
+  if (groupDeleteError) {
+    return res.status(500).json({ success: false, error: groupDeleteError.message });
+  }
+
+  return res.json({ success: true });
+});
+
+// POST /api/groups/:groupId/leave — leave a group
+router.post('/groups/:groupId/leave', authRequire, async (req, res) => {
+  const { groupId } = req.params;
+  const callerId = req.cookies.userId;
+
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('profiles_groups')
+    .select('role')
+    .eq('groups_id', groupId)
+    .eq('user_id', callerId)
+    .maybeSingle();
+
+  if (membershipError) {
+    return res.status(500).json({ success: false, error: membershipError.message });
+  }
+  if (!membership) {
+    return res.status(404).json({ success: false, error: 'You are not a member of this group.' });
+  }
+
+  // If caller is an admin, ensure at least one other admin exists before leaving
+  if (membership.role === 'admin') {
+    const { count, error: adminCountError } = await req.supabase
+      .from('profiles_groups')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('groups_id', groupId)
+      .eq('role', 'admin')
+      .neq('user_id', callerId);
+
+    if (adminCountError) {
+      return res.status(500).json({ success: false, error: adminCountError.message });
+    }
+
+    if (count === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'You are the only admin. Delete the group or promote another member first.',
+      });
+    }
+  }
+
+  const { error: deleteError } = await req.supabase
+    .from('profiles_groups')
+    .delete()
+    .eq('groups_id', groupId)
+    .eq('user_id', callerId);
+
+  if (deleteError) {
+    return res.status(500).json({ success: false, error: deleteError.message });
+  }
+
+  return res.json({ success: true });
+});
+
+// DELETE /api/groups/:groupId/members/:userId — kick a member (admin only)
+router.delete('/groups/:groupId/members/:userId', authRequire, async (req, res) => {
+  const { groupId, userId } = req.params;
+  const callerId = req.cookies.userId;
+
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('profiles_groups')
+    .select('role')
+    .eq('groups_id', groupId)
+    .eq('user_id', callerId)
+    .eq('role', 'admin')
+    .maybeSingle();
+
+  if (membershipError) {
+    return res.status(500).json({ success: false, error: membershipError.message });
+  }
+  if (!membership) {
+    return res.status(403).json({ success: false, error: 'Only group admins can remove members.' });
+  }
+
+  if (userId === callerId) {
+    return res.status(400).json({ success: false, error: 'Cannot remove yourself. Use leave instead.' });
+  }
+
+  const { error: deleteError } = await req.supabase
+    .from('profiles_groups')
+    .delete()
+    .eq('groups_id', groupId)
+    .eq('user_id', userId);
+
+  if (deleteError) {
+    return res.status(500).json({ success: false, error: deleteError.message });
+  }
+
+  return res.json({ success: true });
+});
+
 export default router;

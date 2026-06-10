@@ -9,13 +9,14 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
-      workbox: {
-        globPatterns: ['**/*.{js,css,html}'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
-      },
       manifest: false,
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html}'],
+      },
     }),
   ],
   resolve: {

@@ -115,7 +115,7 @@ body {
   overflow: hidden;
 }
 
-#root { height: 100vh; }
+#root { height: 100dvh; }
 
 h1, h2, h3, h4 {
   font-family: var(--font-body);
@@ -130,10 +130,21 @@ a { color: inherit; text-decoration: none; }
 
 ::selection { background: var(--accent-soft); }
 
+/* ── Mobile: remove 300ms tap delay ──────────────────────── */
+button, [role="button"], a, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* ── Prevent iOS input auto-zoom (font-size must be >= 16px) ── */
+input, textarea, select {
+  font-size: max(16px, 1em);
+}
+
 /* ── Scrollbars ───────────────────────────────────────────── */
 .scroll, .app-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--border-hi) transparent;
+  -webkit-overflow-scrolling: touch;
 }
 .scroll::-webkit-scrollbar,
 .app-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
@@ -282,7 +293,22 @@ a { color: inherit; text-decoration: none; }
 
 /* CalendarPage — custom layout (headerToolbar=false) */
 .fc .fc-view-harness { height: 100% !important; }
-.fc-daygrid-event { background: var(--surface-2) !important; border-color: var(--border) !important; }
-.fc-daygrid-event:hover { background: var(--surface-3) !important; border-color: var(--border-2) !important; }
+.fc-daygrid-event {
+  background-color: var(--fc-event-bg-color, var(--surface-2));
+  border: none !important;
+  border-left: 3px solid var(--fc-event-border-color, var(--border)) !important;
+  border-radius: var(--r-xs) !important;
+  transition: filter 0.15s;
+}
+.fc-daygrid-event:hover { filter: brightness(1.2); }
+.fc-daygrid-event.fc-event-tentative { border-left-style: dashed !important; opacity: 0.65; }
 .fc .fc-daygrid-day-frame { padding: 2px 3px; }
 .fc .fc-daygrid-event-harness { margin-top: 1px; }
+
+/* ── Mobile page padding reduction ───────────────────────── */
+@media (max-width: 767px) {
+  .page-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

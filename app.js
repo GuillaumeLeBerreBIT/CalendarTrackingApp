@@ -17,6 +17,10 @@ import discoveryRouter from "./routes/discovery.js"
 import notificationsRouter from "./routes/notifications.js"
 import savedRouter from "./routes/saved.js"
 import icalRouter from "./routes/ical.js"
+import habitRouter from "./routes/habits.js"
+import timerRouter from "./routes/timers.js"
+import challengeRouter from "./routes/challenges.js"
+import pactRouter from "./routes/pacts.js"
 import { startScheduler } from "./utils/scheduler.js"
 
 const app = express();
@@ -54,6 +58,10 @@ app.use('/api', discoveryRouter);
 app.use('/api', notificationsRouter);
 app.use('/api', savedRouter);
 app.use('/api', icalRouter);
+app.use('/api', habitRouter);
+app.use('/api', timerRouter);
+app.use('/api', challengeRouter);
+app.use('/api', pactRouter);
 
 app.post('/api/refresh-session', authRequire, (req, res) => {
   return res.json({ success: true });
