@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -422,6 +423,7 @@ type CalView = 'month' | 'agenda'
 type ModalMode = 'none' | 'create' | 'view' | 'edit'
 
 export default function CalendarPage() {
+  const navigate = useNavigate()
   const { userId: currentUserId } = useAuthStore()
   const [events, setEvents] = useState<CalEvent[]>([])
   const [groups, setGroups] = useState<Group[]>([])
@@ -828,6 +830,12 @@ export default function CalendarPage() {
                 </div>
               )}
               <IconButton
+                name="timer"
+                size={36}
+                onClick={() => navigate('/countdowns')}
+                title="Countdowns"
+              />
+              <IconButton
                 name="plus"
                 size={36}
                 onClick={() => { setSelectedEvent(null); setSelectInfo(null); setModalMode('create') }}
@@ -859,7 +867,7 @@ export default function CalendarPage() {
               <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
             </div>
 
-            {/* Right: view toggle */}
+            {/* Right: view toggle + countdowns */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Segmented
                 options={[
@@ -870,6 +878,7 @@ export default function CalendarPage() {
                 onChange={v => setCalView(v as CalView)}
                 size="sm"
               />
+              <IconButton name="timer" size={34} isz={15} onClick={() => navigate('/countdowns')} title="Countdowns" />
             </div>
           </div>
         )}

@@ -287,6 +287,17 @@ input, textarea, select {
   height: 100dvh;
 }
 
+/* iOS Safari only (-webkit-touch-callout exists solely on iOS WebKit):
+   older iOS treats 100vh as the LARGEST viewport (URL bar collapsed),
+   pushing the bottom nav under Safari's toolbar. -webkit-fill-available
+   tracks the actual visible height there; newer iOS overrides with dvh. */
+@supports (-webkit-touch-callout: none) {
+  .app-viewport {
+    height: -webkit-fill-available;
+    height: 100dvh;
+  }
+}
+
 /* ── Improve text-3 on dark surface (raise slightly for contrast) ── */
 [data-theme="dark"] { --text-3: #7a7a95; }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import OnboardingFlow from '@/components/OnboardingFlow'
@@ -16,7 +16,7 @@ import PricingPage from '@/pages/PricingPage'
 import JoinGroupPage from '@/pages/JoinGroupPage'
 import PublicEventPage from '@/pages/PublicEventPage'
 import HabitsPage from '@/pages/HabitsPage'
-import TimersPage from '@/pages/TimersPage'
+import CountdownsPage from '@/pages/CountdownsPage'
 import { useAuthStore } from '@/store/authStore'
 import { subscribeToPush } from '@/lib/pushNotifications'
 
@@ -86,7 +86,9 @@ function AppInner() {
           <Route path="/groups/:groupId" element={<GroupDetailPage />} />
           <Route path="/todo" element={<TodoPage />} />
           <Route path="/habits" element={<HabitsPage />} />
-          <Route path="/timers" element={<TimersPage />} />
+          <Route path="/countdowns" element={<CountdownsPage />} />
+          {/* Legacy route — old bookmarks/notification links */}
+          <Route path="/timers" element={<Navigate to="/countdowns" replace />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
         </Route>

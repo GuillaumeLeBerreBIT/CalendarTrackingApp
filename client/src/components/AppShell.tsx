@@ -51,7 +51,6 @@ const NAV_ITEMS = [
   { to: '/groups',    label: 'Groups',   icon: 'groups',   exact: false },
   { to: '/todo',      label: 'Tasks',    icon: 'task',     exact: false },
   { to: '/habits',    label: 'Habits',   icon: 'flame',    exact: false },
-  { to: '/timers',    label: 'Timers',   icon: 'timer',    exact: false },
   { to: '/discovery', label: 'Discover', icon: 'discover', exact: false },
 ] as const
 

@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import api from '@/api/client'
-import { useAuthStore } from '@/store/authStore'
 
 interface Habit {
   habit_id: number
@@ -13,7 +12,6 @@ interface Habit {
   completedToday: boolean
   recentDays: boolean[]
   completionHistory: string[]
-  xp_value?: number
   challenge_id?: number | null
   contribution_value?: number
   weekly_target?: number | null
@@ -24,13 +22,8 @@ interface Habit {
 }
 
 interface LogResult {
-  xpEarned: number
-  multiplier: number
   completedToday: boolean
-  newTotalXp: number | null
   weeklyTargetHit?: boolean
-  bonusXp?: number
-  totalXpEarned?: number
 }
 
 interface HabitStore {
@@ -43,7 +36,6 @@ interface HabitStore {
     frequency: 'daily' | 'weekly'
     emoji: string
     color: string
-    xp_value?: number
     groups_id?: string
     weekly_target?: number | null
     target_increment?: number
@@ -88,23 +80,16 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       }),
     }))
     try {
+      // The backend log call also drives group pact counters and challenge
+      // progress — it must always fire, even though XP is no longer surfaced.
       const { data } = await api.post(`/habits/${habitId}/log`)
-      if (data.success && data.newTotalXp !== null && data.newTotalXp !== undefined) {
-        useAuthStore.getState().addXp(data.newTotalXp)
-      }
-      const totalXpEarned = (data.xpEarned ?? 0) + (data.bonusXp ?? 0)
       return {
-        xpEarned: totalXpEarned,
-        multiplier: data.multiplier ?? 1,
         completedToday: data.completedToday ?? false,
-        newTotalXp: data.newTotalXp ?? null,
         weeklyTargetHit: data.weeklyTargetHit ?? false,
-        bonusXp: data.bonusXp ?? 0,
-        totalXpEarned,
       }
     } catch {
       get().fetchHabits()
-      return { xpEarned: 0, multiplier: 1, completedToday: false, newTotalXp: null }
+      return { completedToday: false }
     }
   },
 
