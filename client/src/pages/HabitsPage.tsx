@@ -3,7 +3,6 @@ import { useHabitStore } from '@/store/habitStore'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
 import { Tag, Empty, Segmented } from '@/components/ui/Primitives'
-import XPBar from '@/components/XPBar'
 import HabitHeatmap from '@/components/HabitHeatmap'
 import WeeklyArc from '@/components/WeeklyArc'
 
@@ -73,8 +72,8 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-// ── XP toast ──────────────────────────────────────────────────────────────────
-function XPToast({ xp, multiplier, weeklyHit }: { xp: number; multiplier: number; weeklyHit?: boolean }) {
+// ── Log confirmation toast ────────────────────────────────────────────────────
+function LogToast({ weeklyHit }: { weeklyHit?: boolean }) {
   return (
     <div style={{
       position: 'fixed',
@@ -84,16 +83,16 @@ function XPToast({ xp, multiplier, weeklyHit }: { xp: number; multiplier: number
       zIndex: 100,
       padding: '10px 18px',
       borderRadius: 'var(--r-full)',
-      background: weeklyHit ? '#f59e0b' : 'var(--accent)',
+      background: 'var(--accent)',
       color: '#fff',
       fontSize: 14,
       fontWeight: 700,
-      boxShadow: weeklyHit ? '0 4px 20px rgba(245,158,11,0.5)' : '0 4px 20px var(--accent-glow)',
+      boxShadow: '0 4px 20px var(--accent-glow)',
       pointerEvents: 'none',
-      animation: 'xp-toast-in 0.25s ease, xp-toast-out 0.3s ease 1.5s forwards',
+      animation: 'log-toast-in 0.25s ease, log-toast-out 0.3s ease 1.5s forwards',
       whiteSpace: 'nowrap',
     }}>
-      {weeklyHit ? `Weekly goal! +${xp} XP` : `+${xp} XP${multiplier > 1 ? ` ×${multiplier.toFixed(1)}` : ''}`}
+      {weeklyHit ? 'Weekly goal hit ✓' : 'Logged ✓'}
     </div>
   )
 }
@@ -239,7 +238,7 @@ function CreateHabitModal({ onClose }: { onClose: () => void }) {
     setSaving(true)
     try {
       await createHabit({
-        title: title.trim(), frequency, emoji, color, xp_value: 10,
+        title: title.trim(), frequency, emoji, color,
         weekly_target: weeklyTarget,
         target_increment: weeklyTarget && progressive ? 1 : 0,
       })
@@ -353,7 +352,7 @@ export default function HabitsPage() {
   const { habits, loading, fetchHabits, logToday, deleteHabit } = useHabitStore()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [xpFlash, setXpFlash] = useState<{ xp: number; multiplier: number; weeklyHit: boolean } | null>(null)
+  const [logFlash, setLogFlash] = useState<{ weeklyHit: boolean } | null>(null)
 
   useEffect(() => {
     fetchHabits()
@@ -361,16 +360,16 @@ export default function HabitsPage() {
 
   async function handleLog(id: number) {
     const result = await logToday(id)
-    if (result.xpEarned > 0) {
-      setXpFlash({ xp: result.xpEarned, multiplier: result.multiplier, weeklyHit: !!result.weeklyTargetHit })
-      setTimeout(() => setXpFlash(null), 2000)
+    if (result.completedToday) {
+      setLogFlash({ weeklyHit: !!result.weeklyTargetHit })
+      setTimeout(() => setLogFlash(null), 2000)
     }
   }
 
   return (
     <>
-      {/* XP toast */}
-      {xpFlash && <XPToast xp={xpFlash.xp} multiplier={xpFlash.multiplier} weeklyHit={xpFlash.weeklyHit} />}
+      {/* Log confirmation toast */}
+      {logFlash && <LogToast weeklyHit={logFlash.weeklyHit} />}
 
       <div style={{
         maxWidth: 680,
@@ -393,9 +392,6 @@ export default function HabitsPage() {
             New Habit
           </Button>
         </header>
-
-        {/* XP bar */}
-        <XPBar />
 
         {/* Content */}
         {loading && habits.length === 0 ? (
@@ -431,11 +427,11 @@ export default function HabitsPage() {
       </div>
 
       <style>{`
-        @keyframes xp-toast-in {
+        @keyframes log-toast-in {
           from { opacity: 0; transform: translateX(-50%) translateY(12px); }
           to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
-        @keyframes xp-toast-out {
+        @keyframes log-toast-out {
           from { opacity: 1; }
           to   { opacity: 0; transform: translateX(-50%) translateY(-8px); }
         }

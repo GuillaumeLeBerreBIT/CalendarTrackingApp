@@ -62,50 +62,61 @@ export default async function authRequire (req, res, next) {
   return next();
 };
 
+// Supabase refresh tokens are single-use (rotated on every exchange, with only a
+// ~10s reuse window). A page load fires many API calls in parallel; if each one
+// exchanged the same cookie token independently, the losers would replay a
+// consumed token and Supabase would revoke the whole session. So concurrent
+// requests carrying the same refresh token share one exchange, and a successful
+// result is kept for a short grace period for requests that raced in before the
+// rotated cookie reached the browser.
+const inflightRefreshes = new Map();
+const REFRESH_RESULT_GRACE_MS = 30 * 1000;
+
+async function exchangeRefreshToken(refreshToken) {
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+
+  if (error) throw new Error('Could not retrieve a bearer token for the user.');
+
+  return data; // { session, user }
+}
+
 async function refreshSession(req, res) {
-  if (!req.cookies.refreshToken) throw new Error('Could not find a refresh token from the cookies.')
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) throw new Error('Could not find a refresh token from the cookies.')
 
-  const {data: refreshSes, error: refreshSesError} = await supabase.auth.refreshSession({refresh_token: req.cookies.refreshToken});
-
-  if (refreshSesError) throw new Error('Could not retrieve a bearer token for the user.')
-  
-  try{
-    const {session, user} = refreshSes
-
-    const secure = process.env.NODE_ENV === 'production';
-
-    res.cookie("authCookie", session.access_token, {
-        maxAge: 3 * 60 * 60 * 1000,
-        httpOnly: true,
-        sameSite: 'lax',
-        secure,
-      });
-
-    res.cookie('refreshToken', session.refresh_token, {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure,
-    });
-
-    res.cookie('expiresAt', session.expires_at, {
-      maxAge: 3 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure,
-    });
-
-    res.cookie('userId', user.id, {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure,
-    })
-
-    return { user, accessToken: session.access_token }
-  } catch (error) {
-    throw new Error('Could not set the cookies for the User.')
+  let pending = inflightRefreshes.get(refreshToken);
+  if (!pending) {
+    pending = exchangeRefreshToken(refreshToken);
+    inflightRefreshes.set(refreshToken, pending);
+    pending.then(
+      () => {
+        const timer = setTimeout(() => inflightRefreshes.delete(refreshToken), REFRESH_RESULT_GRACE_MS);
+        timer.unref?.();
+      },
+      () => inflightRefreshes.delete(refreshToken)
+    );
   }
+
+  const { session, user } = await pending;
+
+  setSessionCookies(res, session, user);
+  return { user, accessToken: session.access_token }
+}
+
+export function setSessionCookies(res, session, user) {
+  const secure = process.env.NODE_ENV === 'production';
+  const base = { httpOnly: true, sameSite: 'lax', secure };
+
+  // The access-token cookies live exactly as long as the JWT inside them
+  // (expires_in is in seconds). The refresh token defines the real session
+  // length — once the access token lapses, authRequire silently exchanges it.
+  const accessMaxAge = (session.expires_in ?? 3600) * 1000;
+  const sessionMaxAge = 30 * 24 * 60 * 60 * 1000;
+
+  res.cookie('authCookie', session.access_token, { ...base, maxAge: accessMaxAge });
+  res.cookie('expiresAt', session.expires_at, { ...base, maxAge: accessMaxAge });
+  res.cookie('refreshToken', session.refresh_token, { ...base, maxAge: sessionMaxAge });
+  res.cookie('userId', user.id, { ...base, maxAge: sessionMaxAge });
 }
 
 export function validatePassword (password) {

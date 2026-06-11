@@ -278,6 +278,26 @@ input, textarea, select {
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .safe-top    { padding-top:    env(safe-area-inset-top,    0px); }
 
+/* ── App viewport height ──────────────────────────────────────
+   100dvh with a 100vh fallback: on browsers without dvh support an
+   inline `height: 100dvh` is silently dropped, the shell grows to
+   content height and the bottom nav ends up below the fold. */
+.app-viewport {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* iOS Safari only (-webkit-touch-callout exists solely on iOS WebKit):
+   older iOS treats 100vh as the LARGEST viewport (URL bar collapsed),
+   pushing the bottom nav under Safari's toolbar. -webkit-fill-available
+   tracks the actual visible height there; newer iOS overrides with dvh. */
+@supports (-webkit-touch-callout: none) {
+  .app-viewport {
+    height: -webkit-fill-available;
+    height: 100dvh;
+  }
+}
+
 /* ── Improve text-3 on dark surface (raise slightly for contrast) ── */
 [data-theme="dark"] { --text-3: #7a7a95; }
 

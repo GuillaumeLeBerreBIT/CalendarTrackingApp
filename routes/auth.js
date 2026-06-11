@@ -1,14 +1,12 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import supabase from "../db/supabase.js";
-import { validatePassword } from "../utils/utils.js";
+import { validatePassword, setSessionCookies } from "../utils/utils.js";
 import authRequire from "../utils/utils.js";
 
 const router = express.Router();
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
-
-const secureCookie = () => process.env.NODE_ENV === 'production';
 
 router.post("/login", authLimiter, async (req, res) => {
 
@@ -21,33 +19,7 @@ router.post("/login", authLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: error.message });
   }
 
-  res.cookie("authCookie", data.session.access_token, {
-    maxAge: 3 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
-
-  res.cookie('userId', data.user.id, {
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
-
-  res.cookie('refreshToken', data.session.refresh_token, {
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
-
-  res.cookie('expiresAt', data.session.expires_at, {
-    maxAge: 3 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
+  setSessionCookies(res, data.session, data.user);
 
   res.json({ success: true });
 });
@@ -81,33 +53,7 @@ router.post("/register", authLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: error.message });
   }
 
-  res.cookie("authCookie", data.session.access_token, {
-    maxAge: 3 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
-
-  res.cookie('userId', data.user.id, {
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
-
-  res.cookie('refreshToken', data.session.refresh_token, {
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
-
-  res.cookie('expiresAt', data.session.expires_at, {
-    maxAge: 3 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: secureCookie(),
-  });
+  setSessionCookies(res, data.session, data.user);
 
   res.json({ success: true });
 });

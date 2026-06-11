@@ -89,7 +89,6 @@ client/
       CountdownPill.tsx  — Live countdown badge (Xd Yh)
       HabitHeatmap.tsx   — 16-week completion grid (flex cells, tap-to-log today)
       WeeklyArc.tsx      — SVG ring showing weekly target progress
-      XPBar.tsx          — XP level progress bar
       GroupChallengeCard.tsx — Group shared goal card with progress bar
       PactModal.tsx      — Create group pact form (reward event + target)
       PactCelebration.tsx — CSS confetti on pact success
@@ -107,8 +106,8 @@ client/
       GroupsPage.tsx     — Group cards grid + create group modal
       GroupDetailPage.tsx— Group detail: members, events, tasks, pacts, challenges
       TodoPage.tsx       — Task lists with progress bars and task management
-      HabitsPage.tsx     — Personal habits: streak, heatmap, XP, weekly arc, pacts
-      TimersPage.tsx     — Pomodoro / countdown timers
+      HabitsPage.tsx     — Personal habits: streak, heatmap, weekly arc (XP UI removed; backend still tracks)
+      CountdownsPage.tsx — Milestone countdowns (trips, big events) — reached from Calendar header; /timers redirects here
       ProfilePage.tsx    — Profile, stats, notification prefs + push enable,
                            calendar sync (subscribe link + .ics import)
       NotificationsPage.tsx — In-app notification list (bell badge in AppShell)
@@ -116,14 +115,14 @@ client/
       RegisterPage.tsx   — Dark auth card
       PricingPage.tsx    — Free vs Plus tier comparison
     store/
-      authStore.ts       — Zustand: user profile, fetchMe(), logout(), addXp()
-      habitStore.ts      — Habits with streaks, completionHistory, XP logging
-      timerStore.ts      — Countdown/Pomodoro timer state
+      authStore.ts       — Zustand: user profile, fetchMe(), logout()
+      habitStore.ts      — Habits with streaks, completionHistory, completion logging
+      timerStore.ts      — Countdown state (exports useCountdownStore; interval timer removed)
       notificationStore.ts — AppNotification list, unread count, mark-read
       savedStore.ts      — Saved discovery events
     types/
       index.ts           — Shared TypeScript interfaces (Profile, Group, CalEvent,
-                           Habit, Timer, Pact, GroupChallenge, AppNotification, etc.)
+                           Habit, Pact, GroupChallenge, AppNotification, etc.)
 ```
 
 ---
@@ -139,8 +138,8 @@ client/
 | Tasks / todo lists | ✅ Done | Per-group, progress bars |
 | Discovery feed | ✅ Done | Ticketmaster live, filter chips, save-to-calendar |
 | iCal sync | ✅ Done | Subscribe URL + .ics import in ProfilePage |
-| Habits tracker | ✅ Done | Streaks, XP, heatmap, weekly arc, progressive targets |
-| Timers (Pomodoro) | ✅ Done | Countdown + interval timers |
+| Habits tracker | ✅ Done | Streaks, heatmap, weekly arc, progressive targets (XP UI removed 2026-06) |
+| Countdowns | ✅ Done | Milestone countdowns; Pomodoro/interval timer removed 2026-06 |
 | Group Pacts | ✅ Done | Locked events, completion target, confetti |
 | Group Challenges | ✅ Done | Shared group goals with progress |
 | Push notifications | ✅ Done | VAPID web push, prefs UI, bell badge |
@@ -216,12 +215,14 @@ All UI components live in `client/src/components/ui/`. Use these everywhere:
 
 Auth uses Supabase Auth with **four HTTP-only cookies**:
 
-| Cookie        | Contents                   | Expiry   |
-|---------------|----------------------------|----------|
-| `authCookie`  | Supabase JWT access token  | 3 hours  |
-| `refreshToken`| Supabase refresh token     | 7 days   |
-| `userId`      | Supabase user UUID         | 7 days   |
-| `expiresAt`   | Token expiry timestamp     | 3 hours  |
+| Cookie        | Contents                   | Expiry                          |
+|---------------|----------------------------|---------------------------------|
+| `authCookie`  | Supabase JWT access token  | JWT lifetime (`expires_in`, 1h default) |
+| `refreshToken`| Supabase refresh token     | 30 days (= real session length) |
+| `userId`      | Supabase user UUID         | 30 days                         |
+| `expiresAt`   | Token expiry timestamp     | JWT lifetime                    |
+
+All four are set via `setSessionCookies()` in `utils/utils.js` — use it anywhere a new session needs to be written; never hand-roll the cookie quartet.
 
 **`authRequire`** in `utils/utils.js` is the auth middleware. Apply it to any route that requires a logged-in user:
 
@@ -234,6 +235,8 @@ After `authRequire`, the authenticated user is available as `req.user` (Supabase
 The current user's UUID is also on `req.cookies.userId` — used for most DB queries.
 
 The middleware automatically refreshes the session if the access token is expired but a valid refresh token exists. If both are missing/invalid, returns `401 JSON` (the React client's axios interceptor handles redirect to `/login`).
+
+Refreshes are **single-flight**: Supabase rotates refresh tokens on every exchange (single-use, ~10s reuse window), so concurrent requests carrying the same refresh token share one exchange via an in-flight map in `utils/utils.js`. Racing the same token independently gets the entire session revoked by Supabase's reuse detection.
 
 ---
 
@@ -318,8 +321,9 @@ npm run build     # Production build → client/dist (served by Express)
 Required `.env` variables:
 ```
 SUPABASE_URL=
-SUPABASE_KEY=
-PORT=              (optional, defaults to 3000)
+SUPABASE_ANON_KEY=   (publishable key, sb_publishable_… — request-scoped clients)
+SUPABASE_SECRET_KEY= (secret key, sb_secret_… — supabaseAdmin only; legacy var name SUPABASE_KEY still works as fallback)
+PORT=                (optional, defaults to 3000)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 TICKET_MASTER_KEY=
@@ -338,4 +342,5 @@ RESEND_API_KEY=
 - **Icon component**: Never use lucide-react — use `<Icon name="..." />` from `@/components/ui/Icon`.
 - **FullCalendar event colors**: Use `--fc-event-bg-color` and `--fc-event-border-color` CSS custom properties set in `eventDidMount` via `setProperty`. The global override in `index.css` reads these — never use `!important` background on `.fc-daygrid-event`.
 - **supabaseAdmin**: Required for cross-user operations (scheduler crons, pact resolution). The regular `req.supabase` client is scoped to the logged-in user via RLS.
+- **Server-side Supabase clients must keep `persistSession: false, autoRefreshToken: false`** (see `db/supabase.js`). With defaults on, the shared client stores the last user's session and auto-rotates its refresh token in the background — invalidating the token in the browser's cookie and force-logging users out at JWT expiry (~1h). Never create a server client without these options.
 - **Discovery**: `DiscoveryPage` calls the real Ticketmaster API via `/api/discovery`. `lib/mockData.ts` only provides the `DiscoveryEvent` type definition now.

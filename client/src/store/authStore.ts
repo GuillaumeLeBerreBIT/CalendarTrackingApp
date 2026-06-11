@@ -9,7 +9,6 @@ interface AuthState {
   loading: boolean
   fetchMe: () => Promise<boolean>
   logout: () => Promise<void>
-  addXp: (newTotal: number) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -25,7 +24,6 @@ export const useAuthStore = create<AuthState>((set) => ({
           ...data,
           hasCompletedOnboarding: data.has_completed_onboarding ?? undefined,
           searchable: data.searchable ?? undefined,
-          total_xp: data.total_xp ?? 0,
         }
         set({ user: profile, userId: data.userId ?? null, loading: false })
         subscribeToPush().catch(() => {})
@@ -42,9 +40,5 @@ export const useAuthStore = create<AuthState>((set) => ({
     await api.post('/logout').catch(() => {})
     set({ user: null, userId: null })
     window.location.href = '/login'
-  },
-
-  addXp: (newTotal) => {
-    set((s) => s.user ? { user: { ...s.user, total_xp: newTotal } } : {})
   },
 }))
