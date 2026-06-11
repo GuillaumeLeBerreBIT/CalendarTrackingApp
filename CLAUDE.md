@@ -89,7 +89,6 @@ client/
       CountdownPill.tsx  — Live countdown badge (Xd Yh)
       HabitHeatmap.tsx   — 16-week completion grid (flex cells, tap-to-log today)
       WeeklyArc.tsx      — SVG ring showing weekly target progress
-      XPBar.tsx          — XP level progress bar
       GroupChallengeCard.tsx — Group shared goal card with progress bar
       PactModal.tsx      — Create group pact form (reward event + target)
       PactCelebration.tsx — CSS confetti on pact success
@@ -107,8 +106,8 @@ client/
       GroupsPage.tsx     — Group cards grid + create group modal
       GroupDetailPage.tsx— Group detail: members, events, tasks, pacts, challenges
       TodoPage.tsx       — Task lists with progress bars and task management
-      HabitsPage.tsx     — Personal habits: streak, heatmap, XP, weekly arc, pacts
-      TimersPage.tsx     — Pomodoro / countdown timers
+      HabitsPage.tsx     — Personal habits: streak, heatmap, weekly arc (XP UI removed; backend still tracks)
+      CountdownsPage.tsx — Milestone countdowns (trips, big events) — reached from Calendar header; /timers redirects here
       ProfilePage.tsx    — Profile, stats, notification prefs + push enable,
                            calendar sync (subscribe link + .ics import)
       NotificationsPage.tsx — In-app notification list (bell badge in AppShell)
@@ -116,14 +115,14 @@ client/
       RegisterPage.tsx   — Dark auth card
       PricingPage.tsx    — Free vs Plus tier comparison
     store/
-      authStore.ts       — Zustand: user profile, fetchMe(), logout(), addXp()
-      habitStore.ts      — Habits with streaks, completionHistory, XP logging
-      timerStore.ts      — Countdown/Pomodoro timer state
+      authStore.ts       — Zustand: user profile, fetchMe(), logout()
+      habitStore.ts      — Habits with streaks, completionHistory, completion logging
+      timerStore.ts      — Countdown state (exports useCountdownStore; interval timer removed)
       notificationStore.ts — AppNotification list, unread count, mark-read
       savedStore.ts      — Saved discovery events
     types/
       index.ts           — Shared TypeScript interfaces (Profile, Group, CalEvent,
-                           Habit, Timer, Pact, GroupChallenge, AppNotification, etc.)
+                           Habit, Pact, GroupChallenge, AppNotification, etc.)
 ```
 
 ---
@@ -139,8 +138,8 @@ client/
 | Tasks / todo lists | ✅ Done | Per-group, progress bars |
 | Discovery feed | ✅ Done | Ticketmaster live, filter chips, save-to-calendar |
 | iCal sync | ✅ Done | Subscribe URL + .ics import in ProfilePage |
-| Habits tracker | ✅ Done | Streaks, XP, heatmap, weekly arc, progressive targets |
-| Timers (Pomodoro) | ✅ Done | Countdown + interval timers |
+| Habits tracker | ✅ Done | Streaks, heatmap, weekly arc, progressive targets (XP UI removed 2026-06) |
+| Countdowns | ✅ Done | Milestone countdowns; Pomodoro/interval timer removed 2026-06 |
 | Group Pacts | ✅ Done | Locked events, completion target, confetti |
 | Group Challenges | ✅ Done | Shared group goals with progress |
 | Push notifications | ✅ Done | VAPID web push, prefs UI, bell badge |
