@@ -216,12 +216,14 @@ All UI components live in `client/src/components/ui/`. Use these everywhere:
 
 Auth uses Supabase Auth with **four HTTP-only cookies**:
 
-| Cookie        | Contents                   | Expiry   |
-|---------------|----------------------------|----------|
-| `authCookie`  | Supabase JWT access token  | 3 hours  |
-| `refreshToken`| Supabase refresh token     | 7 days   |
-| `userId`      | Supabase user UUID         | 7 days   |
-| `expiresAt`   | Token expiry timestamp     | 3 hours  |
+| Cookie        | Contents                   | Expiry                          |
+|---------------|----------------------------|---------------------------------|
+| `authCookie`  | Supabase JWT access token  | JWT lifetime (`expires_in`, 1h default) |
+| `refreshToken`| Supabase refresh token     | 30 days (= real session length) |
+| `userId`      | Supabase user UUID         | 30 days                         |
+| `expiresAt`   | Token expiry timestamp     | JWT lifetime                    |
+
+All four are set via `setSessionCookies()` in `utils/utils.js` — use it anywhere a new session needs to be written; never hand-roll the cookie quartet.
 
 **`authRequire`** in `utils/utils.js` is the auth middleware. Apply it to any route that requires a logged-in user:
 
@@ -234,6 +236,8 @@ After `authRequire`, the authenticated user is available as `req.user` (Supabase
 The current user's UUID is also on `req.cookies.userId` — used for most DB queries.
 
 The middleware automatically refreshes the session if the access token is expired but a valid refresh token exists. If both are missing/invalid, returns `401 JSON` (the React client's axios interceptor handles redirect to `/login`).
+
+Refreshes are **single-flight**: Supabase rotates refresh tokens on every exchange (single-use, ~10s reuse window), so concurrent requests carrying the same refresh token share one exchange via an in-flight map in `utils/utils.js`. Racing the same token independently gets the entire session revoked by Supabase's reuse detection.
 
 ---
 
@@ -318,8 +322,9 @@ npm run build     # Production build → client/dist (served by Express)
 Required `.env` variables:
 ```
 SUPABASE_URL=
-SUPABASE_KEY=
-PORT=              (optional, defaults to 3000)
+SUPABASE_ANON_KEY=   (publishable key, sb_publishable_… — request-scoped clients)
+SUPABASE_SECRET_KEY= (secret key, sb_secret_… — supabaseAdmin only; legacy var name SUPABASE_KEY still works as fallback)
+PORT=                (optional, defaults to 3000)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 TICKET_MASTER_KEY=
@@ -338,4 +343,5 @@ RESEND_API_KEY=
 - **Icon component**: Never use lucide-react — use `<Icon name="..." />` from `@/components/ui/Icon`.
 - **FullCalendar event colors**: Use `--fc-event-bg-color` and `--fc-event-border-color` CSS custom properties set in `eventDidMount` via `setProperty`. The global override in `index.css` reads these — never use `!important` background on `.fc-daygrid-event`.
 - **supabaseAdmin**: Required for cross-user operations (scheduler crons, pact resolution). The regular `req.supabase` client is scoped to the logged-in user via RLS.
+- **Server-side Supabase clients must keep `persistSession: false, autoRefreshToken: false`** (see `db/supabase.js`). With defaults on, the shared client stores the last user's session and auto-rotates its refresh token in the background — invalidating the token in the browser's cookie and force-logging users out at JWT expiry (~1h). Never create a server client without these options.
 - **Discovery**: `DiscoveryPage` calls the real Ticketmaster API via `/api/discovery`. `lib/mockData.ts` only provides the `DiscoveryEvent` type definition now.
