@@ -153,6 +153,7 @@ function OfflineBanner() {
       right: 0,
       zIndex: 9999,
       padding: '10px 16px',
+      paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -208,7 +209,7 @@ export default function AppShell() {
       flexDirection: 'column',
       padding: '18px 12px 14px',
       gap: 0,
-      height: '100dvh',
+      height: '100%',
       position: 'sticky',
       top: 0,
     }}>
@@ -300,6 +301,7 @@ export default function AppShell() {
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: '14px 16px',
+      paddingTop: 'calc(14px + env(safe-area-inset-top, 0px))',
       background: 'var(--surface)',
       borderBottom: '1px solid var(--border)',
       flexShrink: 0,
@@ -366,7 +368,7 @@ export default function AppShell() {
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100dvh',
+        height: '100%',
         background: 'var(--bg)',
         overflow: 'hidden',
       }}>
@@ -390,7 +392,7 @@ export default function AppShell() {
   return (
     <div style={{
       display: 'flex',
-      height: '100dvh',
+      height: '100%',
       background: 'var(--bg)',
       overflow: 'hidden',
     }}>
