@@ -208,7 +208,7 @@ export default function AppShell() {
       flexDirection: 'column',
       padding: '18px 12px 14px',
       gap: 0,
-      height: '100dvh',
+      height: '100%',
       position: 'sticky',
       top: 0,
     }}>
@@ -307,7 +307,7 @@ export default function AppShell() {
       <Logo />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <IconButton name="bell" badge={unread > 0} title="Notifications" onClick={() => navigate('/notifications')} />
-        <IconButton name="discover" title="Discover" onClick={() => navigate('/discovery')} />
+        <IconButton name="settings" title="Profile & settings" onClick={() => navigate('/profile')} />
       </div>
     </header>
   )
@@ -363,10 +363,9 @@ export default function AppShell() {
   // ── Render ─────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div style={{
+      <div className="app-viewport" style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100dvh',
         background: 'var(--bg)',
         overflow: 'hidden',
       }}>
@@ -388,9 +387,8 @@ export default function AppShell() {
   }
 
   return (
-    <div style={{
+    <div className="app-viewport" style={{
       display: 'flex',
-      height: '100dvh',
       background: 'var(--bg)',
       overflow: 'hidden',
     }}>
