@@ -20,11 +20,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { data } = await api.get('/profile')
       if (data.success) {
-        const profile: Profile = {
-          ...data,
-          hasCompletedOnboarding: data.has_completed_onboarding ?? undefined,
-          searchable: data.searchable ?? undefined,
-        }
+        // /profile already returns camelCase fields (hasCompletedOnboarding,
+        // searchable) — spread them through as-is.
+        const profile: Profile = { ...data }
         set({ user: profile, userId: data.userId ?? null, loading: false })
         subscribeToPush().catch(() => {})
         return true

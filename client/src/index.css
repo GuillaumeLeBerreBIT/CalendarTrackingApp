@@ -350,7 +350,7 @@ input, textarea, select {
 .fc .fc-popover-close { color: var(--text-3); opacity: 1; }
 
 /* ── Mobile page padding reduction ───────────────────────── */
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .page-content {
     padding-left: 16px;
     padding-right: 16px;

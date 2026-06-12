@@ -7,7 +7,7 @@ import {
   type RecurrenceState, type RepeatFreq, type EndMode,
   WEEKDAYS, WEEKDAY_LABEL, parseRRule, buildRRule, summarize,
 } from '@/lib/recurrence'
-import type { ParsedEvent } from '@/lib/nlParser'
+import { parseNL, type ParsedEvent } from '@/lib/nlParser'
 
 interface Props {
   event: CalEvent | null
@@ -88,6 +88,25 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+
+  // NL quick-fill (create mode): "Lunch Friday 1pm at Marco's" → fills the form
+  const [nlText, setNlText] = useState('')
+
+  function applyNL() {
+    const text = nlText.trim()
+    if (!text) return
+    const parsed = parseNL(text)
+    setForm(f => ({
+      ...f,
+      title: parsed.title || f.title,
+      location: parsed.location ?? f.location,
+      startDate: parsed.date ?? f.startDate,
+      endDate: parsed.date ?? f.endDate,
+      startTime: parsed.time ?? f.startTime,
+      allDay: !parsed.time,
+    }))
+    setNlText('')
+  }
 
   // Tentative mode — group votes on the date
   const [isTentative, setIsTentative] = useState(false)
@@ -398,6 +417,42 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* ── NL quick-fill (new events only) ── */}
+          {!isEdit && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={nlText}
+                onChange={e => setNlText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); applyNL() }
+                }}
+                placeholder="Quick fill: &quot;Lunch Friday 1pm at Marco's&quot;"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={applyNL}
+                disabled={!nlText.trim()}
+                title="Fill form from text"
+                style={{
+                  padding: '0 14px',
+                  borderRadius: 'var(--r-sm)',
+                  border: 'none',
+                  background: nlText.trim() ? 'var(--accent-soft)' : 'var(--surface-3)',
+                  color: nlText.trim() ? 'var(--accent)' : 'var(--text-3)',
+                  fontWeight: 650,
+                  fontSize: 13,
+                  cursor: nlText.trim() ? 'pointer' : 'default',
+                  minHeight: 44,
+                  flexShrink: 0,
+                  transition: 'var(--transition)',
+                }}
+              >
+                Fill
+              </button>
+            </div>
+          )}
 
           {/* ── Event type selector (new events only) ── */}
           {!isEdit && (

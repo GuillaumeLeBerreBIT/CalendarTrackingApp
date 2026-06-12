@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useHabitStore } from '@/store/habitStore'
+import api from '@/api/client'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
 import { Tag, Empty, Segmented } from '@/components/ui/Primitives'
 import HabitHeatmap from '@/components/HabitHeatmap'
 import WeeklyArc from '@/components/WeeklyArc'
+import type { GroupChallenge } from '@/types'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const inputStyle: React.CSSProperties = {
@@ -232,6 +234,33 @@ function CreateHabitModal({ onClose }: { onClose: () => void }) {
   const [progressive, setProgressive] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Group / challenge linking
+  const [groups, setGroups] = useState<{ groups_id: string; groups_title: string }[]>([])
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('')
+  const [challenges, setChallenges] = useState<GroupChallenge[]>([])
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string>('')
+  const [contributionValue, setContributionValue] = useState(1)
+
+  useEffect(() => {
+    api.get('/groups').then(({ data }) => {
+      if (data.success) {
+        setGroups((data.groups ?? []).map((g: { groupInfo: { groupId: number; title: string } }) => ({
+          groups_id: String(g.groupInfo.groupId),
+          groups_title: g.groupInfo.title,
+        })))
+      }
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    setChallenges([])
+    setSelectedChallengeId('')
+    if (!selectedGroupId) return
+    api.get(`/groups/${selectedGroupId}/challenges`).then(({ data }) => {
+      if (data.success) setChallenges((data.challenges ?? []).filter((c: GroupChallenge) => c.is_active))
+    }).catch(() => {})
+  }, [selectedGroupId])
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
@@ -241,11 +270,24 @@ function CreateHabitModal({ onClose }: { onClose: () => void }) {
         title: title.trim(), frequency, emoji, color,
         weekly_target: weeklyTarget,
         target_increment: weeklyTarget && progressive ? 1 : 0,
+        groups_id: selectedGroupId || null,
+        challenge_id: selectedChallengeId ? parseInt(selectedChallengeId, 10) : null,
+        contribution_value: selectedChallengeId ? contributionValue : undefined,
       })
       onClose()
     } finally {
       setSaving(false)
     }
+  }
+
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    cursor: 'pointer',
+    appearance: 'none' as const,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236f6f87' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 10px center',
+    paddingRight: 32,
   }
 
   return (
@@ -335,6 +377,66 @@ function CreateHabitModal({ onClose }: { onClose: () => void }) {
             </label>
           )}
         </div>
+
+        {/* Group sharing */}
+        {groups.length > 0 && (
+          <div>
+            <label style={labelStyle}>Share with group (optional)</label>
+            <select
+              value={selectedGroupId}
+              onChange={(e) => setSelectedGroupId(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">None — keep private</option>
+              {groups.map((g) => (
+                <option key={g.groups_id} value={g.groups_id}>{g.groups_title}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Challenge linking — only shown when a group with active challenges is selected */}
+        {selectedGroupId && challenges.length > 0 && (
+          <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Counts toward challenge (optional)</label>
+              <select
+                value={selectedChallengeId}
+                onChange={(e) => setSelectedChallengeId(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">None</option>
+                {challenges.map((c) => (
+                  <option key={c.challenge_id} value={String(c.challenge_id)}>
+                    {c.title} ({c.current_value}/{c.target_value} {c.unit})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedChallengeId && (
+              <div>
+                <label style={labelStyle}>Contribution per log</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    type="number" min={1} max={100}
+                    value={contributionValue}
+                    onChange={(e) => setContributionValue(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    style={{ ...inputStyle, width: 80 }}
+                  />
+                  <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+                    {challenges.find((c) => String(c.challenge_id) === selectedChallengeId)?.unit ?? 'units'} per completion
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedGroupId && challenges.length === 0 && (
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
+            No active challenges in this group yet.
+          </p>
+        )}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
           <Button variant="ghost" size="md" type="button" onClick={onClose}>Cancel</Button>

@@ -7,8 +7,9 @@ import { useAuthStore } from '@/store/authStore'
 import Icon from '@/components/ui/Icon'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
-import { Tag, Section, Empty, Progress } from '@/components/ui/Primitives'
-import { groupColorByIndex } from './GroupsPage'
+import { Tag, Section, Empty, Progress, Segmented } from '@/components/ui/Primitives'
+import { QRCodeSVG } from 'qrcode.react'
+import { groupColorById } from './GroupsPage'
 import EventFormModal from '@/components/EventFormModal'
 import GroupChallengeCard from '@/components/GroupChallengeCard'
 import PactModal from '@/components/PactModal'
@@ -78,6 +79,19 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
+interface GroupHabit {
+  habit_id: number
+  user_id: string
+  username: string | null
+  title: string
+  emoji: string
+  color: string
+  frequency: 'daily' | 'weekly'
+  streak: number
+  completedToday: boolean
+  recentDays: boolean[]
+}
+
 interface ActivityItem {
   user_id: string
   username: string
@@ -141,8 +155,7 @@ export default function GroupDetailPage() {
   const [sharedColor, setSharedColor] = useState('#3b82f6')
   const [myColor, setMyColor] = useState('#3b82f6')
   const [loading, setLoading] = useState(true)
-  const [groupIndex] = useState(() => Math.abs((groupId?.charCodeAt(0) ?? 0) % 6))
-  const groupColor = groupColorByIndex(groupIndex)
+  const groupColor = groupColorById(groupId ?? '')
 
   // ── Edit group modal state ───────────────────────────────────────────────────
   const [showEditModal, setShowEditModal] = useState(false)
@@ -173,6 +186,9 @@ export default function GroupDetailPage() {
 
   // Challenges
   const [challenges, setChallenges] = useState<GroupChallenge[]>([])
+
+  // Group habits (member progress)
+  const [groupHabits, setGroupHabits] = useState<GroupHabit[]>([])
   const [showCreateChallenge, setShowCreateChallenge] = useState(false)
   const [challengeTitle, setChallengeTitle] = useState('')
   const [challengeTarget, setChallengeTarget] = useState('')
@@ -229,18 +245,67 @@ export default function GroupDetailPage() {
   const [shareLink, setShareLink] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
 
+  // ── Invite modal state ───────────────────────────────────────────────────────
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [searchResult, setSearchResult] = useState<{ username: string; user_id: string; email: string } | null>(null)
-  const [inviteList, setInviteList] = useState<{ username: string; user_id: string; email: string }[]>([])
-  const [searching, setSearching] = useState(false)
-  const [inviting, setInviting] = useState(false)
+  const [inviteTab, setInviteTab] = useState<'link' | 'people'>('link')
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [inviteUrlLoading, setInviteUrlLoading] = useState(false)
+  const [inviteUrlError, setInviteUrlError] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [peopleQuery, setPeopleQuery] = useState('')
+  const [peopleResults, setPeopleResults] = useState<{ user_id: string; username: string; email: string }[]>([])
+  const [peopleSearching, setPeopleSearching] = useState(false)
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
+  const [invitingId, setInvitingId] = useState<string | null>(null)
+
+  // Generate the invite link once, the first time the modal opens
+  useEffect(() => {
+    if (!inviteOpen || inviteUrl || inviteUrlLoading) return
+    let cancelled = false
+    setInviteUrlLoading(true)
+    setInviteUrlError(false)
+    api.post('/generateInviteLink', { groupId })
+      .then(({ data }) => {
+        if (cancelled) return
+        if (data.success && data.url) setInviteUrl(data.url)
+        else setInviteUrlError(true)
+      })
+      .catch(() => { if (!cancelled) setInviteUrlError(true) })
+      .finally(() => { if (!cancelled) setInviteUrlLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteOpen])
+
+  // Debounced people search (300ms)
+  useEffect(() => {
+    if (!inviteOpen || inviteTab !== 'people') return
+    const q = peopleQuery.trim()
+    if (q.length < 2) {
+      setPeopleResults([])
+      setPeopleSearching(false)
+      return
+    }
+    setPeopleSearching(true)
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/users/search', { params: { q, groups_id: groupId } })
+        if (data.success && Array.isArray(data.users)) setPeopleResults(data.users)
+        else setPeopleResults([])
+      } catch {
+        setPeopleResults([])
+      } finally {
+        setPeopleSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peopleQuery, inviteTab, inviteOpen])
 
   const [activeTab, setActiveTab] = useState<Tab>('overview')
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
 
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
+    const handler = () => setIsMobile(window.innerWidth < 1024)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
@@ -326,6 +391,11 @@ export default function GroupDetailPage() {
         if (data.success) setChallenges(data.challenges ?? [])
       }).catch(() => {})
 
+      // 8. Group habits (member progress)
+      api.get(`/groups/${groupId}/habits`).then(({ data }) => {
+        if (data.success) setGroupHabits(data.habits ?? [])
+      }).catch(() => {})
+
     } finally {
       setLoading(false)
     }
@@ -352,35 +422,27 @@ export default function GroupDetailPage() {
     await api.post('/setMemberColor', { groupsId: groupId, color }).catch(() => {})
   }
 
-  async function searchUser(e: FormEvent) {
-    e.preventDefault()
-    setSearching(true)
-    setSearchResult(null)
+  async function inviteUser(user: { user_id: string; username: string; email: string }) {
+    if (invitedIds.has(user.user_id) || invitingId) return
+    setInvitingId(user.user_id)
     try {
-      const { data } = await api.post('/checkUser', { isUser: searchTerm })
-      if (data.success && data.match) setSearchResult(data.user)
-      else setSearchResult(null)
+      await api.post('/inviteUsers', { groupId, userList: [user] })
+      setInvitedIds((prev) => new Set(prev).add(user.user_id))
+    } catch {
+      // silently fail — row stays invitable
     } finally {
-      setSearching(false)
+      setInvitingId(null)
     }
   }
 
-  function addToInviteList() {
-    if (!searchResult || inviteList.find((u) => u.user_id === searchResult.user_id)) return
-    setInviteList((prev) => [...prev, searchResult])
-    setSearchResult(null)
-    setSearchTerm('')
-  }
-
-  async function sendInvites() {
-    if (!inviteList.length) return
-    setInviting(true)
+  async function copyInviteUrl() {
+    if (!inviteUrl) return
     try {
-      await api.post('/inviteUsers', { groupId, userList: inviteList })
-      setInviteOpen(false)
-      setInviteList([])
-    } finally {
-      setInviting(false)
+      await navigator.clipboard.writeText(inviteUrl)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      // clipboard unavailable
     }
   }
 
@@ -1376,6 +1438,52 @@ export default function GroupDetailPage() {
     fontSize: 13.5, color: 'var(--text-1)', outline: 'none',
   }
 
+  // ── Member habit progress section ────────────────────────────────────────────
+  const memberProgressSection = groupHabits.length > 0 ? (
+    <Section title="Member progress">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {groupHabits.map((habit) => (
+          <div key={habit.habit_id} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            background: 'var(--surface-2)', borderRadius: 'var(--r-md)',
+            padding: '10px 14px',
+          }}>
+            <Avatar id={habit.user_id} size={32} label={habit.username ?? ''} name={habit.username ?? ''} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>{habit.emoji}</span>
+                <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {habit.title}
+                </span>
+                {habit.username && (
+                  <span style={{ fontSize: 11.5, color: 'var(--text-3)', marginLeft: 'auto', flexShrink: 0 }}>
+                    {habit.username}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, color: habit.color, fontWeight: 700 }}>
+                  {habit.streak >= 7 ? '🔥' : '⚡'} {habit.streak}
+                </span>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {habit.recentDays.map((done, i) => (
+                    <div key={i} style={{
+                      width: 8, height: 8, borderRadius: 2,
+                      background: done ? habit.color : 'var(--surface-3)',
+                    }} />
+                  ))}
+                </div>
+                {habit.completedToday && (
+                  <span style={{ fontSize: 11, color: habit.color, fontWeight: 650 }}>✓ today</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  ) : null
+
   const challengesSection = (
     <Section title="Challenges" count={challenges.length || undefined}>
       <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '0 0 12px', lineHeight: 1.5 }}>
@@ -1649,7 +1757,7 @@ export default function GroupDetailPage() {
             {activeTab === 'overview' && <>{pactSection}{eventsSection}{tasksSection}{challengesSection}{dangerZone}</>}
             {activeTab === 'events'   && eventsSection}
             {activeTab === 'tasks'    && tasksSection}
-            {activeTab === 'members'  && <>{membersSection}{dangerZone}</>}
+            {activeTab === 'members'  && <>{membersSection}{memberProgressSection}{dangerZone}</>}
           </>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 32 }}>
@@ -1662,6 +1770,7 @@ export default function GroupDetailPage() {
             </div>
             <div>
               {membersSection}
+              {memberProgressSection}
               {activitySection}
             </div>
           </div>
@@ -1672,73 +1781,141 @@ export default function GroupDetailPage() {
       {inviteOpen && (
         <Modal title="Invite members" onClose={() => setInviteOpen(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <form onSubmit={searchUser} style={{ display: 'flex', gap: 8 }}>
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by username or email"
-                style={{ ...inputStyle, flex: 1 }}
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <Segmented
+                size="sm"
+                options={[
+                  { value: 'link', label: 'QR / Link', icon: 'share' },
+                  { value: 'people', label: 'Find people', icon: 'users' },
+                ]}
+                value={inviteTab}
+                onChange={(v) => setInviteTab(v as 'link' | 'people')}
               />
-              <Button type="submit" variant="secondary" size="sm" disabled={searching}>
-                {searching ? '…' : 'Search'}
-              </Button>
-            </form>
-
-            {searchResult && (
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: 'var(--r-md)',
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border-2)',
-              }}>
-                <div>
-                  <p style={{ fontSize: 13.5, fontWeight: 650, color: 'var(--text-1)', margin: 0 }}>{searchResult.username}</p>
-                  <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>{searchResult.email}</p>
-                </div>
-                <Button variant="soft" size="sm" onClick={addToInviteList}>Add</Button>
-              </div>
-            )}
-
-            {inviteList.length > 0 && (
-              <div>
-                <p style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  To invite:
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {inviteList.map((u) => (
-                    <div key={u.user_id} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--r-sm)',
-                      background: 'var(--surface-2)',
-                    }}>
-                      <span style={{ fontSize: 13.5, color: 'var(--text-1)' }}>{u.username}</span>
-                      <button
-                        onClick={() => setInviteList((prev) => prev.filter((x) => x.user_id !== u.user_id))}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex' }}
-                      >
-                        <Icon name="close" size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
-              <Button
-                variant="primary"
-                full
-                disabled={inviting || inviteList.length === 0}
-                onClick={sendInvites}
-              >
-                {inviting ? 'Inviting…' : 'Send invites'}
-              </Button>
-              <Button variant="secondary" full onClick={() => setInviteOpen(false)}>
-                Cancel
-              </Button>
             </div>
+
+            {inviteTab === 'link' && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                {inviteUrlLoading && (
+                  <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '24px 0' }}>Generating link…</p>
+                )}
+                {inviteUrlError && !inviteUrlLoading && (
+                  <p style={{
+                    fontSize: 12.5, color: 'hsl(0 70% 65%)', margin: 0,
+                    padding: '8px 12px', background: 'hsl(0 70% 50% / 0.1)', borderRadius: 'var(--r-sm)',
+                  }}>
+                    Could not generate an invite link. Close and try again.
+                  </p>
+                )}
+                {inviteUrl && (
+                  <>
+                    {/* QR tile — white padding so it scans in dark theme */}
+                    <div style={{
+                      background: '#fff',
+                      padding: 12,
+                      borderRadius: 'var(--r-lg)',
+                      lineHeight: 0,
+                      boxShadow: 'var(--shadow-sm)',
+                    }}>
+                      <QRCodeSVG value={inviteUrl} size={180} aria-label="Group invite QR code" />
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0, textAlign: 'center' }}>
+                      Scan the code or share the link — anyone with it can join this group.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'center' }}>
+                      <input
+                        readOnly
+                        value={inviteUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                        aria-label="Invite link"
+                        style={{ ...inputStyle, flex: 1, fontSize: 12, color: 'var(--text-2)' }}
+                      />
+                      <Button variant="secondary" size="sm" icon={linkCopied ? 'check' : 'share'} onClick={copyInviteUrl}>
+                        {linkCopied ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {inviteTab === 'people' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <input
+                  value={peopleQuery}
+                  onChange={(e) => setPeopleQuery(e.target.value)}
+                  placeholder="Search by username or email"
+                  aria-label="Search people"
+                  style={inputStyle}
+                  autoFocus
+                />
+
+                {peopleQuery.trim().length < 2 ? (
+                  <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, textAlign: 'center', padding: '14px 0' }}>
+                    Search by username or email
+                  </p>
+                ) : peopleSearching ? (
+                  <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, textAlign: 'center', padding: '14px 0' }}>
+                    Searching…
+                  </p>
+                ) : peopleResults.length === 0 ? (
+                  <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, textAlign: 'center', padding: '14px 0' }}>
+                    No one found for “{peopleQuery.trim()}”.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 280, overflowY: 'auto' }} className="scroll">
+                    {peopleResults.map((u) => {
+                      const invited = invitedIds.has(u.user_id)
+                      return (
+                        <div
+                          key={u.user_id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 12,
+                            padding: '9px 12px',
+                            borderRadius: 'var(--r-md)',
+                            background: 'var(--surface-2)',
+                            border: '1px solid var(--border)',
+                          }}
+                        >
+                          <Avatar id={u.user_id} size={32} name={u.username} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{
+                              fontSize: 13.5, fontWeight: 650, color: 'var(--text-1)', margin: 0,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {u.username}
+                            </p>
+                            <p style={{
+                              fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {u.email}
+                            </p>
+                          </div>
+                          {invited ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                              fontSize: 12, fontWeight: 650, color: 'var(--g-work)', flexShrink: 0,
+                            }}>
+                              <Icon name="check" size={13} sw={2.2} />
+                              Invited
+                            </span>
+                          ) : (
+                            <Button
+                              variant="soft"
+                              size="sm"
+                              disabled={invitingId === u.user_id}
+                              onClick={() => inviteUser(u)}
+                            >
+                              {invitingId === u.user_id ? 'Inviting…' : 'Invite'}
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </Modal>
       )}

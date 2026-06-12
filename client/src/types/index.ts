@@ -52,6 +52,7 @@ export interface Group {
   groups_title: string
   groups_description: string
   tag_name: string
+  shared_color?: string | null
   members?: Member[]
   events?: CalEvent[]
   todoLists?: TaskList[]
@@ -87,6 +88,7 @@ export interface CalEvent {
     groupName?: string
     groupsId?: string
     createdBy?: string
+    publicToken?: string | null
     recurrenceRule?: string | null
     isRecurring?: boolean
     recurringEventId?: string | number

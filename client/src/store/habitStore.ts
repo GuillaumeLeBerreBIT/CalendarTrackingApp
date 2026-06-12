@@ -36,7 +36,19 @@ interface HabitStore {
     frequency: 'daily' | 'weekly'
     emoji: string
     color: string
-    groups_id?: string
+    groups_id?: string | null
+    challenge_id?: number | null
+    contribution_value?: number
+    weekly_target?: number | null
+    target_increment?: number
+  }) => Promise<void>
+  editHabit: (habitId: number, data: {
+    title?: string
+    emoji?: string
+    color?: string
+    groups_id?: string | null
+    challenge_id?: number | null
+    contribution_value?: number
     weekly_target?: number | null
     target_increment?: number
   }) => Promise<void>
@@ -95,6 +107,11 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
   createHabit: async (data) => {
     await api.post('/habits', data)
+    await get().fetchHabits()
+  },
+
+  editHabit: async (habitId, data) => {
+    await api.put(`/habits/${habitId}`, data)
     await get().fetchHabits()
   },
 

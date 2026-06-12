@@ -5,7 +5,7 @@ import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
 import { Empty } from '@/components/ui/Primitives'
-import { groupColorByIndex } from './GroupsPage'
+import { groupColorById } from './GroupsPage'
 import EventFormModal from '@/components/EventFormModal'
 
 type Assignee = { userId: string; username: string | null }
@@ -259,6 +259,21 @@ function TaskItem({ task, color, taskListId, onToggle, onAssign, onSchedule }: {
         }}>
           {task.task_title}
         </p>
+        {task.task_description && (
+          <p style={{
+            fontSize: 12,
+            color: 'var(--text-3)',
+            margin: '3px 0 0',
+            lineHeight: 1.45,
+            textDecoration: task.is_completed ? 'line-through' : 'none',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>
+            {task.task_description}
+          </p>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
           {task.priority && (
             <span style={{
@@ -349,7 +364,6 @@ function TaskItem({ task, color, taskListId, onToggle, onAssign, onSchedule }: {
 // ── Task list card ────────────────────────────────────────────────────────────
 interface TaskListCardProps {
   tl: TaskList
-  groupIndex: number
   isExpanded: boolean
   onToggleExpand: () => void
   onAddTask: () => void
@@ -358,9 +372,9 @@ interface TaskListCardProps {
   onScheduleTask: (task: Task, groupsId: string) => void
 }
 
-function TaskListCard({ tl, groupIndex, isExpanded, onToggleExpand, onAddTask, onToggleTask, onAssign, onScheduleTask }: TaskListCardProps) {
+function TaskListCard({ tl, isExpanded, onToggleExpand, onAddTask, onToggleTask, onAssign, onScheduleTask }: TaskListCardProps) {
   const { idTl, idG, title, tag_group } = tl.taskListInfo
-  const color = groupColorByIndex(groupIndex)
+  const color = groupColorById(idG)
   const pct = tl.totalTasks > 0 ? Math.round((tl.totalCompletedTasks / tl.totalTasks) * 100) : 0
 
   return (
@@ -482,13 +496,6 @@ function TaskListCard({ tl, groupIndex, isExpanded, onToggleExpand, onAddTask, o
   )
 }
 
-// ── Build a tag → index map for consistent color assignment ───────────────────
-function buildTagIndexMap(groups: Group[]): Map<string, number> {
-  const m = new Map<string, number>()
-  groups.forEach((g, i) => m.set(g.tag_name, i))
-  return m
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function TodoPage() {
   const [taskLists, setTaskLists] = useState<TaskList[]>([])
@@ -566,8 +573,6 @@ export default function TodoPage() {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
-  const tagIndexMap = buildTagIndexMap(groups)
-
   return (
     <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 760, margin: '0 auto' }}>
       {/* Header */}
@@ -590,13 +595,11 @@ export default function TodoPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {taskLists.map((tl) => {
-            const { idTl, tag_group } = tl.taskListInfo
-            const groupIdx = tagIndexMap.get(tag_group) ?? 0
+            const { idTl } = tl.taskListInfo
             return (
               <TaskListCard
                 key={idTl}
                 tl={tl}
-                groupIndex={groupIdx}
                 isExpanded={!!expanded[idTl]}
                 onToggleExpand={() => toggleExpand(idTl)}
                 onAddTask={() => setCreateTaskOpen(idTl)}

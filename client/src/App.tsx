@@ -1,8 +1,9 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import OnboardingFlow from '@/components/OnboardingFlow'
+import OnboardingWizard from '@/components/OnboardingWizard'
+import UpgradeModal from '@/components/UpgradeModal'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import DiscoveryPage from '@/pages/DiscoveryPage'
@@ -35,21 +36,16 @@ function AppInner() {
     if (user) subscribeToPush()
   }, [user])
 
-  // Show onboarding only when the field is explicitly false (new users).
-  // undefined or true means existing/completed user → skip wizard.
-  const [showOnboarding, setShowOnboarding] = useState(false)
-
-  useEffect(() => {
-    if (user?.hasCompletedOnboarding === false) {
-      setShowOnboarding(true)
-    }
-  }, [user])
+  // Show onboarding only when auth is resolved (user !== null) and the flag is
+  // explicitly false — never flashes for logged-out users or while fetchMe is
+  // pending. The wizard flips the flag in the auth store on completion/skip,
+  // which unmounts it here without a reload.
+  const showOnboarding = !!user && user.hasCompletedOnboarding === false
 
   return (
     <>
-      {showOnboarding && (
-        <OnboardingFlow onComplete={() => setShowOnboarding(false)} />
-      )}
+      {showOnboarding && <OnboardingWizard />}
+      <UpgradeModal />
 
       <Routes>
         {/* DEV-only harness */}
@@ -69,7 +65,7 @@ function AppInner() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/join/:token" element={<JoinGroupPage />} />
-        <Route path="/e/:eventId" element={<PublicEventPage />} />
+        <Route path="/e/:token" element={<PublicEventPage />} />
 
         {/* Protected — wrapped in AppShell */}
         <Route

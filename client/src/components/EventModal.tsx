@@ -60,7 +60,7 @@ function isDiscovery(data: DiscoveryEvent | CalEvent): data is DiscoveryEvent {
 
 export default function EventModal({ data, onClose, savedSet, onSave, onEdit, currentUserId, onSaveToCalendar, onRsvp }: EventModalProps) {
   const navigate = useNavigate()
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
   const isCalEvent = 'extendedProps' in data
   const eventId = isCalEvent ? data.id : null
 
@@ -92,10 +92,15 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
 
   function handleShare() {
     if (isDisc) return
-    // Extract the real DB event id: data.id may be "uuid::suffix" for recurring events
-    const rawId = data.id ?? ''
-    const dbId = rawId.includes('::') ? rawId.split('::')[0] : rawId
-    navigator.clipboard.writeText(window.location.origin + '/e/' + dbId).then(() => {
+    const token = calEvent?.extendedProps?.publicToken
+    if (!token) return
+    const url = window.location.origin + '/e/' + token
+    // Native share sheet on mobile (WhatsApp etc.), clipboard fallback on desktop
+    if (navigator.share) {
+      navigator.share({ title: calEvent?.title ?? 'Event', url }).catch(() => {})
+      return
+    }
+    navigator.clipboard.writeText(url).then(() => {
       setShareCopied(true)
       setTimeout(() => setShareCopied(false), 2000)
     }).catch(() => {})

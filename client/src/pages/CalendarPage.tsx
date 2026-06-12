@@ -449,7 +449,7 @@ export default function CalendarPage() {
   const calRef = useRef<FullCalendar>(null)
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
+    const check = () => setIsMobile(window.innerWidth < 1024)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
@@ -1029,15 +1029,20 @@ export default function CalendarPage() {
                 eventDidMount={(info) => {
                   const hex = eventHex(info.event.extendedProps as Record<string, unknown>)
                   const isTentative = info.event.extendedProps?.status === 'tentative'
-                  // Compute transparent bg — handle both #rrggbb and hsl(...) formats
+                  // Compute transparent bg — handle both #rrggbb and hsl(...) formats.
+                  // Tentative events get a fainter fill so they read as unconfirmed.
+                  const alpha = isTentative ? 0.07 : 0.12
                   const bgAlpha = hex.startsWith('hsl(') && hex.endsWith(')')
-                    ? hex.slice(0, -1) + ' / 0.12)'
-                    : hex + '1e'
+                    ? hex.slice(0, -1) + ` / ${alpha})`
+                    : hex + (isTentative ? '12' : '1e')
                   // Feed CSS custom properties — index.css reads these on .fc-daygrid-event
                   info.el.style.setProperty('--fc-event-bg-color', bgAlpha)
                   info.el.style.setProperty('--fc-event-border-color', hex)
                   if (isTentative) {
+                    // Dashed outline + reduced opacity (opacity comes from the
+                    // .fc-event-tentative rule in index.css)
                     info.el.classList.add('fc-event-tentative')
+                    info.el.style.borderStyle = 'dashed'
                   }
                 }}
               />

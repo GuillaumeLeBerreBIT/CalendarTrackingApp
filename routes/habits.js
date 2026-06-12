@@ -133,7 +133,7 @@ router.get('/habits', authRequire, async (req, res) => {
 // ─── POST /habits ─────────────────────────────────────────────────────────────
 
 router.post('/habits', authRequire, async (req, res) => {
-  const { title, frequency, emoji, color, groups_id, xp_value, weekly_target, target_increment } = req.body;
+  const { title, frequency, emoji, color, groups_id, xp_value, weekly_target, target_increment, challenge_id, contribution_value } = req.body;
 
   if (!title || typeof title !== 'string' || title.trim() === '') {
     return res.status(400).json({ success: false, error: 'title is required.' });
@@ -144,6 +144,19 @@ router.post('/habits', authRequire, async (req, res) => {
   }
 
   const weeklyTargetNum = weekly_target ? Math.max(1, Math.min(14, parseInt(weekly_target, 10) || 0)) || null : null;
+  const parsedGroupId = groups_id ? parseInt(groups_id, 10) || null : null;
+  const parsedChallengeId = challenge_id ? parseInt(challenge_id, 10) || null : null;
+
+  // Verify challenge belongs to the specified group before linking
+  if (parsedChallengeId && parsedGroupId) {
+    const { data: ch } = await req.supabase
+      .from('group_challenges')
+      .select('challenge_id')
+      .eq('challenge_id', parsedChallengeId)
+      .eq('groups_id', parsedGroupId)
+      .maybeSingle();
+    if (!ch) return res.status(400).json({ success: false, error: 'Challenge not found in this group.' });
+  }
 
   const { data: habit, error } = await req.supabase
     .from('habits')
@@ -153,7 +166,9 @@ router.post('/habits', authRequire, async (req, res) => {
       frequency,
       emoji: emoji || null,
       color: color || null,
-      groups_id: groups_id ? parseInt(groups_id, 10) || null : null,
+      groups_id: parsedGroupId,
+      challenge_id: parsedChallengeId,
+      contribution_value: parsedChallengeId ? Math.max(1, parseInt(contribution_value, 10) || 1) : null,
       xp_value: Math.max(1, Math.min(100, parseInt(xp_value, 10) || 10)),
       weekly_target: weeklyTargetNum,
       target_increment: weeklyTargetNum ? (parseInt(target_increment, 10) || 0) : 0,
@@ -182,6 +197,67 @@ router.delete('/habits/:id', authRequire, async (req, res) => {
   if (error) return res.status(500).json({ success: false, error: error.message });
 
   return res.status(204).send();
+});
+
+// ─── PUT /habits/:id ──────────────────────────────────────────────────────────
+
+router.put('/habits/:id', authRequire, async (req, res) => {
+  const habitId = parseInt(req.params.id, 10);
+  if (isNaN(habitId)) return res.status(400).json({ success: false, error: 'Invalid habit id.' });
+
+  const { title, emoji, color, weekly_target, target_increment, groups_id, challenge_id, contribution_value } = req.body;
+
+  const updates = {};
+  if (title !== undefined) {
+    if (!title || typeof title !== 'string' || title.trim() === '')
+      return res.status(400).json({ success: false, error: 'title cannot be empty.' });
+    updates.title = title.trim();
+  }
+  if (emoji !== undefined) updates.emoji = emoji || null;
+  if (color !== undefined) updates.color = color || null;
+  if (groups_id !== undefined) updates.groups_id = groups_id ? parseInt(groups_id, 10) || null : null;
+
+  const parsedChallengeId = challenge_id !== undefined
+    ? (challenge_id ? parseInt(challenge_id, 10) || null : null)
+    : undefined;
+
+  if (parsedChallengeId !== undefined) {
+    if (parsedChallengeId && updates.groups_id) {
+      const { data: ch } = await req.supabase
+        .from('group_challenges')
+        .select('challenge_id')
+        .eq('challenge_id', parsedChallengeId)
+        .eq('groups_id', updates.groups_id)
+        .maybeSingle();
+      if (!ch) return res.status(400).json({ success: false, error: 'Challenge not found in this group.' });
+    }
+    updates.challenge_id = parsedChallengeId;
+    updates.contribution_value = parsedChallengeId
+      ? Math.max(1, parseInt(contribution_value, 10) || 1)
+      : null;
+  }
+
+  if (weekly_target !== undefined) {
+    const wt = weekly_target ? Math.max(1, Math.min(14, parseInt(weekly_target, 10) || 0)) || null : null;
+    updates.weekly_target = wt;
+    updates.target_increment = wt ? (parseInt(target_increment, 10) || 0) : 0;
+  }
+
+  if (!Object.keys(updates).length)
+    return res.status(400).json({ success: false, error: 'No fields to update.' });
+
+  const { data: habit, error } = await req.supabase
+    .from('habits')
+    .update(updates)
+    .eq('habit_id', habitId)
+    .eq('user_id', req.cookies.userId)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  if (!habit) return res.status(404).json({ success: false, error: 'Habit not found.' });
+
+  return res.json({ success: true, habit });
 });
 
 // ─── POST /habits/:id/log ─────────────────────────────────────────────────────

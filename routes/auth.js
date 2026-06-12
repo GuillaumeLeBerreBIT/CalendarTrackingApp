@@ -3,6 +3,13 @@ import rateLimit from "express-rate-limit";
 import supabase from "../db/supabase.js";
 import { validatePassword, setSessionCookies } from "../utils/utils.js";
 import authRequire from "../utils/utils.js";
+import {
+  attachTier,
+  countAcceptedGroups,
+  countEventsThisMonth,
+  FREE_MAX_GROUPS,
+  FREE_MAX_EVENTS_MONTH,
+} from "../utils/tier.js";
 
 const router = express.Router();
 
@@ -106,6 +113,40 @@ router.get('/profile', authRequire, async (req, res) => {
     hasCompletedOnboarding: profile.has_completed_onboarding === true,
     searchable: profile.searchable !== false,
     total_xp: profile.total_xp || 0,
+  });
+});
+
+/**
+ * GET /usage
+ * Returns the user's plan/tier plus current usage against free-tier limits.
+ * Plus / always-free users still get real counts (frontend shows "unlimited").
+ */
+router.get('/usage', authRequire, attachTier, async (req, res) => {
+  const userId = req.cookies.userId;
+  const client = req.supabase || supabase;
+
+  const { data: profile, error: profileError } = await client
+    .from('profiles')
+    .select('plan, always_free')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError) {
+    return res.status(500).json({ success: false, error: profileError.message });
+  }
+
+  const [groupsUsed, eventsUsed] = await Promise.all([
+    countAcceptedGroups(client, userId),
+    countEventsThisMonth(client, userId),
+  ]);
+
+  return res.json({
+    success: true,
+    plan: profile.plan || 'free',
+    alwaysFree: profile.always_free === true,
+    tier: req.tier,
+    groups: { used: groupsUsed, max: FREE_MAX_GROUPS },
+    eventsThisMonth: { used: eventsUsed, max: FREE_MAX_EVENTS_MONTH },
   });
 });
 

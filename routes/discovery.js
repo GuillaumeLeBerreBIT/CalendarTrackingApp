@@ -172,7 +172,15 @@ router.get("/discovery", authRequire, discoveryLimiter, async (req, res) => {
 
     const data = await tmRes.json();
     const rawEvents = data?._embedded?.events ?? [];
-    const events = rawEvents.map(mapTicketmasterEvent);
+    // TM returns the same show multiple times (one entry per ticket pool, distinct
+    // ids) — dedupe on title+date+venue, keeping the first (earliest, sort=date,asc).
+    const seen = new Set();
+    const events = rawEvents.map(mapTicketmasterEvent).filter((ev) => {
+      const sig = `${ev.title.toLowerCase()}|${ev.date}|${ev.venue.toLowerCase()}`;
+      if (seen.has(sig)) return false;
+      seen.add(sig);
+      return true;
+    });
 
     cache.set(cacheKey, { ts: Date.now(), events });
     return res.json({ success: true, events });

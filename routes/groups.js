@@ -2,6 +2,7 @@ import express from "express";
 import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire ,{retrieveEvents, retrieveTodoLists, retrieveAllTasks } from "../utils/utils.js"
 import { notifyUsers } from "../utils/notifications.js";
+import { attachTier, checkLimit } from "../utils/tier.js";
 import { format } from "date-fns";
 const router = express.Router();
 
@@ -76,6 +77,7 @@ router.get("/groups", authRequire, async (req, res) => {
           tag: group.tag_name,
           tag_name: group.tag_name,
           groupId: group.groups_id,
+          sharedColor: group.shared_color || null,
           created_at: format(new Date(group.created_at), 'dd-MM-yyyy'),
           created_at_raw: group.created_at,
           totalTasks: totalTasks,
@@ -179,6 +181,64 @@ router.post('/checkUser', authRequire ,async (req, res) => {
 
 });
 
+/**
+ * GET /api/users/search?q=&groups_id=
+ * Search for searchable users by username or email substring.
+ * Returns at most 10 matches, excluding the requesting user and (optionally)
+ * users already in the given group.
+ */
+router.get('/users/search', authRequire, async (req, res) => {
+  try {
+    const raw = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (raw.length < 2 || raw.length > 100) {
+      return res.json({ success: true, users: [] });
+    }
+
+    // Sanitize for PostgREST or() filter syntax — strip injection-capable chars
+    const q = raw.replace(/[,()%*]/g, '');
+    if (q.length < 2) {
+      return res.json({ success: true, users: [] });
+    }
+
+    let query = req.supabase
+      .from('profiles')
+      .select('user_id, username, email')
+      .eq('searchable', true)
+      .or(`username.ilike.*${q}*,email.ilike.*${q}*`)
+      .neq('user_id', req.cookies.userId)
+      .limit(10);
+
+    const { data: users, error } = await query;
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    let results = users || [];
+
+    // Optionally exclude users already in a given group (any invite_status)
+    const groupsId = req.query.groups_id ? parseInt(req.query.groups_id) : NaN;
+    if (!isNaN(groupsId) && results.length > 0) {
+      const { data: existingMembers, error: membersError } = await req.supabase
+        .from('profiles_groups')
+        .select('user_id')
+        .eq('groups_id', groupsId)
+        .in('user_id', results.map(u => u.user_id));
+
+      if (!membersError && existingMembers) {
+        const memberIds = new Set(existingMembers.map(m => m.user_id));
+        results = results.filter(u => !memberIds.has(u.user_id));
+      }
+    }
+
+    return res.json({
+      success: true,
+      users: results.map(u => ({ user_id: u.user_id, username: u.username, email: u.email })),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.post('/inviteUsers', authRequire, async (req, res) => {
 
   try {
@@ -278,7 +338,12 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
   }
 });
 
-router.post('/createGroup', authRequire, async (req, res) => {
+router.post('/createGroup', authRequire, attachTier, checkLimit('groups'), async (req, res) => {
+
+  // Optional creator-picked color (hex only — same validation as setGroupSharedColor)
+  const sharedColor = typeof req.body['shared-color'] === 'string' && /^#[0-9a-fA-F]{6}$/.test(req.body['shared-color'])
+    ? req.body['shared-color']
+    : null;
 
   const {data: newGroup, error: newGroupError} = await req.supabase
   .from('groups')
@@ -286,6 +351,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
       groups_title: req.body['group-title'],
       groups_description: req.body['group-description'],
       tag_name: req.body['tag-name'],
+      ...(sharedColor && { shared_color: sharedColor }),
     })
   .select()
 
@@ -470,6 +536,10 @@ router.post('/setGroupSharedColor', authRequire, async (req, res) => {
     return res.status(400).json({ success: false, error: 'groupsId and sharedColor are required' });
   }
 
+  if (!/^#[0-9a-fA-F]{6}$/.test(sharedColor)) {
+    return res.status(400).json({ success: false, error: 'sharedColor must be a hex color like #aabbcc.' });
+  }
+
   const { data: membership, error: membershipError } = await req.supabase
     .from('profiles_groups')
     .select('role')
@@ -496,6 +566,10 @@ router.post('/setMemberColor', authRequire, async (req, res) => {
 
   if (!groupsId || !color) {
     return res.status(400).json({ success: false, error: 'groupsId and color are required' });
+  }
+
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+    return res.status(400).json({ success: false, error: 'color must be a hex color like #aabbcc.' });
   }
 
   const { error } = await req.supabase

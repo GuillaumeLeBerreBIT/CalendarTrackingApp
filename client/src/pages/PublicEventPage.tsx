@@ -68,7 +68,7 @@ function formatDateTime(date: string, time?: string): string {
 }
 
 export default function PublicEventPage() {
-  const { eventId } = useParams<{ eventId: string }>()
+  const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -76,8 +76,8 @@ export default function PublicEventPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!eventId) return
-    api.get(`/e/${eventId}`)
+    if (!token) return
+    api.get(`/e/${token}`)
       .then(({ data }) => {
         if (data.success && data.event) {
           setEvent(data.event)
@@ -93,7 +93,7 @@ export default function PublicEventPage() {
         }
       })
       .finally(() => setLoading(false))
-  }, [eventId])
+  }, [token])
 
   return (
     <div style={{

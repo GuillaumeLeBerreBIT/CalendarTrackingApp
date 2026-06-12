@@ -12,6 +12,20 @@ export function groupColorByIndex(idx: number) {
   return GROUP_COLOR_PALETTE[idx % GROUP_COLOR_PALETTE.length]
 }
 
+/** Stable hash of the group id → palette index. Unlike position-based cycling,
+ *  a group keeps its color when the list reorders or other groups are deleted. */
+export function groupColorById(groupsId: string | number) {
+  const s = String(groupsId)
+  let hash = 0
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0
+  return GROUP_COLOR_PALETTE[Math.abs(hash) % GROUP_COLOR_PALETTE.length]
+}
+
+/** Creator-picked shared color when set, stable hash fallback otherwise. */
+export function groupColorFor(group: { groups_id: string | number; shared_color?: string | null }) {
+  return group.shared_color || groupColorById(group.groups_id)
+}
+
 // ── Striped image-placeholder overlay ────────────────────────────────────────
 function ImgPh({ opacity = 0.25 }: { opacity?: number }) {
   return (
@@ -33,13 +47,12 @@ function ImgPh({ opacity = 0.25 }: { opacity?: number }) {
 // ── Group card ────────────────────────────────────────────────────────────────
 interface GroupCardProps {
   group: Group
-  index: number
   onClick: () => void
 }
 
-function GroupCard({ group, index, onClick }: GroupCardProps) {
+function GroupCard({ group, onClick }: GroupCardProps) {
   const [hovered, setHovered] = useState(false)
-  const color = groupColorByIndex(index)
+  const color = groupColorFor(group)
   const letter = group.groups_title?.[0]?.toUpperCase() ?? 'G'
 
   const memberCount = group.members?.length ?? 0
@@ -336,7 +349,7 @@ export default function GroupsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ 'group-title': '', 'group-description': '', 'tag-name': '' })
+  const [form, setForm] = useState({ 'group-title': '', 'group-description': '', 'tag-name': '', 'shared-color': '' })
   const [creating, setCreating] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -352,11 +365,12 @@ export default function GroupsPage() {
         type RawMember = { user_id: string; role?: string; profile?: { username?: string; email?: string } }
         // Merge groupInfo with top-level fields (members, events, todoLists, totalEvents)
         type RawTotalTasks = { all: number; completed: number } | null
-        const mapped: Group[] = data.userGroups.map((g: { groupInfo: { groupId: string; title: string; description: string; tag: string; created_at?: string; totalTasks?: RawTotalTasks; progressWidth?: number }; members: RawMember[]; events: Group['events']; todoLists: Group['todoLists']; totalEvents: number }) => ({
+        const mapped: Group[] = data.userGroups.map((g: { groupInfo: { groupId: string; title: string; description: string; tag: string; sharedColor?: string | null; created_at?: string; totalTasks?: RawTotalTasks; progressWidth?: number }; members: RawMember[]; events: Group['events']; todoLists: Group['todoLists']; totalEvents: number }) => ({
           groups_id: String(g.groupInfo.groupId),
           groups_title: g.groupInfo.title,
           groups_description: g.groupInfo.description,
           tag_name: g.groupInfo.tag,
+          shared_color: g.groupInfo.sharedColor ?? null,
           members: (g.members ?? []).map((m): NonNullable<Group['members']>[number] => ({
             user_id: m.user_id,
             username: m.profile?.username ?? '',
@@ -402,7 +416,7 @@ export default function GroupsPage() {
     try {
       await api.post('/createGroup', form)
       setCreateOpen(false)
-      setForm({ 'group-title': '', 'group-description': '', 'tag-name': '' })
+      setForm({ 'group-title': '', 'group-description': '', 'tag-name': '', 'shared-color': '' })
       load()
     } finally {
       setCreating(false)
@@ -528,13 +542,12 @@ export default function GroupsPage() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))',
           gap: 16,
         }}>
-          {groups.map((g, i) => {
+          {groups.map((g) => {
             const isSelected = selectedIds.has(g.groups_id)
             return (
               <div key={g.groups_id} style={{ position: 'relative' }}>
                 <GroupCard
                   group={g}
-                  index={i}
                   onClick={() => selectMode ? toggleSelect(g.groups_id) : navigate(`/groups/${g.groups_id}`)}
                 />
                 {selectMode && (
@@ -611,6 +624,33 @@ export default function GroupsPage() {
                 style={inputStyle}
                 placeholder="my-tag"
               />
+            </div>
+            <div>
+              <label style={labelStyle}>Color</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {GROUP_COLOR_PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, 'shared-color': p['shared-color'] === c ? '' : c }))}
+                    aria-label={`Group color ${c}`}
+                    style={{
+                      width: 28, height: 28, borderRadius: '50%', background: c,
+                      border: form['shared-color'] === c ? '3px solid var(--text-1)' : '2px solid transparent',
+                      outline: form['shared-color'] === c ? '2px solid var(--accent)' : 'none',
+                      outlineOffset: 2,
+                      cursor: 'pointer', flexShrink: 0, transition: 'var(--transition)',
+                    }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={form['shared-color'] || '#818cf8'}
+                  onChange={(e) => setForm((p) => ({ ...p, 'shared-color': e.target.value }))}
+                  title="Custom color"
+                  style={{ width: 28, height: 28, padding: 0, border: '1px solid var(--border-2)', borderRadius: '50%', background: 'transparent', cursor: 'pointer' }}
+                />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
               <Button type="submit" variant="primary" full disabled={creating}>

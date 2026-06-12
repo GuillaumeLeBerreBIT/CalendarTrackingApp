@@ -2,6 +2,7 @@ import express from "express";
 import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire, { createEventObj } from "../utils/utils.js";
 import { notifyUsers } from "../utils/notifications.js";
+import { attachTier, checkLimit } from "../utils/tier.js";
 import { expandRecurringEvent, capRuleUntil } from "../utils/recurrence.js";
 
 const router = express.Router()
@@ -20,7 +21,7 @@ async function canManageEvent(reqSupabase, event, userId) {
   return !!data;
 }
 
-router.post("/parseEvent", authRequire, async (req, res) => {
+router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), async (req, res) => {
 
   const insertEventObj = createEventObj(req.body)
   const eventStatus = req.body.status === 'tentative' ? 'tentative' : 'confirmed';
@@ -74,6 +75,32 @@ router.post("/parseEvent", authRequire, async (req, res) => {
       .insert(optionRows);
     if (optionsError) {
       return res.status(500).json({ success: false, error: optionsError.message });
+    }
+  }
+
+  // Tentative event: ask all accepted group members (except the creator) to vote
+  if (eventStatus === 'tentative' && eventData[0].groups_id) {
+    try {
+      const groupsId = eventData[0].groups_id;
+      const { data: voteMembers } = await req.supabase
+        .from('profiles_groups')
+        .select('user_id')
+        .eq('groups_id', groupsId)
+        .eq('invite_status', 'accepted');
+
+      const voterIds = (voteMembers || [])
+        .map(m => m.user_id)
+        .filter(id => id !== req.cookies.userId);
+
+      if (voterIds.length > 0) {
+        await notifyUsers(req.supabase, voterIds, 'event_invite', {
+          title: 'Vote on a date',
+          body: `Vote on a date for "${eventData[0].event_title}"`,
+          link: `/groups/${groupsId}`,
+        });
+      }
+    } catch (notifyError) {
+      console.warn('Tentative vote notification failed:', notifyError.message);
     }
   }
 
@@ -732,6 +759,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
             imageUrl: e.image_url || null,
             eventType: e.event_type || 'appointment',
             createdBy: e.created_by || null,
+            publicToken: e.public_token || null,
             recurrenceRule: e.recurrence_rule || null,
             isRecurring: !!e.recurrence_rule,
             recurringEventId: e.event_id,
@@ -844,20 +872,23 @@ router.patch('/rsvp/:eventId', authRequire, async (req, res) => {
 })
 
 /**
- * GET /api/e/:eventId
+ * GET /api/e/:token
  * PUBLIC — no auth required. Returns non-sensitive event details for sharing.
+ * Looks up by public_token (random UUID) so event IDs can't be enumerated.
  * Uses supabaseAdmin to bypass RLS (the events table requires auth.uid()).
  */
-router.get('/e/:eventId', async (req, res) => {
-  const eventId = parseInt(req.params.eventId);
-  if (isNaN(eventId)) {
-    return res.status(400).json({ success: false, error: 'Invalid event ID.' });
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+router.get('/e/:token', async (req, res) => {
+  const { token } = req.params;
+  if (!UUID_RE.test(token)) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
   }
 
   const { data: event, error: eventError } = await supabaseAdmin
     .from('events')
     .select('event_id, event_title, event_description, start_date, start_time, end_date, end_time, all_day, location, groups_id, created_by')
-    .eq('event_id', eventId)
+    .eq('public_token', token)
     .single();
 
   if (eventError || !event) {
@@ -885,14 +916,13 @@ router.get('/e/:eventId', async (req, res) => {
     supabaseAdmin
       .from('profiles_events')
       .select('user_id', { count: 'exact', head: true })
-      .eq('event_id', eventId)
+      .eq('event_id', event.event_id)
       .eq('rsvp_status', 'going'),
   ]);
 
   return res.json({
     success: true,
     event: {
-      eventId: event.event_id,
       title: event.event_title,
       description: event.event_description || null,
       startDate: event.start_date,

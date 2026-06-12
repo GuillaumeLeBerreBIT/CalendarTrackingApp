@@ -3,7 +3,8 @@ import { useAuthStore } from '@/store/authStore'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
-import { Section } from '@/components/ui/Primitives'
+import { Section, Tag, Progress } from '@/components/ui/Primitives'
+import { Link } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
 import type { NotificationPrefs, ProfileStats } from '@/types'
 
@@ -173,6 +174,29 @@ export default function ProfilePage() {
     setSearchable(next)
     api.patch('/profile', { searchable: next }).catch(() => setSearchable(!next))
   }
+
+  // ── Plan & usage ─────────────────────────────────────────────────────────────
+  interface Usage {
+    plan: string
+    alwaysFree: boolean
+    tier: string
+    groups: { used: number; max: number }
+    eventsThisMonth: { used: number; max: number }
+  }
+  const [usage, setUsage] = useState<Usage | null>(null)
+  useEffect(() => {
+    api.get('/usage')
+      .then(({ data }) => {
+        if (data.success) setUsage({
+          plan: data.plan,
+          alwaysFree: !!data.alwaysFree,
+          tier: data.tier,
+          groups: data.groups,
+          eventsThisMonth: data.eventsThisMonth,
+        })
+      })
+      .catch(() => {})
+  }, [])
 
   const [stats, setStats] = useState<ProfileStats | null>(null)
   useEffect(() => {
@@ -395,6 +419,63 @@ export default function ProfilePage() {
           <StatCard n={stats?.groups ?? 0} label="Groups" />
           <StatCard n={stats?.saved ?? 0} label="Saved" />
         </div>
+      )}
+
+      {/* Plan & usage */}
+      {usage && (
+        <Section title="Plan & usage">
+          <div style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-lg)',
+            padding: '16px',
+          }}>
+            {(usage.plan === 'plus' || usage.alwaysFree) ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+                <Tag tone="free">
+                  <Icon name="sparkle" size={12} />
+                  Plus — unlimited
+                </Tag>
+                <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
+                  Unlimited groups and events. Thanks for being on Plus!
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7 }}>
+                    <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-2)' }}>Groups</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+                      {usage.groups.used} / {usage.groups.max}
+                    </span>
+                  </div>
+                  <Progress value={usage.groups.used} total={usage.groups.max} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7 }}>
+                    <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-2)' }}>Events this month</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+                      {usage.eventsThisMonth.used} / {usage.eventsThisMonth.max}
+                    </span>
+                  </div>
+                  <Progress value={usage.eventsThisMonth.used} total={usage.eventsThisMonth.max} />
+                </div>
+                <Link
+                  to="/pricing"
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 650,
+                    color: 'var(--accent)',
+                    textDecoration: 'none',
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  Upgrade to Plus →
+                </Link>
+              </div>
+            )}
+          </div>
+        </Section>
       )}
 
       {/* Account section */}
