@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button'
 import { Section, Tag, Progress } from '@/components/ui/Primitives'
 import { Link } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
+import { BILLING_ENABLED } from '@/lib/billing'
 import type { NotificationPrefs, ProfileStats } from '@/types'
 
 // ── Toggle switch ───────────────────────────────────────────────────────────────
@@ -173,6 +174,22 @@ export default function ProfilePage() {
   async function handleSearchableToggle(next: boolean) {
     setSearchable(next)
     api.patch('/profile', { searchable: next }).catch(() => setSearchable(!next))
+  }
+
+  // ── Stripe billing portal ─────────────────────────────────────────────────────
+  const [portalLoading, setPortalLoading] = useState(false)
+
+  async function handleManageBilling() {
+    setPortalLoading(true)
+    try {
+      const { data } = await api.post('/billing/portal')
+      if (data.success && data.url) window.location.href = data.url
+    } catch {
+      setMessage('Could not open billing portal. Please try again.')
+      setIsError(true)
+    } finally {
+      setPortalLoading(false)
+    }
   }
 
   // ── Data export & account deletion (GDPR) ─────────────────────────────────────
@@ -477,7 +494,7 @@ export default function ProfilePage() {
             padding: '16px',
           }}>
             {(usage.plan === 'plus' || usage.alwaysFree) ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
                 <Tag tone="free">
                   <Icon name="sparkle" size={12} />
                   Plus — unlimited
@@ -485,6 +502,15 @@ export default function ProfilePage() {
                 <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
                   Unlimited groups and events. Thanks for being on Plus!
                 </p>
+                {BILLING_ENABLED && !usage.alwaysFree && (
+                  <button
+                    onClick={handleManageBilling}
+                    disabled={portalLoading}
+                    style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--accent)', background: 'none', border: 'none', cursor: portalLoading ? 'not-allowed' : 'pointer', padding: 0, opacity: portalLoading ? 0.6 : 1 }}
+                  >
+                    {portalLoading ? 'Opening…' : 'Manage billing →'}
+                  </button>
+                )}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -506,18 +532,20 @@ export default function ProfilePage() {
                   </div>
                   <Progress value={usage.eventsThisMonth.used} total={usage.eventsThisMonth.max} />
                 </div>
-                <Link
-                  to="/pricing"
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: 650,
-                    color: 'var(--accent)',
-                    textDecoration: 'none',
-                    alignSelf: 'flex-start',
-                  }}
-                >
-                  Upgrade to Plus →
-                </Link>
+                {BILLING_ENABLED && (
+                  <Link
+                    to="/pricing"
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 650,
+                      color: 'var(--accent)',
+                      textDecoration: 'none',
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    Upgrade to Plus →
+                  </Link>
+                )}
               </div>
             )}
           </div>

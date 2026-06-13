@@ -73,7 +73,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     description: event?.extendedProps?.description ?? '',
     location: (event?.extendedProps?.location as string | undefined) ?? prefill?.location ?? '',
     imageUrl: (event?.extendedProps?.imageUrl as string | undefined) ?? '',
-    allDay: event?.allDay ?? (selectInfo?.allDay ?? !prefill?.time),
+    allDay: event?.allDay ?? false,
     startDate: event?.start?.split('T')[0] ?? selectInfo?.startStr?.split('T')[0] ?? prefill?.date ?? '',
     endDate: (event?.end ?? event?.start ?? '')?.split('T')[0] ?? selectInfo?.endStr?.split('T')[0] ?? prefill?.date ?? '',
     startTime: event?.start?.includes('T') ? event.start.split('T')[1].slice(0, 5) : (prefill?.time ?? ''),

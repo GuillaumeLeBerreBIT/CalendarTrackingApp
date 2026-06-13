@@ -19,7 +19,12 @@ const TYPE_PREF_KEY = {
  * opted out of that type. `buildPayload` is either a static { title, body, link }
  * object or a function (recipientId) => { title, body, link }.
  *
- * @param {object} client   - a Supabase client (use req.supabase for RLS context)
+ * @param {object} client   - a Supabase client, used only to read recipient prefs.
+ *                            The notifications INSERT itself goes through
+ *                            supabaseAdmin: creating a notification for *another*
+ *                            user is an inherently cross-user (privileged) write,
+ *                            so it must not depend on a permissive public RLS
+ *                            policy on the notifications table.
  * @param {string|string[]} recipients
  * @param {string} type      - one of the keys in TYPE_PREF_KEY
  * @param {object|function} buildPayload
@@ -56,7 +61,9 @@ export async function notifyUsers(client, recipients, type, buildPayload) {
     }
 
     if (rows.length > 0) {
-      await client.from("notifications").insert(rows);
+      // Privileged cross-user write — see JSDoc. supabaseAdmin bypasses RLS so
+      // the permissive "insert any notification" policy can be removed.
+      await supabaseAdmin.from("notifications").insert(rows);
 
       // Fire-and-forget web push to all recipients who have subscriptions
       try {

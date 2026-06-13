@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUpgradeStore } from '@/store/upgradeStore'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
+import api from '@/api/client'
+import { BILLING_ENABLED } from '@/lib/billing'
 
 const LIMIT_COPY: Record<string, { title: string; body: string }> = {
   groups: {
@@ -22,12 +25,26 @@ const FALLBACK = {
 export default function UpgradeModal() {
   const { open, limit, hideUpgrade } = useUpgradeStore()
   const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
 
   if (!open) return null
 
   const copy = (limit && LIMIT_COPY[limit]) || FALLBACK
 
-  function seePlus() {
+  async function handleUpgrade() {
+    setLoading(true)
+    try {
+      const { data } = await api.post('/billing/create-checkout-session')
+      if (data.success && data.url) {
+        hideUpgrade()
+        window.location.href = data.url
+        return
+      }
+    } catch {
+      // billing not configured or user not logged in — fall back to pricing page
+    } finally {
+      setLoading(false)
+    }
     hideUpgrade()
     navigate('/pricing')
   }
@@ -84,10 +101,14 @@ export default function UpgradeModal() {
           </p>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <Button variant="ghost" size="md" onClick={hideUpgrade}>Maybe later</Button>
-            <Button variant="primary" size="md" onClick={seePlus} iconRight="arrowR">
-              See Plus
+            <Button variant={BILLING_ENABLED ? 'ghost' : 'primary'} size="md" onClick={hideUpgrade}>
+              {BILLING_ENABLED ? 'Maybe later' : 'Got it'}
             </Button>
+            {BILLING_ENABLED && (
+              <Button variant="primary" size="md" onClick={handleUpgrade} disabled={loading} iconRight="arrowR">
+                {loading ? 'Loading…' : 'Upgrade to Plus'}
+              </Button>
+            )}
           </div>
         </div>
       </div>

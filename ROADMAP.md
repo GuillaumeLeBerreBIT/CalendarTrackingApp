@@ -54,26 +54,91 @@ Effort tags: **S** = a couple of hours · **M** = ~a day · **L** = several days
 10. ✅ **Discovery feed dedupe** — backend dedupes TM results on title+date+venue
     (TM returns one entry per ticket pool)
 
-## Phase 4 — Monetization readiness (before marketing)
+## Phase 4 — Monetization readiness ✅ Done 2026-06-14 (built, dormant)
 
-11. `plan` column on profiles + **server-side** entitlement middleware (M)
-12. Enforce Free limits (3 groups / 50 events·mo) and make PricingPage promises real;
-    reconsider weak gates (iCal/colors) in favor of capacity & advanced group features (M)
-13. Payments via Merchant of Record — **Paddle** or Lemon Squeezy (handles EU VAT;
-    being Belgium-based makes raw Stripe a VAT admin burden) (L)
-14. Upgrade flow, billing portal, webhook → plan sync (L)
+11. ✅ `plan` + `always_free` columns on profiles + **server-side** entitlement middleware
+    (`utils/tier.js`: `attachTier`, `checkLimit`)
+12. ✅ Free limits enforced (3 groups / 50 events·mo) — `checkLimit` wired into
+    `POST /createGroup` and `POST /parseEvent`; 403 `UPGRADE_REQUIRED` → global `UpgradeModal`
+13. ✅ Payments via **Stripe** (decision changed from Paddle — see ⚠️ VAT note below).
+    `routes/billing.js` + `subscriptions` table (migrated from Paddle columns)
+14. ✅ Upgrade flow + billing portal + webhook → plan sync
+    (`/billing/create-checkout-session`, `/billing/portal`, `/billing/webhook`;
+    handles checkout.completed / subscription.updated / subscription.deleted, idempotent, signature-verified)
+
+**Billing is OFF by default.** Master flag `VITE_BILLING_ENABLED` (client) gates every
+upgrade entry point; backend returns 503 until the `STRIPE_*` keys are set. Eventli runs
+as a fully-free app for the two `always_free` accounts. To start selling: set the flag +
+add Stripe keys + rebuild (no code changes). See LAUNCH_CHECKLIST.md.
+
+> ⚠️ **VAT caveat:** Stripe is *not* a Merchant of Record, so EU VAT on B2C sales is the
+> seller's responsibility (Stripe Tax can calculate it, but you file/remit). Paddle/Lemon
+> Squeezy would have handled this end-to-end. Acceptable while invite-only/free; revisit
+> before charging real EU customers.
 
 ## Phase 5 — Pre-launch hardening
 
-15. supabaseAdmin route audit (IDOR risk where RLS is bypassed)
-16. Run Supabase advisors (RLS), rate-limit all mutating routes
-17. Error monitoring (Sentry) + privacy-friendly analytics (Plausible/PostHog)
-18. ✅ GDPR basics: privacy policy page (`/privacy`, `PrivacyPage.tsx` — needs `PRIVACY_EMAIL`/`CONTROLLER_NAME` filled, see LAUNCH_CHECKLIST.md), **account deletion** (`POST /api/account/delete`, password re-auth, FK-safe cascade), data export (`GET /api/account/export`) — UI in ProfilePage "Privacy & data" + "Danger zone"
-19. Onboarding polish: first-run path straight into "create a group → invite → first event"
+15. ✅ supabaseAdmin / IDOR audit — found & fixed: `authRequire` now binds the
+    attacker-controllable `userId` cookie to the verified JWT (`req.cookies.userId = req.user.id`),
+    closing account-deletion/export/data IDOR across all `supabaseAdmin` routes
+16. ⚠️ **Partial** — rate limiting done (global 300/15m on `/api`, `trust proxy` fixed so it
+    keys on real client IP, webhook exempt). **Remaining: RLS hardening from advisors** (see Phase 6 #20)
+17. ⚠️ **Partial** — ✅ Sentry error monitoring (backend `@sentry/node` + frontend `@sentry/react`,
+    source-map upload via vite plugin). ❌ Privacy-friendly analytics (Plausible/PostHog) not added
+18. ✅ GDPR basics: privacy policy page (`/privacy`, `PrivacyPage.tsx` — needs `PRIVACY_EMAIL`/`CONTROLLER_NAME`
+    filled, see LAUNCH_CHECKLIST.md), **account deletion** (`POST /api/account/delete`, password re-auth,
+    FK-safe cascade), data export (`GET /api/account/export`) — UI in ProfilePage "Privacy & data" + "Danger zone"
+19. ✅ Onboarding polish: first-run wizard (OnboardingWizard) + QR/username invite
+
+**Also done 2026-06-14:** Content-Security-Policy enabled in `helmet` (was disabled);
+external-only scripts verified against the production build.
+
+## Phase 6 — Remaining before public launch
+
+20. ✅ **RLS hardening** — Done 2026-06-14 (migration `db/migrations/2026-06-14_rls_hardening.sql`,
+    applied + validated by simulating real authenticated/anon sessions; advisor WARNs cleared):
+    - `notifications`: dropped the two `WITH CHECK (true)` INSERT policies (closed the
+      notification-spam vector). `notifyUsers` now inserts via `supabaseAdmin` (it's a
+      privileged cross-user write) — `utils/notifications.js`.
+    - `group_invite_tokens`: dropped permissive `service_update_token` UPDATE (only writer is `supabaseAdmin`)
+    - `event_reminders_sent`: dropped permissive `ers_all` (scheduler-only / service role)
+    - `profiles_task`: added the missing policy (group members manage assignees) — this also
+      **repaired a latent bug** (task assignment was silently failing under RLS)
+    - Revoked RPC `EXECUTE` on `handle_new_user()` (signup trigger) and `is_group_member()` from
+      anon. `is_group_member` keeps `authenticated` EXECUTE — required because it's used inside RLS
+      policies (the resulting 0029 advisor WARN is expected and accepted).
+21. **Supabase dashboard toggles** (no code, manual): enable Leaked Password Protection
+    (HaveIBeenPwned), upgrade Postgres to latest patch version. *(Both still open — from advisors.)*
+22. **Terms of Service page** (legal) — `/terms`, minimum age 13, Belgian governing law
+23. **Privacy policy i18n** — FR + NL translations before marketing in Belgium
+24. *(Optional)* Privacy-friendly analytics (Plausible or PostHog EU)
+25. *(Optional, before charging EU customers)* Stripe Tax or migrate to Paddle/Lemon Squeezy for VAT
+
+### Phase 7 — Security follow-ups (low severity, defense-in-depth)
+
+Surfaced during the 2026-06-14 RLS review; none are exploitable for data theft, all pre-existing:
+26. **Task-assignee validation** — neither app nor RLS checks that an *assigned* `user_id` is a
+    member of the task's group, so a member can assign a task to an arbitrary user. Add a
+    membership check on assignee ids (app-layer in `routes/todo.js` and/or tighten the
+    `profiles_task` WITH CHECK).
+27. **Broad read policies (review, don't blindly change)** — several SELECT policies are
+    `USING (true)` / `auth.uid() IS NOT NULL`, exposing cross-user rows to *any* authenticated
+    user: `profiles` (incl. email, also readable by anon), `profiles_events`, `profiles_groups`,
+    `event_overrides`. Tightening needs per-feature analysis (and migrating `routes/auth.js` off
+    the anon client) so it doesn't break user search / member lists. Defense-in-depth, not urgent.
 
 ---
 
+### Status summary (2026-06-14)
+
+Phases 0–5 complete; **Phase 6 #20 (RLS hardening) done & validated 2026-06-14** — the one
+item with a genuine abuse vector (notification spam) is closed. The app is feature-complete
+and shippable for private/free use. What's left before *public, paid* launch:
+- **Phase 6 #21–23** — Supabase dashboard toggles + ToS page + FR/NL translations (mostly non-code)
+- **Phase 7 #26–27** — low-severity security follow-ups (defense-in-depth, not urgent)
+- Manual launch steps in **LAUNCH_CHECKLIST.md** (DPAs, ROPA, Stripe setup, two-person test)
+
 ### Suggested order
 
-~~Phase 0~~ → ~~Phase 1~~ → ~~Phase 2~~ → ~~Phase 3~~ →
-Phase 4 (monetization) → Phase 5 alongside beta testing with a real group.
+~~Phase 0 → 1 → 2 → 3 → 4 → 5 → 6 #20~~ → #21 dashboard toggles →
+#22–23 legal → #26 assignee check → #24–25 / #27 optional/at-scale.

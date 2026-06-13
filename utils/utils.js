@@ -14,6 +14,9 @@ export default async function authRequire (req, res, next) {
       const { user, accessToken } = await refreshSession(req, res)
       req.user = user
       req.supabase = createUserClient(accessToken)
+      // Bind the userId cookie to the verified JWT — the cookie itself is
+      // attacker-controllable, so never let downstream code trust it raw.
+      req.cookies.userId = user.id
       return next()
 
     } catch (error) {
@@ -33,6 +36,7 @@ export default async function authRequire (req, res, next) {
       const { user, accessToken } = await refreshSession(req, res);
       req.user = user;
       req.supabase = createUserClient(accessToken)
+      req.cookies.userId = user.id
       return next();
 
     } catch (error) {
@@ -51,6 +55,7 @@ export default async function authRequire (req, res, next) {
       const { user: freshUser, accessToken: freshToken } = await refreshSession(req, res);
       req.user = freshUser;
       req.supabase = createUserClient(freshToken);
+      req.cookies.userId = freshUser.id
       return next();
     } catch (_) {
       // Fall through to use existing valid token
@@ -59,6 +64,7 @@ export default async function authRequire (req, res, next) {
 
   req.supabase = createUserClient(supaToken)
   req.user = data.user;
+  req.cookies.userId = data.user.id
   return next();
 };
 
