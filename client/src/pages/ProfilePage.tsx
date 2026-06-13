@@ -175,6 +175,52 @@ export default function ProfilePage() {
     api.patch('/profile', { searchable: next }).catch(() => setSearchable(!next))
   }
 
+  // ── Data export & account deletion (GDPR) ─────────────────────────────────────
+  const [exporting, setExporting] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const res = await api.get('/account/export', { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data as Blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'eventli-data.json'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setMessage('Could not export your data. Please try again.')
+      setIsError(true)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleDeleteAccount(e: FormEvent) {
+    e.preventDefault()
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const { data } = await api.post('/account/delete', { password: deletePassword })
+      if (data.success) {
+        // Account is gone — drop client state and bounce to login.
+        window.location.href = '/login'
+      } else {
+        setDeleteError(data.error ?? 'Could not delete your account.')
+      }
+    } catch (err: any) {
+      setDeleteError(err?.response?.data?.error ?? 'Could not delete your account.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   // ── Plan & usage ─────────────────────────────────────────────────────────────
   interface Usage {
     plan: string
@@ -924,6 +970,102 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+        </div>
+      </Section>
+
+      {/* Privacy & data (GDPR) */}
+      <Section title="Privacy & data">
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)',
+          overflow: 'hidden',
+        }}>
+          {/* Export */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', minHeight: 44 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Export my data</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>Download a JSON copy of everything we hold about you</p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Preparing…' : 'Export'}
+            </Button>
+          </div>
+          {/* Privacy policy link */}
+          <Link
+            to="/privacy"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '13px 16px',
+              minHeight: 44,
+              borderTop: '1px solid var(--border)',
+              textDecoration: 'none',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Privacy policy</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>How we handle your data and your GDPR rights</p>
+            </div>
+            <Icon name="chevR" size={15} sw={2} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+          </Link>
+        </div>
+      </Section>
+
+      {/* Danger zone — account deletion */}
+      <Section title="Danger zone">
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid rgba(244,63,94,0.25)',
+          borderRadius: 'var(--r-lg)',
+          padding: '16px',
+        }}>
+          {!deleteOpen ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Delete account</p>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0', lineHeight: 1.5 }}>
+                  Permanently erase your account and personal data. This cannot be undone.
+                </p>
+              </div>
+              <Button variant="danger" size="sm" onClick={() => { setDeleteOpen(true); setDeleteError('') }}>
+                Delete
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleDeleteAccount} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0, lineHeight: 1.55 }}>
+                This permanently deletes your account, groups you created, events, habits and all
+                personal data. Enter your password to confirm.
+              </p>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Your password"
+                autoComplete="current-password"
+                style={inputStyle}
+                autoFocus
+              />
+              {deleteError && (
+                <p style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{deleteError}</p>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button type="submit" variant="danger" size="sm" disabled={deleting || !deletePassword}>
+                  {deleting ? 'Deleting…' : 'Permanently delete'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setDeleteOpen(false); setDeletePassword(''); setDeleteError('') }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </Section>
 

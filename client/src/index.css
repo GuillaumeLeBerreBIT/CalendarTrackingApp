@@ -188,6 +188,7 @@ input, textarea, select {
 @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
 @keyframes scaleIn  { from { opacity:0; transform:scale(0.96) translateY(8px); } to { opacity:1; transform:none; } }
 @keyframes pop      { 0% { transform:scale(0.8); } 50% { transform:scale(1.12); } 100% { transform:scale(1); } }
+@keyframes slideUp  { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:none; } }
 
 /* ── Nav items ────────────────────────────────────────────── */
 .nav-item {

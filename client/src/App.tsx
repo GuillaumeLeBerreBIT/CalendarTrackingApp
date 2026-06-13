@@ -14,6 +14,7 @@ import TodoPage from '@/pages/TodoPage'
 import ProfilePage from '@/pages/ProfilePage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import PricingPage from '@/pages/PricingPage'
+import PrivacyPage from '@/pages/PrivacyPage'
 import JoinGroupPage from '@/pages/JoinGroupPage'
 import PublicEventPage from '@/pages/PublicEventPage'
 import HabitsPage from '@/pages/HabitsPage'
@@ -64,6 +65,7 @@ function AppInner() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/join/:token" element={<JoinGroupPage />} />
         <Route path="/e/:token" element={<PublicEventPage />} />
 

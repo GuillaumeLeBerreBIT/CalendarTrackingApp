@@ -97,6 +97,7 @@ function eventHex(extendedProps?: Record<string, unknown>): string {
 interface AgendaListProps {
   events: CalEvent[]
   onEventClick: (ev: CalEvent) => void
+  onAddEvent?: () => void
 }
 
 // Local-time YYYY-MM-DD (toISOString would shift the date around midnight)
@@ -104,7 +105,7 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function AgendaList({ events, onEventClick }: AgendaListProps) {
+function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
   // Group by date string (YYYY-MM-DD), today and onwards only — the agenda
   // is a "what's coming" view; past events live in the month grid.
   const byDay = useMemo(() => {
@@ -125,18 +126,53 @@ function AgendaList({ events, onEventClick }: AgendaListProps) {
       <div style={{
         flex: 1,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'var(--text-3)',
-        fontSize: 14,
+        gap: 14,
+        padding: 24,
       }}>
-        No upcoming events. Toggle a calendar group or add a new event.
+        <p style={{ fontSize: 14, color: 'var(--text-3)', textAlign: 'center', margin: 0 }}>
+          No upcoming events. Toggle a calendar group above or create one.
+        </p>
+        {onAddEvent && (
+          <button
+            onClick={onAddEvent}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '10px 18px', borderRadius: 'var(--r-sm)',
+              background: 'var(--accent)', color: 'var(--accent-text)',
+              border: 'none', fontSize: 13.5, fontWeight: 650, cursor: 'pointer',
+              boxShadow: '0 4px 14px var(--accent-glow)',
+            }}
+          >
+            <Icon name="plus" size={15} sw={2.2} />
+            New event
+          </button>
+        )}
       </div>
     )
   }
 
   return (
     <div className="scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px 24px 24px' }}>
+      {/* New event shortcut at the top of agenda */}
+      {onAddEvent && (
+        <button
+          onClick={onAddEvent}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            width: '100%', padding: '10px 14px', marginBottom: 16,
+            borderRadius: 'var(--r-md)', cursor: 'pointer',
+            background: 'var(--accent-soft)', border: '1px dashed var(--accent-line)',
+            color: 'var(--accent)', fontSize: 13.5, fontWeight: 650,
+            transition: 'var(--transition)',
+          }}
+        >
+          <Icon name="plus" size={15} sw={2.2} />
+          New event
+        </button>
+      )}
       {byDay.map(([dateStr, dayEvents]) => {
         const date = new Date(dateStr + 'T00:00:00')
         const dow = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
@@ -1052,6 +1088,7 @@ export default function CalendarPage() {
           <AgendaList
             events={filteredEvents}
             onEventClick={handleAgendaEventClick}
+            onAddEvent={() => { setSelectedEvent(null); setSelectInfo(null); setModalMode('create') }}
           />
         ))}
       </div>

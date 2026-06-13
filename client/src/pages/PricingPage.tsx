@@ -40,7 +40,7 @@ function Logo() {
 
 export default function PricingPage() {
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 16px' }}>
+    <div style={{ height: '100dvh', overflowY: 'auto', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 16px' }}>
       <Logo />
 
       {/* Heading */}

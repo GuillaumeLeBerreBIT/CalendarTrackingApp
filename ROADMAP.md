@@ -68,7 +68,7 @@ Effort tags: **S** = a couple of hours · **M** = ~a day · **L** = several days
 15. supabaseAdmin route audit (IDOR risk where RLS is bypassed)
 16. Run Supabase advisors (RLS), rate-limit all mutating routes
 17. Error monitoring (Sentry) + privacy-friendly analytics (Plausible/PostHog)
-18. GDPR basics: privacy policy, **account deletion** (doesn't exist yet — legally required), data export
+18. ✅ GDPR basics: privacy policy page (`/privacy`, `PrivacyPage.tsx` — needs `PRIVACY_EMAIL`/`CONTROLLER_NAME` filled, see LAUNCH_CHECKLIST.md), **account deletion** (`POST /api/account/delete`, password re-auth, FK-safe cascade), data export (`GET /api/account/export`) — UI in ProfilePage "Privacy & data" + "Danger zone"
 19. Onboarding polish: first-run path straight into "create a group → invite → first event"
 
 ---

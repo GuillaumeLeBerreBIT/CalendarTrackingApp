@@ -333,6 +333,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     : 'Create & invite everyone'
 
   const isGroupType = eventType === 'appointment' || eventType === 'social'
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
   return (
     <div
@@ -340,20 +341,28 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 200,
+        zIndex: 500,
         background: 'var(--scrim)',
         backdropFilter: 'blur(6px)',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
+        alignItems: isMobile ? 'flex-end' : 'center',
+        justifyContent: isMobile ? 'stretch' : 'center',
+        padding: isMobile ? 0 : 16,
         animation: 'fadeIn 0.2s ease',
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
         className="scroll"
-        style={{
+        style={isMobile ? {
+          width: '100%',
+          maxHeight: '92dvh',
+          overflowY: 'auto',
+          background: 'var(--surface)',
+          borderRadius: 'var(--r-xl) var(--r-xl) 0 0',
+          boxShadow: 'var(--shadow-lg)',
+          animation: 'slideUp 0.28s cubic-bezier(0.2,0.7,0.2,1) both',
+        } : {
           width: 'min(480px, 100%)',
           maxHeight: '92vh',
           overflowY: 'auto',
@@ -364,6 +373,12 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
           animation: 'scaleIn 0.24s cubic-bezier(0.2,0.7,0.2,1) both',
         }}
       >
+        {/* Mobile drag handle */}
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--border-2)' }} />
+          </div>
+        )}
         {/* Header */}
         <div style={{
           display: 'flex',
@@ -974,7 +989,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
           )}
 
           {/* ── Actions ── */}
-          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+          <div style={{ display: 'flex', gap: 10, paddingTop: 4, paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
             <button
               type="submit"
               disabled={saving}
