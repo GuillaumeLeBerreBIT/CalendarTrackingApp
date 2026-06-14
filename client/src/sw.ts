@@ -42,7 +42,7 @@ registerRoute(
 // Handle incoming push messages from the backend
 self.addEventListener('push', (event) => {
   let data: { title?: string; body?: string; link?: string } = {}
-  try { data = event.data?.json() ?? {} } catch { data = {} }
+  try { data = event.data?.json() ?? {} } catch { /* keep default {} on malformed payload */ }
 
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Eventli', {
