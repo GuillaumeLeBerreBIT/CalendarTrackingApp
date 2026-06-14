@@ -781,9 +781,11 @@ export default function CalendarPage() {
             gap: 8,
             flexShrink: 0,
           }}>
-            {/* Row 1: prev ← Month Year → next */}
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <IconButton name="chevL" size={40} isz={16} onClick={navPrev} title="Previous" />
+            {/* Row 1: Today · Month Year · ‹ ›
+                Today lives up here (balanced against the chevron group) so the
+                view controls below fit on a single tidy row. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Button variant="ghost" size="sm" onClick={navToday} style={{ flexShrink: 0 }}>Today</Button>
               <h1 style={{
                 flex: 1, textAlign: 'center',
                 fontSize: 17, fontWeight: 700, color: 'var(--text-1)',
@@ -792,12 +794,15 @@ export default function CalendarPage() {
                 {monthLabel}{' '}
                 <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>{yearLabel}</span>
               </h1>
-              <IconButton name="chevR" size={40} isz={16} onClick={navNext} title="Next" />
+              <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                <IconButton name="chevL" size={36} isz={16} onClick={navPrev} title="Previous" />
+                <IconButton name="chevR" size={36} isz={16} onClick={navNext} title="Next" />
+              </div>
             </div>
-            {/* Row 2: Today · · · [Month|Agenda] [layout toggle] [+] */}
+            {/* Row 2: [Month|Agenda] · · · [layout toggle] [countdowns] [+]
+                With Today moved to Row 1 these controls fit on one row without
+                wrapping, so the "+" primary action is never clipped. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
-              <div style={{ flex: 1 }} />
               <Segmented
                 options={[
                   { value: 'month', label: 'Month', icon: 'grid' },
@@ -807,6 +812,7 @@ export default function CalendarPage() {
                 onChange={v => setCalView(v as CalView)}
                 size="sm"
               />
+              <div style={{ flex: 1 }} />
               {/* Layout toggle — only visible when showing month on mobile */}
               {calView === 'month' && (
                 <div

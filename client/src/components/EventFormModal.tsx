@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '@/components/ui/Icon'
 import type { DateSelectArg } from '@fullcalendar/core'
 import api from '@/api/client'
@@ -335,7 +336,11 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const isGroupType = eventType === 'appointment' || eventType === 'social'
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
-  return (
+  // Portal to <body> so the fixed overlay escapes the .app-viewport
+  // (overflow:hidden + 100dvh) wrapper. On iOS Safari a position:fixed
+  // descendant of an overflow:hidden ancestor gets clipped and renders
+  // *behind* the bottom nav — portalling lifts it above everything.
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -1081,7 +1086,8 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
 

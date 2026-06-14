@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
 import CountdownPill from '@/components/CountdownPill'
@@ -269,7 +270,9 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
     pending: { label: 'Invited',   color: 'var(--text-3)' },
   }
 
-  return (
+  // Portal to <body>: a position:fixed overlay nested inside .app-viewport
+  // (overflow:hidden) is clipped behind the mobile bottom nav on iOS Safari.
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -881,7 +884,8 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
