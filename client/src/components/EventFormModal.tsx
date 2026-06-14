@@ -48,6 +48,18 @@ const inputStyle: React.CSSProperties = {
   minWidth: 0,
 }
 
+// Date/time inputs only: reset the native WebKit appearance so the control
+// honours its box width exactly (iOS/Chrome-iOS otherwise let the internal
+// value text bleed to the box edge, making the two columns look like they
+// overlap at the seam). Kept separate from inputStyle so the <select> fields
+// keep their native dropdown chevron.
+const dateTimeStyle: React.CSSProperties = {
+  ...inputStyle,
+  WebkitAppearance: 'none',
+  appearance: 'none',
+  textAlign: 'left',
+}
+
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 11.5,
@@ -670,11 +682,11 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start date</label>
-                <input type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={inputStyle} />
+                <input type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={dateTimeStyle} />
               </div>
               <div>
                 <label style={labelStyle}>End date</label>
-                <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={inputStyle} />
+                <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={dateTimeStyle} />
               </div>
             </div>
           )}
@@ -684,11 +696,11 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start time</label>
-                <input type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} style={inputStyle} />
+                <input type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} style={dateTimeStyle} />
               </div>
               <div>
                 <label style={labelStyle}>End time</label>
-                <input type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} style={inputStyle} />
+                <input type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} style={dateTimeStyle} />
               </div>
             </div>
           )}
@@ -739,7 +751,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                           type="date"
                           value={opt.startDate}
                           onChange={e => setDateOption(idx, 'startDate', e.target.value)}
-                          style={{ ...inputStyle, minHeight: 38 }}
+                          style={{ ...dateTimeStyle, minHeight: 38 }}
                         />
                       </div>
                       <div>
@@ -748,7 +760,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                           type="time"
                           value={opt.startTime}
                           onChange={e => setDateOption(idx, 'startTime', e.target.value)}
-                          style={{ ...inputStyle, minHeight: 38 }}
+                          style={{ ...dateTimeStyle, minHeight: 38 }}
                         />
                       </div>
                     </div>
@@ -760,7 +772,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                         type="time"
                         value={opt.endTime}
                         onChange={e => setDateOption(idx, 'endTime', e.target.value)}
-                        style={{ ...inputStyle, minHeight: 38 }}
+                        style={{ ...dateTimeStyle, minHeight: 38 }}
                       />
                     </div>
                   </div>
@@ -853,7 +865,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
                     <input type="radio" name="endmode" checked={rec.endMode === 'on'} onChange={() => setRec(r => ({ ...r, endMode: 'on' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
                     On
-                    <input type="date" value={rec.endDate} onChange={e => setRec(r => ({ ...r, endDate: e.target.value, endMode: 'on' as EndMode }))} style={{ ...inputStyle, width: 160, minHeight: 36 }} />
+                    <input type="date" value={rec.endDate} onChange={e => setRec(r => ({ ...r, endDate: e.target.value, endMode: 'on' as EndMode }))} style={{ ...dateTimeStyle, width: 160, minHeight: 36 }} />
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
                     <input type="radio" name="endmode" checked={rec.endMode === 'after'} onChange={() => setRec(r => ({ ...r, endMode: 'after' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
