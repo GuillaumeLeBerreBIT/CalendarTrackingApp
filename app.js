@@ -131,8 +131,19 @@ app.get('/healthz', (req, res) => {
 });
 
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'client/dist')));
+  app.use(express.static(path.join(__dirname, 'client/dist'), {
+    setHeaders(res, filePath) {
+      // Content-hashed bundles are immutable — cache them forever.
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        // HTML shell + service worker must always revalidate so deploys land.
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }));
   app.get('/*splat', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(__dirname, 'client/dist/index.html'));
   });
 }

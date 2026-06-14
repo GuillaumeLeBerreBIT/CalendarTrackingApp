@@ -14,9 +14,11 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      // Emit an external registerSW.js instead of an inline <script>, so the
-      // production CSP (script-src 'self') doesn't block SW registration.
-      injectRegister: 'script',
+      // Register from bundled app code (main.tsx) via virtual:pwa-register
+      // instead of an injected script. The registration lives in /assets JS
+      // (same origin) so the production CSP (script-src 'self') is satisfied,
+      // and autoUpdate can reload the open page when a new SW takes control.
+      injectRegister: false,
       manifest: false,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html}'],
