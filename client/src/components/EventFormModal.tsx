@@ -43,6 +43,9 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'inherit',
   minHeight: 44,
   boxSizing: 'border-box',
+  // iOS native date/time inputs have a wide intrinsic min-width; without this
+  // they refuse to shrink inside a 2-col grid and overflow the modal edge.
+  minWidth: 0,
 }
 
 const labelStyle: React.CSSProperties = {
@@ -664,7 +667,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
 
           {/* ── Normal dates (hidden when tentative) ── */}
           {!isTentative && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start date</label>
                 <input type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={inputStyle} />
@@ -678,7 +681,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
 
           {/* ── Normal times (hidden when tentative) ── */}
           {!isTentative && !form.allDay && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start time</label>
                 <input type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} style={inputStyle} />
@@ -729,7 +732,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                         </button>
                       )}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
                       <div>
                         <label style={{ ...labelStyle, marginBottom: 4 }}>Date</label>
                         <input
