@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tracking-calendar-v1';
+const CACHE_NAME = 'tracking-calendar-v2';
 
 // Only cache static assets that definitely exist
 const ASSETS_TO_CACHE = [

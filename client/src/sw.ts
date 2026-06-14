@@ -3,8 +3,15 @@ import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import { StaleWhileRevalidate, NetworkFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
+import { clientsClaim } from 'workbox-core'
 
 declare const self: ServiceWorkerGlobalScope & typeof globalThis
+
+// Take over as soon as a new SW is installed, instead of waiting for every tab
+// to close. Combined with registerType: 'autoUpdate', this means a rebuilt UI
+// activates on the next app launch on phone — no manual "close all windows".
+self.skipWaiting()
+clientsClaim()
 
 // Workbox injects the precache manifest here at build time
 precacheAndRoute(self.__WB_MANIFEST)
