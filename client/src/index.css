@@ -6,7 +6,7 @@
 
 /* ════════════════════════════════════════════════════════════
    EVENTLI — Design System
-   Dark-primary social calendar + event discovery
+   Dark-primary social calendar for real groups
 ════════════════════════════════════════════════════════════ */
 
 :root {
@@ -40,11 +40,6 @@
   --g-climb:   #38bdf8;
   --g-book:    #c084fc;
   --g-self:    var(--accent);
-
-  /* Source brand tints */
-  --src-ticket:     #2b6df6;
-  --src-eventbrite: #f0603c;
-  --src-meetup:     #f0436b;
 }
 
 /* ── Dark theme (default) ─────────────────────────────────── */

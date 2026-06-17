@@ -94,7 +94,6 @@ export default function PrivacyPage() {
         <ul style={{ margin: '0 0 12px', paddingLeft: 20 }}>
           <Li><strong>Supabase</strong> — database and authentication hosting (EU region).</Li>
           <Li><strong>Resend</strong> — sending the daily digest email, if enabled.</Li>
-          <Li><strong>Ticketmaster</strong> — the Discover feed queries their public events API; we don't send them your personal data.</Li>
         </ul>
         <P>We never sell your personal data.</P>
 

@@ -127,6 +127,24 @@ Surfaced during the 2026-06-14 RLS review; none are exploitable for data theft, 
     `event_overrides`. Tightening needs per-feature analysis (and migrating `routes/auth.js` off
     the anon client) so it doesn't break user search / member lists. Defense-in-depth, not urgent.
 
+## Phase 8 — Focus the product (2026-06-15)
+
+28. ✅ **Discovery / Ticketmaster retired** — every viable public-event API is paywalled,
+    closed to public search, or commercially grey, and discovery was never the moat. Removed
+    `routes/discovery.js`, `routes/saved.js`, `DiscoveryPage`, `SaveToCalendarModal`, `savedStore`,
+    `SourceBadge`, the `DiscoveryEvent`/`SavedEvent` types, source CSS vars, the nav item, the
+    `saved_events` references in stats/export/deletion, the privacy-policy Ticketmaster line, and
+    the `TICKET_MASTER_*` env keys. ⚠️ **The removed keys were live — rotate/revoke them in the
+    Ticketmaster developer portal.**
+29. ✅ **Date voting upgraded to availability voting** — the existing single-choice tentative-event
+    vote (one pick per person) became Doodle/When2meet-style multi-slot voting: each member marks
+    every candidate slot yes/maybe/no. Migration `db/migrations/2026-06-15_availability_voting.sql`
+    (added `availability` col, re-keyed unique to `(event_id, option_id, user_id)`, applied + verified).
+    `/voteEventDate` takes an `availability` (or `clear`); `renderEvents` returns per-option
+    `yes/maybe/no` counts + `myVotes`; GroupDetailPage shows a 3-state pill control + overlap meter
+    (UX-reviewed: 44px touch targets, glyph + colour, aria-labels). Creator still confirms via
+    `/confirmEventDate` (now picks the max-yes slot).
+
 ---
 
 ### Status summary (2026-06-14)

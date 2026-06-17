@@ -268,7 +268,6 @@ export default function ProfilePage() {
         if (data.success) setStats({
           eventsThisMonth: data.eventsThisMonth ?? 0,
           groups: data.groups ?? 0,
-          saved: data.saved ?? 0,
         })
       })
       .catch(() => {})
@@ -477,10 +476,9 @@ export default function ProfilePage() {
           {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 90, borderRadius: 'var(--r-lg)' }} />)}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 32 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 32 }}>
           <StatCard n={stats?.eventsThisMonth ?? 0} label="Events this month" />
           <StatCard n={stats?.groups ?? 0} label="Groups" />
-          <StatCard n={stats?.saved ?? 0} label="Saved" />
         </div>
       )}
 

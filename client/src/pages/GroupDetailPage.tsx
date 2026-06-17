@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/api/client'
 import CountdownPill from '@/components/CountdownPill'
-import type { Member, CalEvent, TaskList, Task, GroupChallenge, Pact } from '@/types'
+import type { Member, CalEvent, TaskList, Task, GroupChallenge, Pact, Availability } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import Icon from '@/components/ui/Icon'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
@@ -14,8 +14,19 @@ import EventFormModal from '@/components/EventFormModal'
 import GroupChallengeCard from '@/components/GroupChallengeCard'
 import PactModal from '@/components/PactModal'
 import PactCelebration from '@/components/PactCelebration'
+import CommentThread from '@/components/CommentThread'
+
+// Max candidate date slots per tentative event (mirrors MAX_DATE_OPTIONS on the backend).
+const MAX_DATE_OPTIONS = 6
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
+
+// Availability voting pills (yes / maybe / no) — colours mirror RsvpPill.
+const AVAILABILITY_PILLS: { value: Availability; label: string; title: string; color: string; bg: string }[] = [
+  { value: 'yes',   label: '✓',  title: 'I can make it',   color: 'var(--g-work)',   bg: 'rgba(34,211,170,0.12)' },
+  { value: 'maybe', label: '~',  title: 'Maybe',           color: 'var(--g-family)', bg: 'rgba(245,158,11,0.12)' },
+  { value: 'no',    label: '✕',  title: "Can't make it",   color: 'var(--text-2)',   bg: 'var(--surface-3)' },
+]
 
 function ImgPh({ opacity = 0.22 }: { opacity?: number }) {
   return (
@@ -209,11 +220,41 @@ export default function GroupDetailPage() {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
   const [votingEventId, setVotingEventId] = useState<string | null>(null)
   const [confirmingEventId, setConfirmingEventId] = useState<string | null>(null)
+  const [discussionEventId, setDiscussionEventId] = useState<string | null>(null)
+  // Add-a-date inline form (one open at a time)
+  const [addDateEventId, setAddDateEventId] = useState<string | null>(null)
+  const [newSlotDate, setNewSlotDate] = useState('')
+  const [newSlotTime, setNewSlotTime] = useState('')
+  const [addingSlot, setAddingSlot] = useState(false)
 
-  async function handleVote(eventId: string, optionId: number) {
+  async function reloadGroupEvents() {
+    const { data } = await api.get('/renderEvents')
+    if (data.success && Array.isArray(data.events)) {
+      setEvents(data.events.filter((e: CalEvent) => String(e.extendedProps?.groupsId) === String(groupId)))
+    }
+  }
+
+  async function handleAddDateOption(eventId: string) {
+    if (!newSlotDate || addingSlot) return
+    setAddingSlot(true)
+    try {
+      await api.post(`/events/${eventId}/date-options`, {
+        startDate: newSlotDate,
+        startTime: newSlotTime || null,
+      })
+      setNewSlotDate(''); setNewSlotTime(''); setAddDateEventId(null)
+      await reloadGroupEvents()
+    } catch {
+      // silently fail — user can retry
+    } finally {
+      setAddingSlot(false)
+    }
+  }
+
+  async function handleVote(eventId: string, optionId: number, availability: Availability | 'clear') {
     setVotingEventId(eventId)
     try {
-      await api.post('/voteEventDate', { eventId, optionId })
+      await api.post('/voteEventDate', { eventId, optionId, availability })
       // Reload events for this group
       const { data } = await api.get('/renderEvents')
       if (data.success && Array.isArray(data.events)) {
@@ -833,15 +874,18 @@ export default function GroupDetailPage() {
                 {tentativeEvents.map(ev => {
                   const isExpanded = expandedEventId === ev.id
                   const opts = ev.extendedProps?.dateOptions ?? []
-                  const myVote = ev.extendedProps?.myVote ?? null
+                  const myVotes = ev.extendedProps?.myVotes ?? {}
                   const totalMembers = ev.extendedProps?.totalGroupMembers ?? members.length
                   const totalVoters = new Set(opts.flatMap(o => o.votes.map(v => v.userId))).size
                   const isCreator = ev.extendedProps?.createdBy === currentUserId
                   const isVoting = votingEventId === ev.id
                   const isConfirming = confirmingEventId === ev.id
-                  // Leading option by vote count
+                  // Leading option = most "yes", tie-broken by "maybe".
                   const leadingOption = opts.length > 0
-                    ? opts.reduce((best, o) => o.voteCount > best.voteCount ? o : best, opts[0])
+                    ? opts.reduce((best, o) =>
+                        (o.yesCount > best.yesCount) ||
+                        (o.yesCount === best.yesCount && o.maybeCount > best.maybeCount)
+                          ? o : best, opts[0])
                     : null
 
                   return (
@@ -918,8 +962,8 @@ export default function GroupDetailPage() {
                             opts
                               .sort((a, b) => a.position - b.position)
                               .map(opt => {
-                                const hasVoted = myVote === opt.optionId
-                                const isLeading = leadingOption?.optionId === opt.optionId && opt.voteCount > 0
+                                const mine = myVotes[opt.optionId] ?? null
+                                const isLeading = leadingOption?.optionId === opt.optionId && opt.yesCount > 0
                                 // Format date label
                                 const dateObj = new Date(opt.startDate + 'T00:00:00')
                                 const dateLbl = dateObj.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -929,71 +973,108 @@ export default function GroupDetailPage() {
                                 return (
                                   <div key={opt.optionId} style={{
                                     display: 'flex',
+                                    flexWrap: 'wrap',
                                     alignItems: 'center',
                                     gap: 10,
                                     padding: '8px 0',
                                   }}>
-                                    {/* Date label */}
-                                    <span style={{
-                                      fontSize: 13,
-                                      fontWeight: 700,
-                                      color: 'var(--text-1)',
-                                      width: 160,
-                                      flexShrink: 0,
-                                      whiteSpace: 'nowrap',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                    }}>
-                                      {label}
-                                    </span>
-                                    {/* Progress bar */}
-                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                    {/* Date + overlap meter */}
+                                    <div style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                        <span style={{
+                                          fontSize: 13, fontWeight: 700,
+                                          color: isLeading ? 'var(--accent)' : 'var(--text-1)',
+                                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                        }}>
+                                          {label}
+                                        </span>
+                                        <span style={{
+                                          fontSize: 11.5, color: 'var(--text-3)', flexShrink: 0,
+                                          fontVariantNumeric: 'tabular-nums',
+                                        }}>
+                                          <span style={{ color: 'var(--g-work)', fontWeight: 700 }}>✓ {opt.yesCount}</span>
+                                          {opt.maybeCount > 0 && <span style={{ color: 'var(--g-family)' }}> · ~ {opt.maybeCount}</span>}
+                                        </span>
+                                      </div>
                                       <Progress
-                                        value={opt.voteCount}
+                                        value={opt.yesCount}
                                         total={Math.max(1, totalMembers)}
                                         color={isLeading ? 'var(--accent)' : 'var(--surface-3)'}
                                         height={6}
                                       />
                                     </div>
-                                    {/* Vote count */}
-                                    <span style={{
-                                      fontSize: 12,
-                                      color: 'var(--text-3)',
-                                      width: 48,
-                                      textAlign: 'right',
-                                      flexShrink: 0,
-                                      fontVariantNumeric: 'tabular-nums',
-                                    }}>
-                                      {opt.voteCount} vote{opt.voteCount !== 1 ? 's' : ''}
-                                    </span>
-                                    {/* Vote button */}
-                                    {hasVoted ? (
-                                      <div style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                        padding: '5px 10px',
-                                        borderRadius: 'var(--r-sm)',
-                                        background: 'rgba(34,211,170,0.12)',
-                                        color: 'var(--g-work)',
-                                        fontSize: 12,
-                                        fontWeight: 700,
-                                        flexShrink: 0,
-                                      }}>
-                                        <Icon name="check" size={12} sw={2.5} />
-                                        Voted
-                                      </div>
-                                    ) : (
-                                      <Button
-                                        variant="soft"
-                                        size="sm"
-                                        disabled={isVoting}
-                                        onClick={() => handleVote(ev.id, opt.optionId)}
-                                      >
-                                        Vote
-                                      </Button>
-                                    )}
+                                    {/* Availability control: yes / maybe / no */}
+                                    <div style={{ display: 'inline-flex', gap: 6, flexShrink: 0 }}>
+                                      {AVAILABILITY_PILLS.map(p => {
+                                        const active = mine === p.value
+                                        return (
+                                          <button
+                                            key={p.value}
+                                            type="button"
+                                            disabled={isVoting}
+                                            title={p.title}
+                                            aria-label={p.title}
+                                            aria-pressed={active}
+                                            onClick={() => handleVote(ev.id, opt.optionId, active ? 'clear' : p.value)}
+                                            style={{
+                                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                              minWidth: 44, height: 40, padding: '0 10px',
+                                              borderRadius: 'var(--r-sm)',
+                                              border: `1px solid ${active ? p.color : 'var(--border-2)'}`,
+                                              background: active ? p.bg : 'transparent',
+                                              color: active ? p.color : 'var(--text-2)',
+                                              fontSize: 13, fontWeight: 700,
+                                              cursor: isVoting ? 'default' : 'pointer',
+                                              opacity: isVoting ? 0.6 : 1,
+                                              transition: 'var(--transition)',
+                                            }}
+                                          >
+                                            {p.label}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
                                   </div>
                                 )
                               })
+                          )}
+
+                          {/* Add a date — any member can propose more slots (up to the cap) */}
+                          {opts.length < MAX_DATE_OPTIONS && (
+                            addDateEventId === ev.id ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 4 }}>
+                                <input
+                                  type="date"
+                                  value={newSlotDate}
+                                  onChange={e => setNewSlotDate(e.target.value)}
+                                  style={{ ...inputStyle, width: 'auto', flex: '1 1 130px' }}
+                                />
+                                <input
+                                  type="time"
+                                  value={newSlotTime}
+                                  onChange={e => setNewSlotTime(e.target.value)}
+                                  style={{ ...inputStyle, width: 'auto', flex: '0 1 110px' }}
+                                />
+                                <Button size="sm" variant="primary" disabled={!newSlotDate || addingSlot} onClick={() => handleAddDateOption(ev.id)}>
+                                  {addingSlot ? 'Adding…' : 'Add'}
+                                </Button>
+                                <Button size="sm" variant="ghost" disabled={addingSlot} onClick={() => { setAddDateEventId(null); setNewSlotDate(''); setNewSlotTime('') }}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setAddDateEventId(ev.id); setNewSlotDate(''); setNewSlotTime('') }}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                                  alignSelf: 'flex-start',
+                                  background: 'transparent', border: 'none', padding: '2px 0',
+                                  color: 'var(--accent)', fontSize: 13, fontWeight: 650, cursor: 'pointer',
+                                }}
+                              >
+                                <Icon name="plus" size={15} sw={2.2} /> Add a date
+                              </button>
+                            )
                           )}
 
                           {/* Creator-only: Confirm leading date */}
@@ -1009,6 +1090,24 @@ export default function GroupDetailPage() {
                               </Button>
                             </div>
                           )}
+
+                          {/* Discussion — reuses the shared event comment thread */}
+                          <div style={{ marginTop: 4, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                            {discussionEventId === ev.id ? (
+                              <CommentThread eventId={ev.id} currentUserId={currentUserId ?? undefined} title="Discussion" />
+                            ) : (
+                              <button
+                                onClick={() => setDiscussionEventId(ev.id)}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                                  background: 'transparent', border: 'none', padding: '2px 0',
+                                  color: 'var(--text-2)', fontSize: 13, fontWeight: 650, cursor: 'pointer',
+                                }}
+                              >
+                                <Icon name="chat" size={15} sw={1.9} /> Discussion
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

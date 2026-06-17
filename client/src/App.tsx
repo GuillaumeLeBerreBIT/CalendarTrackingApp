@@ -6,7 +6,6 @@ import OnboardingWizard from '@/components/OnboardingWizard'
 import UpgradeModal from '@/components/UpgradeModal'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
-import DiscoveryPage from '@/pages/DiscoveryPage'
 import CalendarPage from '@/pages/CalendarPage'
 import GroupsPage from '@/pages/GroupsPage'
 import GroupDetailPage from '@/pages/GroupDetailPage'
@@ -79,7 +78,6 @@ function AppInner() {
         >
           <Route index element={<CalendarPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/discovery" element={<DiscoveryPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/groups/:groupId" element={<GroupDetailPage />} />
           <Route path="/todo" element={<TodoPage />} />

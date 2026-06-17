@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-A social calendar, group coordination, and local event discovery web app called **Eventli**. Users join groups (family, friends, team) to coordinate events and tasks on a shared calendar. They can browse a local event discovery feed (Ticketmaster live) to find things nearby, save events to their group calendar, and RSVP with people they know. Authentication is handled by Supabase Auth.
+A social calendar and group coordination web app called **Eventli**. Users join groups (family, friends, team) to coordinate events and tasks on a shared calendar, propose tentative events and vote on availability (yes/maybe/no per date slot), and RSVP with people they know. Authentication is handled by Supabase Auth.
 
 ---
 
@@ -43,8 +43,6 @@ routes/
   challenges.js          — /api/groups/:id/challenges (group shared goals)
   pacts.js               — /api/groups/:id/pacts (locked-event group bets)
   notifications.js       — /api/notifications, /api/notification-prefs
-  discovery.js           — /api/discovery (Ticketmaster proxy with 10-min cache)
-  saved.js               — /api/saved (bookmark discovery events)
   ical.js                — /api/calendar/token, /api/calendar/:token.ics, /api/calendar/import
   email.js               — daily digest emails via Resend
 utils/
@@ -94,13 +92,12 @@ client/
       PactCelebration.tsx — CSS confetti on pact success
       PWAInstallBanner.tsx — beforeinstallprompt banner (dismissed via localStorage)
     lib/
-      design.ts          — Group color map, source badge metadata, design constants
-      mockData.ts        — DiscoveryEvent type definition (data comes from real API)
+      design.ts          — Group color map, design constants
+      mockData.ts        — MOCK_MEMBERS (sample avatars used by EventModal)
       nlParser.ts        — Natural-language event parser ("Lunch Friday 1pm")
       countdown.ts       — Countdown utility helpers
       pushNotifications.ts — subscribeToPush() — VAPID key fetch + browser subscribe
     pages/
-      DiscoveryPage.tsx  — Discovery feed (Ticketmaster live via /api/discovery)
       CalendarPage.tsx   — FullCalendar month/agenda, Monday start, group filter,
                            event color theming, mobile 2-row header, locked events
       GroupsPage.tsx     — Group cards grid + create group modal
@@ -119,7 +116,6 @@ client/
       habitStore.ts      — Habits with streaks, completionHistory, completion logging
       timerStore.ts      — Countdown state (exports useCountdownStore; interval timer removed)
       notificationStore.ts — AppNotification list, unread count, mark-read
-      savedStore.ts      — Saved discovery events
     types/
       index.ts           — Shared TypeScript interfaces (Profile, Group, CalEvent,
                            Habit, Pact, GroupChallenge, AppNotification, etc.)
@@ -134,9 +130,9 @@ client/
 | Auth (login/register/logout) | ✅ Done | Supabase cookies |
 | Calendar (month + agenda) | ✅ Done | FullCalendar, Monday start, mobile layout |
 | Events (CRUD, RSVP, recurring) | ✅ Done | NL parse, reminders, recurrence |
+| Date availability voting | ✅ Done | Tentative events; multi-slot yes/maybe/no per date, overlap meter, creator confirms (upgraded 2026-06-15) |
 | Groups + invites | ✅ Done | Role-based, invite tokens |
 | Tasks / todo lists | ✅ Done | Per-group, progress bars |
-| Discovery feed | ✅ Done | Ticketmaster live, filter chips, save-to-calendar |
 | iCal sync | ✅ Done | Subscribe URL + .ics import in ProfilePage |
 | Habits tracker | ✅ Done | Streaks, heatmap, weekly arc, progressive targets (XP UI removed 2026-06) |
 | Countdowns | ✅ Done | Milestone countdowns; Pomodoro/interval timer removed 2026-06 |
@@ -189,7 +185,7 @@ export const GROUP_COLORS = {
   work:    '#22d3aa',
   climb:   '#38bdf8',
   book:    '#c084fc',
-  self:    'var(--accent)',  // discovery saves
+  self:    'var(--accent)',  // personal events
 }
 ```
 
@@ -269,6 +265,8 @@ if (error) return res.status(500).json({ success: false, error: error.message })
 | `profiles_groups`      | `user_id`, `groups_id`, `role`, `invite_status`, `joined_at`, `color`                        |
 | `events`               | `event_id`, `event_title`, `start_date`, `end_date`, `start_time`, `end_time`, `groups_id`, `status`, `pact_id` |
 | `profiles_events`      | `user_id`, `event_id`, `rsvp_status`                                                         |
+| `event_date_options`   | `option_id`, `event_id`, `start_date`, `start_time`, `end_date`, `end_time`, `position`     |
+| `event_date_votes`     | `vote_id`, `event_id`, `option_id`, `user_id`, `availability` (yes/maybe/no); unique `(event_id, option_id, user_id)` |
 | `task_list`            | `task_list_id`, `groups_id`, `list_title`                                                    |
 | `task`                 | `task_id`, `task_list_id`, `task_title`, `is_completed`                                      |
 | `habits`               | `habit_id`, `user_id`, `title`, `emoji`, `color`, `frequency`, `xp_value`, `weekly_target`, `target_increment`, `habit_start_week` |
@@ -326,7 +324,6 @@ SUPABASE_SECRET_KEY= (secret key, sb_secret_… — supabaseAdmin only; legacy v
 PORT=                (optional, defaults to 3000)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
-TICKET_MASTER_KEY=
 RESEND_API_KEY=
 ```
 
@@ -343,4 +340,4 @@ RESEND_API_KEY=
 - **FullCalendar event colors**: Use `--fc-event-bg-color` and `--fc-event-border-color` CSS custom properties set in `eventDidMount` via `setProperty`. The global override in `index.css` reads these — never use `!important` background on `.fc-daygrid-event`.
 - **supabaseAdmin**: Required for cross-user operations (scheduler crons, pact resolution). The regular `req.supabase` client is scoped to the logged-in user via RLS.
 - **Server-side Supabase clients must keep `persistSession: false, autoRefreshToken: false`** (see `db/supabase.js`). With defaults on, the shared client stores the last user's session and auto-rotates its refresh token in the background — invalidating the token in the browser's cookie and force-logging users out at JWT expiry (~1h). Never create a server client without these options.
-- **Discovery**: `DiscoveryPage` calls the real Ticketmaster API via `/api/discovery`. `lib/mockData.ts` only provides the `DiscoveryEvent` type definition now.
+- **Date voting**: tentative events store candidate slots in `event_date_options`; members mark availability per slot in `event_date_votes` (one row per `(event_id, option_id, user_id)`, `availability` ∈ yes/maybe/no). `renderEvents` returns per-option `yesCount/maybeCount/noCount` + a `myVotes` map; the creator confirms a slot via `/confirmEventDate`. (Discovery/Ticketmaster removed 2026-06-15.)

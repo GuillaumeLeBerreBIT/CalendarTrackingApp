@@ -4,11 +4,15 @@ import Icon from '@/components/ui/Icon'
 import type { DateSelectArg } from '@fullcalendar/core'
 import api from '@/api/client'
 import type { CalEvent, Group, Member } from '@/types'
+import RecurringScopePrompt from '@/components/RecurringScopePrompt'
 import {
   type RecurrenceState, type RepeatFreq, type EndMode,
   WEEKDAYS, WEEKDAY_LABEL, parseRRule, buildRRule, summarize,
 } from '@/lib/recurrence'
 import { parseNL, type ParsedEvent } from '@/lib/nlParser'
+
+// Max candidate date slots per tentative event (mirrors MAX_DATE_OPTIONS on the backend).
+const MAX_DATE_OPTIONS = 6
 
 interface Props {
   event: CalEvent | null
@@ -143,7 +147,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   }
 
   function addDateOption() {
-    if (dateOptions.length >= 4) return
+    if (dateOptions.length >= MAX_DATE_OPTIONS) return
     setDateOptions(prev => [...prev, emptyOption()])
   }
 
@@ -429,7 +433,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                   transition: 'var(--transition)',
                 }}
               >
-                <Icon name="close" size={15} sw={2.2} />
+                <Icon name="trash" size={15} sw={2.2} />
               </button>
             )}
             <button
@@ -781,7 +785,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
               <button
                 type="button"
                 onClick={addDateOption}
-                disabled={dateOptions.length >= 4}
+                disabled={dateOptions.length >= MAX_DATE_OPTIONS}
                 style={{
                   marginTop: 8,
                   display: 'inline-flex',
@@ -791,11 +795,11 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                   borderRadius: 'var(--r-sm)',
                   border: '1px solid var(--border-2)',
                   background: 'transparent',
-                  color: dateOptions.length >= 4 ? 'var(--text-3)' : 'var(--accent)',
+                  color: dateOptions.length >= MAX_DATE_OPTIONS ? 'var(--text-3)' : 'var(--accent)',
                   fontSize: 12.5,
                   fontWeight: 650,
-                  cursor: dateOptions.length >= 4 ? 'not-allowed' : 'pointer',
-                  opacity: dateOptions.length >= 4 ? 0.5 : 1,
+                  cursor: dateOptions.length >= MAX_DATE_OPTIONS ? 'not-allowed' : 'pointer',
+                  opacity: dateOptions.length >= MAX_DATE_OPTIONS ? 0.5 : 1,
                   transition: 'var(--transition)',
                 }}
               >
@@ -1054,73 +1058,16 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
 
       {/* ── Recurring scope chooser ── */}
       {scopePrompt && (
-        <div
-          onClick={(e) => { e.stopPropagation(); setScopePrompt(null) }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 300,
-            background: 'var(--scrim)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        <RecurringScopePrompt
+          mode={scopePrompt}
+          onChoose={(scope) => {
+            if (scopePrompt === 'save') doSave(scope)
+            else doDelete(scope)
           }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 'min(360px, 100%)', background: 'var(--surface)',
-              borderRadius: 'var(--r-lg)', border: '1px solid var(--border-2)',
-              boxShadow: 'var(--shadow-lg)', padding: 20,
-              display: 'flex', flexDirection: 'column', gap: 10,
-            }}
-          >
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 4px' }}>
-              {scopePrompt === 'save' ? 'Save recurring event' : 'Delete recurring event'}
-            </h3>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 8px' }}>
-              This is a repeating event. Apply to:
-            </p>
-
-            <ScopeButton label="This event only" onClick={() => (scopePrompt === 'save' ? doSave('this') : doDelete('this'))} />
-            <ScopeButton
-              label="This and following events"
-              onClick={() => (scopePrompt === 'save' ? doSave('following') : doDelete('following'))}
-            />
-            <ScopeButton
-              label="All events in the series"
-              danger={scopePrompt === 'delete'}
-              onClick={() => (scopePrompt === 'save' ? doSave('all') : doDelete('all'))}
-            />
-            <button
-              type="button"
-              onClick={() => setScopePrompt(null)}
-              style={{
-                marginTop: 4, background: 'transparent', border: 'none',
-                color: 'var(--text-3)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '8px',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+          onCancel={() => setScopePrompt(null)}
+        />
       )}
     </div>,
     document.body
-  )
-}
-
-function ScopeButton({ label, onClick, danger = false }: { label: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        width: '100%', textAlign: 'left', padding: '12px 14px',
-        borderRadius: 'var(--r-sm)', cursor: 'pointer',
-        border: '1px solid var(--border-2)',
-        background: 'var(--surface-2)',
-        color: danger ? '#fb7185' : 'var(--text-1)',
-        fontSize: 13.5, fontWeight: 600, transition: 'var(--transition)',
-      }}
-    >
-      {label}
-    </button>
   )
 }

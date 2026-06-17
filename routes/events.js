@@ -7,6 +7,9 @@ import { expandRecurringEvent, capRuleUntil } from "../utils/recurrence.js";
 
 const router = express.Router()
 
+// Max candidate date slots a tentative event may carry (set at creation + added later).
+export const MAX_DATE_OPTIONS = 6;
+
 // True if the user created the event, or is an admin of the event's group.
 async function canManageEvent(reqSupabase, event, userId) {
   if (event.created_by === userId) return true;
@@ -62,7 +65,7 @@ router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), 
 
   // Insert candidate date options for tentative events
   if (eventStatus === 'tentative' && dateOptions.length > 0) {
-    const optionRows = dateOptions.slice(0, 4).map((opt, i) => ({
+    const optionRows = dateOptions.slice(0, MAX_DATE_OPTIONS).map((opt, i) => ({
       event_id: eventId,
       start_date: opt.startDate,
       start_time: opt.startTime || null,
@@ -712,18 +715,23 @@ router.get('/renderEvents', authRequire, async (req, res) => {
         // Build tentative voting data when applicable
         const isTentative = e.status === 'tentative';
         let dateOptionsData = undefined;
-        let myVote = null;
+        let myVotes = null;
 
         if (isTentative) {
           const eventVotes = votesByEvent[e.event_id] || [];
           const eventOptions = optionsByEvent[e.event_id] || [];
 
-          // Find this user's current vote
-          const myVoteRow = eventVotes.find(v => v.user_id === req.cookies.userId);
-          myVote = myVoteRow ? myVoteRow.option_id : null;
+          // This user's availability per option: { [optionId]: 'yes'|'maybe'|'no' }
+          myVotes = {};
+          eventVotes.forEach(v => {
+            if (v.user_id === req.cookies.userId) myVotes[v.option_id] = v.availability;
+          });
 
           dateOptionsData = eventOptions.map(opt => {
             const optVotes = eventVotes.filter(v => v.option_id === opt.option_id);
+            const yesCount = optVotes.filter(v => v.availability === 'yes').length;
+            const maybeCount = optVotes.filter(v => v.availability === 'maybe').length;
+            const noCount = optVotes.filter(v => v.availability === 'no').length;
             return {
               optionId: opt.option_id,
               startDate: opt.start_date,
@@ -734,8 +742,13 @@ router.get('/renderEvents', authRequire, async (req, res) => {
               votes: optVotes.map(v => ({
                 userId: v.user_id,
                 username: voterProfileMap[v.user_id] || null,
+                availability: v.availability,
               })),
-              voteCount: optVotes.length,
+              yesCount,
+              maybeCount,
+              noCount,
+              // voteCount kept as the "yes" tally for existing progress-bar callers
+              voteCount: yesCount,
             };
           });
         }
@@ -769,7 +782,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
             status: e.status || 'confirmed',
             ...(isTentative && {
               dateOptions: dateOptionsData,
-              myVote,
+              myVotes,
               totalGroupMembers: groupMemberCountMap[e.groups_id] || 0,
             }),
             ...(e.status === 'locked' && pactByEventId[e.event_id] && {
@@ -940,15 +953,23 @@ router.get('/e/:token', async (req, res) => {
 
 /**
  * POST /api/voteEventDate
- * Cast or change a vote for a candidate date slot on a tentative event.
- * Body: { eventId: number, optionId: number }
+ * Set this user's availability for a single candidate date slot on a tentative
+ * event. Multi-slot: a user can mark every option independently.
+ * Body: { eventId: number, optionId: number, availability: 'yes'|'maybe'|'no'|'clear' }
+ *   - 'clear' retracts the answer (deletes the row) so the slot reads "no opinion".
  */
+const VOTE_AVAILABILITY = ['yes', 'maybe', 'no'];
+
 router.post('/voteEventDate', authRequire, async (req, res) => {
   const eventId = parseInt(req.body.eventId);
   const optionId = parseInt(req.body.optionId);
+  const availability = req.body.availability;
 
   if (isNaN(eventId) || isNaN(optionId)) {
     return res.status(400).json({ success: false, error: 'Invalid eventId or optionId.' });
+  }
+  if (availability !== 'clear' && !VOTE_AVAILABILITY.includes(availability)) {
+    return res.status(400).json({ success: false, error: 'Invalid availability.' });
   }
 
   // Verify event exists and is tentative
@@ -980,19 +1001,154 @@ router.post('/voteEventDate', authRequire, async (req, res) => {
     }
   }
 
-  // Upsert vote — one per user per event, option can change
+  // 'clear' → retract this slot's answer; otherwise upsert the availability.
+  // One row per (event, option, user) so every slot can be answered independently.
+  if (availability === 'clear') {
+    const { error: delError } = await supabaseAdmin
+      .from('event_date_votes')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('option_id', optionId)
+      .eq('user_id', req.cookies.userId);
+    if (delError) {
+      return res.status(500).json({ success: false, error: delError.message });
+    }
+    return res.json({ success: true, optionId, availability: null });
+  }
+
   const { error: voteError } = await supabaseAdmin
     .from('event_date_votes')
     .upsert(
-      { event_id: eventId, option_id: optionId, user_id: req.cookies.userId },
-      { onConflict: 'event_id,user_id' }
+      { event_id: eventId, option_id: optionId, user_id: req.cookies.userId, availability },
+      { onConflict: 'event_id,option_id,user_id' }
     );
 
   if (voteError) {
     return res.status(500).json({ success: false, error: voteError.message });
   }
 
-  return res.json({ success: true, optionId });
+  return res.json({ success: true, optionId, availability });
+});
+
+/**
+ * POST /api/events/:eventId/date-options
+ * Any accepted group member can propose an additional candidate slot on a
+ * tentative event (up to MAX_DATE_OPTIONS). The proposer is auto-marked 'yes'
+ * on the new slot, and other members are notified to come vote it.
+ * Body: { startDate: 'YYYY-MM-DD', startTime?, endDate?, endTime? }
+ */
+router.post('/events/:eventId/date-options', authRequire, async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  if (isNaN(eventId)) {
+    return res.status(400).json({ success: false, error: 'Invalid event ID.' });
+  }
+  const { startDate, startTime, endDate, endTime } = req.body;
+  if (!startDate) {
+    return res.status(400).json({ success: false, error: 'A start date is required.' });
+  }
+
+  // Event must exist and be tentative
+  const { data: event, error: eventError } = await req.supabase
+    .from('events')
+    .select('event_id, event_title, status, groups_id')
+    .eq('event_id', eventId)
+    .single();
+
+  if (eventError || !event) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
+  if (event.status !== 'tentative') {
+    return res.status(400).json({ success: false, error: 'Event is not tentative.' });
+  }
+
+  // Caller must be an accepted member of the event's group
+  if (event.groups_id) {
+    const { data: membership } = await req.supabase
+      .from('profiles_groups')
+      .select('user_id')
+      .eq('groups_id', event.groups_id)
+      .eq('user_id', req.cookies.userId)
+      .eq('invite_status', 'accepted')
+      .maybeSingle();
+    if (!membership) {
+      return res.status(403).json({ success: false, error: 'You are not a member of this group.' });
+    }
+  }
+
+  // Enforce the slot cap
+  const { count: existingCount } = await supabaseAdmin
+    .from('event_date_options')
+    .select('option_id', { count: 'exact', head: true })
+    .eq('event_id', eventId);
+  if ((existingCount || 0) >= MAX_DATE_OPTIONS) {
+    return res.status(400).json({ success: false, error: `A doodle can have at most ${MAX_DATE_OPTIONS} date options.` });
+  }
+
+  // Insert the new option at the next position
+  const { data: option, error: optionError } = await supabaseAdmin
+    .from('event_date_options')
+    .insert({
+      event_id: eventId,
+      start_date: startDate,
+      start_time: startTime || null,
+      end_date: endDate || null,
+      end_time: endTime || null,
+      position: existingCount || 0,
+    })
+    .select()
+    .single();
+
+  if (optionError) {
+    return res.status(500).json({ success: false, error: optionError.message });
+  }
+
+  // Proposer is available on the slot they added
+  await supabaseAdmin
+    .from('event_date_votes')
+    .upsert(
+      { event_id: eventId, option_id: option.option_id, user_id: req.cookies.userId, availability: 'yes' },
+      { onConflict: 'event_id,option_id,user_id' }
+    );
+
+  // Notify other accepted members so they come vote the new slot
+  if (event.groups_id) {
+    try {
+      const { data: members } = await req.supabase
+        .from('profiles_groups')
+        .select('user_id')
+        .eq('groups_id', event.groups_id)
+        .eq('invite_status', 'accepted');
+      const recipientIds = (members || [])
+        .map(m => m.user_id)
+        .filter(id => id !== req.cookies.userId);
+      if (recipientIds.length > 0) {
+        await notifyUsers(req.supabase, recipientIds, 'event_invite', {
+          title: 'New date to vote on',
+          body: `A new date was added to "${event.event_title}"`,
+          link: `/groups/${event.groups_id}`,
+        });
+      }
+    } catch (notifyError) {
+      console.warn('Add-date-option notification failed:', notifyError.message);
+    }
+  }
+
+  return res.json({
+    success: true,
+    option: {
+      optionId: option.option_id,
+      startDate: option.start_date,
+      startTime: option.start_time ? option.start_time.slice(0, 5) : null,
+      endDate: option.end_date || null,
+      endTime: option.end_time ? option.end_time.slice(0, 5) : null,
+      position: option.position,
+      votes: [{ userId: req.cookies.userId, username: null, availability: 'yes' }],
+      yesCount: 1,
+      maybeCount: 0,
+      noCount: 0,
+      voteCount: 1,
+    },
+  });
 });
 
 /**
@@ -1037,15 +1193,19 @@ router.post('/confirmEventDate', authRequire, async (req, res) => {
     return res.status(404).json({ success: false, error: 'Date option not found.' });
   }
 
-  // Update the event to confirmed with the winning dates
+  // Update the event to confirmed with the winning dates.
+  // events.end_date is NOT NULL but a date option's end_date may be null
+  // (single-day slot) — fall back to start_date. all_day follows whether the
+  // chosen slot carries a time, so a timed slot no longer renders as all-day.
   const { error: updateError } = await req.supabase
     .from('events')
     .update({
       status: 'confirmed',
       start_date: winningOption.start_date,
       start_time: winningOption.start_time,
-      end_date: winningOption.end_date,
+      end_date: winningOption.end_date || winningOption.start_date,
       end_time: winningOption.end_time,
+      all_day: !winningOption.start_time,
     })
     .eq('event_id', eventId);
 

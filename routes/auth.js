@@ -180,7 +180,7 @@ router.patch('/profile', authRequire, async (req, res) => {
 
 /**
  * PATCH /profile/city
- * Update the authenticated user's home city (used as the default discovery location).
+ * Update the authenticated user's home city.
  * Body: { city: string }  — empty string clears it.
  */
 router.patch('/profile/city', authRequire, async (req, res) => {
@@ -265,16 +265,7 @@ router.get('/profile/stats', authRequire, async (req, res) => {
     groups = count || 0;
   } catch (_) { groups = 0; }
 
-  let saved = 0;
-  try {
-    const { count } = await req.supabase
-      .from('saved_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    saved = count || 0;
-  } catch (_) { saved = 0; }
-
-  return res.json({ success: true, eventsThisMonth, groups, saved });
+  return res.json({ success: true, eventsThisMonth, groups });
 });
 
 // GET /push/vapid-public-key — returns the VAPID public key so the frontend can subscribe
@@ -302,7 +293,6 @@ router.get('/account/export', authRequire, async (req, res) => {
     ['habits', 'user_id'],
     ['habit_completions', 'user_id'],
     ['timers', 'user_id'],
-    ['saved_events', 'user_id'],
     ['notifications', 'user_id'],
     ['event_comments', 'user_id'],
     ['event_reactions', 'user_id'],
@@ -375,7 +365,6 @@ router.post('/account/delete', authRequire, async (req, res) => {
 
     // 2. Clear personal rows with no FK to profiles (would orphan otherwise).
     await supabaseAdmin.from('notifications').delete().eq('user_id', userId);
-    await supabaseAdmin.from('saved_events').delete().eq('user_id', userId);
     await supabaseAdmin.from('subscriptions').delete().eq('user_id', userId);
     await supabaseAdmin.from('events').delete().eq('created_by', userId);
 

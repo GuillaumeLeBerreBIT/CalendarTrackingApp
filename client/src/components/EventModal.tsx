@@ -3,12 +3,11 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
 import CountdownPill from '@/components/CountdownPill'
-import { Avatar, AvatarStack } from '@/components/ui/Avatar'
-import Button, { IconButton } from '@/components/ui/Button'
-import { SourceBadge, MapPreview } from '@/components/ui/Primitives'
-import { MOCK_MEMBERS, type DiscoveryEvent } from '@/lib/mockData'
+import { IconButton } from '@/components/ui/Button'
 import type { CalEvent } from '@/types'
 import api from '@/api/client'
+import RecurringScopePrompt from '@/components/RecurringScopePrompt'
+import CommentThread from '@/components/CommentThread'
 
 const HEX_GROUP_COLORS: Record<string, string> = {
   family: '#f59e0b', friends: '#ec4899', work: '#22d3aa',
@@ -45,27 +44,21 @@ function resolveEventHex(participants: Array<{ userId: string }>, groupName?: st
 type RsvpChoice = 'going' | 'maybe' | 'no' | null
 
 interface EventModalProps {
-  data: DiscoveryEvent | CalEvent
+  data: CalEvent
   onClose: () => void
-  savedSet?: Set<string>
-  onSave?: (id: string) => void
   onEdit?: () => void
+  onDeleted?: () => void
   currentUserId?: string
-  onSaveToCalendar?: (ev: DiscoveryEvent) => void
   onRsvp?: () => void
 }
 
-function isDiscovery(data: DiscoveryEvent | CalEvent): data is DiscoveryEvent {
-  return 'blurb' in data && 'cat' in data
-}
-
-export default function EventModal({ data, onClose, savedSet, onSave, onEdit, currentUserId, onSaveToCalendar, onRsvp }: EventModalProps) {
+export default function EventModal({ data, onClose, onEdit, onDeleted, currentUserId, onRsvp }: EventModalProps) {
   const navigate = useNavigate()
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
-  const isCalEvent = 'extendedProps' in data
-  const eventId = isCalEvent ? data.id : null
+  const isCalEvent = true
+  const eventId = data.id
 
-  const calEvent = isCalEvent ? (data as CalEvent) : null
+  const calEvent = data
   const isGroupEvent = isCalEvent && !!(calEvent?.extendedProps?.groupsId)
   const participants = calEvent?.extendedProps?.participants ?? []
   const isMultiPerson = participants.length > 1
@@ -77,22 +70,48 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
     calEvent?.extendedProps?.createdBy as string | null | undefined,
     calEvent?.extendedProps?.resolvedHex as string | null | undefined,
   )
-  const imageUrl = isCalEvent ? calEvent?.extendedProps?.imageUrl : (data as DiscoveryEvent).image
+  const imageUrl = calEvent?.extendedProps?.imageUrl
   const location = calEvent?.extendedProps?.location
 
   const [shareCopied, setShareCopied] = useState(false)
+
+  // ── Delete state ───────────────────────────────────────────
+  const [deleting, setDeleting] = useState(false)
+  const [deleteScope, setDeleteScope] = useState<'prompt' | null>(null)
+
+  async function doDelete(scope: string, date: string | null) {
+    setDeleting(true)
+    try {
+      const calEv = data as CalEvent
+      const eventId = calEv.extendedProps?.recurringEventId ?? calEv.id
+      const params: Record<string, string> = { scope }
+      if (date) params.date = date
+      await api.delete(`/parseEvent/${eventId}`, { params })
+      onDeleted?.()
+    } catch (err) {
+      console.error('Delete failed', err)
+    } finally {
+      setDeleting(false)
+      setDeleteScope(null)
+    }
+  }
+
+  function handleDelete() {
+    const calEv = data as CalEvent
+    const isRecurring = calEv.extendedProps?.isRecurring || calEv.extendedProps?.recurringEventId
+    if (isRecurring) {
+      setDeleteScope('prompt')
+      return
+    }
+    if (!window.confirm('Delete this event? This cannot be undone.')) return
+    doDelete('this', null)
+  }
 
   // ── Reactions ──────────────────────────────────────────────
   const [reactions, setReactions] = useState<Array<{ emoji: string; count: number; iMine: boolean }>>([])
   const [reactionsLoaded, setReactionsLoaded] = useState(false)
 
-  // ── Comments ───────────────────────────────────────────────
-  const [comments, setComments] = useState<Array<{ commentId: number; body: string; userId: string; username: string; createdAt: string }>>([])
-  const [commentInput, setCommentInput] = useState('')
-  const [submittingComment, setSubmittingComment] = useState(false)
-
   function handleShare() {
-    if (isDisc) return
     const token = calEvent?.extendedProps?.publicToken
     if (!token) return
     const url = window.location.origin + '/e/' + token
@@ -145,24 +164,22 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // Fetch reactions + comments in parallel when the modal opens for a real calendar event
+  // Fetch reactions when the modal opens for a real calendar event.
+  // (Comments are fetched independently by <CommentThread>.)
   useEffect(() => {
-    if (!isCalEvent || !eventId || isDiscovery(data)) {
+    if (!eventId) {
       setReactions([])
-      setComments([])
       setReactionsLoaded(false)
       return
     }
     let cancelled = false
-    Promise.all([
-      api.get<{ reactions: Array<{ emoji: string; count: number; iMine: boolean }> }>(`/events/${eventId}/reactions`).catch(() => null),
-      api.get<{ comments: Array<{ commentId: number; body: string; userId: string; username: string; createdAt: string }> }>(`/events/${eventId}/comments`).catch(() => null),
-    ]).then(([reactRes, commRes]) => {
-      if (cancelled) return
-      if (reactRes?.data?.reactions) setReactions(reactRes.data.reactions)
-      setReactionsLoaded(true)
-      if (commRes?.data?.comments) setComments(commRes.data.comments)
-    })
+    api.get<{ reactions: Array<{ emoji: string; count: number; iMine: boolean }> }>(`/events/${eventId}/reactions`)
+      .catch(() => null)
+      .then((reactRes) => {
+        if (cancelled) return
+        if (reactRes?.data?.reactions) setReactions(reactRes.data.reactions)
+        setReactionsLoaded(true)
+      })
     return () => { cancelled = true }
   }, [eventId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -198,63 +215,19 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
     }
   }
 
-  async function handleCommentSubmit() {
-    if (!commentInput.trim() || !eventId || submittingComment) return
-    setSubmittingComment(true)
-    try {
-      const res = await api.post<{ comment: { commentId: number; body: string; userId: string; username: string; createdAt: string } }>(`/events/${eventId}/comments`, { body: commentInput.trim() })
-      if (res.data?.comment) {
-        setComments(prev => [...prev, res.data.comment])
-        setCommentInput('')
-      }
-    } catch {
-      // silently fail — user can retry
-    } finally {
-      setSubmittingComment(false)
-    }
-  }
-
-  async function handleCommentDelete(commentId: number) {
-    if (!eventId) return
-    setComments(prev => prev.filter(c => c.commentId !== commentId))
-    try {
-      await api.delete(`/events/${eventId}/comments/${commentId}`)
-    } catch {
-      // If delete fails we don't restore; backend is source of truth on next open
-    }
-  }
-
-  // Normalise both event shapes into a common display shape
-  const isDisc = isDiscovery(data)
-
-  const cat    = isDisc ? data.cat : 'calendar'
-  const title  = isDisc ? data.title : data.title
-  const blurb  = isDisc ? data.blurb : (data.extendedProps?.description ?? '')
-  const source = isDisc ? data.source : null
-  const date   = isDisc
-    ? `${data.date} · ${data.time}`
-    : data.start
-      ? `${data.start.split('T')[0]}${data.start.includes('T') ? ' · ' + data.start.split('T')[1].slice(0, 5) : ''}`
-      : ''
-  const venue  = isDisc ? data.venue : (data.extendedProps?.groupName ?? 'Calendar event')
-  const area   = isDisc ? data.area : ''
-  const price  = isDisc ? data.price : null
-  const going  = isDisc ? data.going : (data.extendedProps?.participants?.filter(p => p.rsvpStatus === 'going').map(p => p.userId) ?? [])
-  const organiser = isDisc ? data.organiser : (data.extendedProps?.groupName ?? '')
-  const isSaved = savedSet?.has(data.id) ?? false
+  // Display shape for a calendar event
+  const cat    = 'calendar'
+  const title  = data.title
+  const blurb  = data.extendedProps?.description ?? ''
+  const date   = data.start
+    ? `${data.start.split('T')[0]}${data.start.includes('T') ? ' · ' + data.start.split('T')[1].slice(0, 5) : ''}`
+    : ''
+  const venue  = data.extendedProps?.groupName ?? 'Calendar event'
+  const area   = ''
 
   // Edit/Delete actions are gated on management rights (creator OR group admin),
   // independent of whether the user is an invited participant.
-  const canManage = !isDisc && (data.extendedProps?.canManage === true)
-
-  // Members from "going" list that we know about
-  const knownGoingIds = going.filter(id => MOCK_MEMBERS[id])
-  const goingNames = knownGoingIds.slice(0, 2).map(id => MOCK_MEMBERS[id]?.name?.split(' ')[0]).filter(Boolean)
-  const goingLabel = goingNames.length === 1
-    ? `${goingNames[0]} is going to this`
-    : goingNames.length >= 2
-    ? `${goingNames.join(' & ')} are going to this`
-    : ''
+  const canManage = data.extendedProps?.canManage === true
 
   const rsvpOptions: { key: RsvpChoice & string; label: string; icon: string; color: string }[] = [
     { key: 'going', label: 'Going',    icon: 'check', color: 'var(--g-work)' },
@@ -343,26 +316,22 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
 
           {/* Top-left: source badge or event-type pill */}
           <div style={{ position: 'absolute', top: 14, left: 16, zIndex: 2, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {source ? (
-              <SourceBadge source={source} />
-            ) : (
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 10px',
-                borderRadius: 'var(--r-full)',
-                background: isMultiPerson ? groupHex + '33' : groupHex + '22',
-                backdropFilter: 'blur(8px)',
-                border: `1px solid ${groupHex}55`,
-                fontSize: 11,
-                fontWeight: 600,
-                color: '#fff',
-              }}>
-                <Icon name={isMultiPerson ? 'users' : isGroupEvent ? 'calendar' : 'profile'} size={12} sw={2} />
-                {isMultiPerson ? 'Group event' : isGroupEvent ? 'Appointment' : 'Personal'}
-              </span>
-            )}
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 10px',
+              borderRadius: 'var(--r-full)',
+              background: isMultiPerson ? groupHex + '33' : groupHex + '22',
+              backdropFilter: 'blur(8px)',
+              border: `1px solid ${groupHex}55`,
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#fff',
+            }}>
+              <Icon name={isMultiPerson ? 'users' : isGroupEvent ? 'calendar' : 'profile'} size={12} sw={2} />
+              {isMultiPerson ? 'Group event' : isGroupEvent ? 'Appointment' : 'Personal'}
+            </span>
             {isCalEvent && data.extendedProps?.isRecurring && (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -387,15 +356,49 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
             )}
           </div>
 
-          {/* Top-right: share (calendar events only) + close */}
+          {/* Top-right: edit + delete (when canManage) + share (calendar) + close */}
           <div style={{ position: 'absolute', top: 14, right: 16, display: 'flex', gap: 8, zIndex: 2 }}>
-            {!isDisc && (
+            {canManage && (
+              <>
+                <IconButton
+                  name="edit"
+                  tone="glass"
+                  size={44}
+                  title="Edit event"
+                  onClick={onEdit}
+                />
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  title="Delete event"
+                  style={{
+                    position: 'relative',
+                    width: 44,
+                    height: 44,
+                    borderRadius: 'var(--r-sm)',
+                    border: '1px solid rgba(239,68,68,0.45)',
+                    background: deleting ? 'rgba(239,68,68,0.18)' : 'rgba(0,0,0,0.4)',
+                    color: '#ef4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'var(--transition)',
+                    backdropFilter: 'blur(8px)',
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                    opacity: deleting ? 0.6 : 1,
+                  }}
+                >
+                  <Icon name="trash" size={20} sw={1.8} />
+                </button>
+              </>
+            )}
+            {(
               shareCopied ? (
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   padding: '0 12px',
-                  height: 36,
+                  height: 44,
                   borderRadius: 'var(--r-sm)',
                   background: 'rgba(0,0,0,0.4)',
                   backdropFilter: 'blur(8px)',
@@ -408,10 +411,10 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
                   Copied!
                 </span>
               ) : (
-                <IconButton name="share" tone="glass" size={36} title="Copy link" onClick={handleShare} />
+                <IconButton name="share" tone="glass" size={44} title="Copy link" onClick={handleShare} />
               )
             )}
-            <IconButton name="close" tone="glass" size={36} onClick={onClose} title="Close" />
+            <IconButton name="close" tone="glass" size={44} onClick={onClose} title="Close" />
           </div>
 
           {/* Bottom: date + title */}
@@ -436,19 +439,12 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <MetaItem icon="pin" primary={venue} secondary={area || undefined} />
-              {!isDisc && location && (
+              {location && (
                 <MetaItem icon="map" primary={location} secondary="Location" />
               )}
-              {isDisc ? (
-                <MetaItem icon="users" primary={organiser} secondary="Organiser" />
-              ) : creatorName ? (
+              {creatorName ? (
                 <MetaItem icon="profile" primary={creatorName} secondary="Created by" />
               ) : null}
-              {price && (
-                <div style={{ marginLeft: 'auto', fontSize: 22, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
-                  {price}
-                </div>
-              )}
             </div>
             {isCalEvent && data.extendedProps?.groupName && (
               <div
@@ -483,24 +479,6 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
               </div>
             )}
           </div>
-
-          {/* Social proof banner */}
-          {knownGoingIds.length > 0 && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              background: 'var(--accent-softer)',
-              border: '1px solid var(--accent-line)',
-              borderRadius: 'var(--r-md)',
-              padding: '13px 15px',
-            }}>
-              <AvatarStack ids={knownGoingIds} size={28} ringColor="var(--surface-2)" max={3} />
-              <span style={{ fontSize: 13.5, color: 'var(--text-2)' }}>
-                <span style={{ color: 'var(--accent)', fontWeight: 650 }}>{goingLabel}</span>
-              </span>
-            </div>
-          )}
 
           {/* Description */}
           {blurb && (
@@ -572,66 +550,8 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
             )}
           </div>}
 
-          {/* Map preview — only for discovery events with an area */}
-          {isDisc && area && (
-            <MapPreview area={area} venue={venue} />
-          )}
-
-          {/* Attendees — discovery events use mock member data */}
-          {isDisc && going.length > 0 && (
-            <div>
-              {knownGoingIds.length > 0 && (
-                <>
-                  <div style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: '0.09em',
-                    textTransform: 'uppercase',
-                    color: 'var(--text-3)',
-                    marginBottom: 10,
-                  }}>
-                    From your groups
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                    {knownGoingIds.map((id) => (
-                      <div key={id} style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 7,
-                        padding: '5px 10px 5px 5px',
-                        borderRadius: 'var(--r-full)',
-                        background: 'var(--accent-softer)',
-                        border: '1px solid var(--accent-line)',
-                      }}>
-                        <Avatar id={id} size={22} />
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>
-                          {MOCK_MEMBERS[id]?.name?.split(' ')[0] || id}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-              {going.filter(id => !MOCK_MEMBERS[id]).length > 0 && (
-                <>
-                  <div style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: '0.09em',
-                    textTransform: 'uppercase',
-                    color: 'var(--text-3)',
-                    marginBottom: 10,
-                  }}>
-                    Others
-                  </div>
-                  <AvatarStack ids={going.filter(id => !MOCK_MEMBERS[id])} size={30} max={8} />
-                </>
-              )}
-            </div>
-          )}
-
           {/* Attendees — real calendar events use the actual participant list */}
-          {!isDisc && liveParticipants.length > 0 && (
+          {liveParticipants.length > 0 && (
             <div>
               <h3 style={{
                 fontSize: 11,
@@ -716,186 +636,33 @@ export default function EventModal({ data, onClose, savedSet, onSave, onEdit, cu
           )}
 
           {/* ── Reaction Bar ──────────────────────────────────── */}
-          {isCalEvent && !isDiscovery(data) && eventId && reactionsLoaded && (
+          {eventId && reactionsLoaded && (
             <ReactionBar reactions={reactions} onToggle={handleReactionToggle} />
           )}
 
           {/* ── Comment Thread ────────────────────────────────── */}
-          {isCalEvent && !isDiscovery(data) && eventId && reactionsLoaded && (
-            <div>
-              <div style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.09em',
-                textTransform: 'uppercase',
-                color: 'var(--text-3)',
-                marginBottom: 12,
-              }}>
-                Comments
-              </div>
-
-              {comments.length === 0 ? (
-                <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 14 }}>
-                  No comments yet. Be the first!
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-                  {comments.map(c => (
-                    <div key={c.commentId} style={{
-                      display: 'flex',
-                      gap: 10,
-                      padding: '10px 12px',
-                      borderRadius: 'var(--r-md)',
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      alignItems: 'flex-start',
-                    }}>
-                      <Avatar id={c.userId} size={26} name={c.username} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 3 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{c.username}</span>
-                          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{relativeTime(c.createdAt)}</span>
-                        </div>
-                        <p style={{ fontSize: 13.5, color: 'var(--text-1)', lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
-                          {c.body}
-                        </p>
-                      </div>
-                      {c.userId === currentUserId && (
-                        <button
-                          onClick={() => handleCommentDelete(c.commentId)}
-                          title="Delete comment"
-                          style={{
-                            flexShrink: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: 22,
-                            height: 22,
-                            borderRadius: 'var(--r-sm)',
-                            border: '1px solid var(--border)',
-                            background: 'transparent',
-                            color: 'var(--text-3)',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <Icon name="close" size={14} sw={2} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                <textarea
-                  rows={1}
-                  maxLength={1000}
-                  value={commentInput}
-                  onChange={e => setCommentInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCommentSubmit() }
-                  }}
-                  placeholder="Add a comment…"
-                  style={{
-                    flex: 1,
-                    resize: 'none',
-                    padding: '9px 12px',
-                    borderRadius: 'var(--r-md)',
-                    border: '1px solid var(--border-2)',
-                    background: 'var(--surface-2)',
-                    color: 'var(--text-1)',
-                    fontSize: 13.5,
-                    lineHeight: 1.5,
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                  }}
-                />
-                <button
-                  onClick={handleCommentSubmit}
-                  disabled={submittingComment || !commentInput.trim()}
-                  style={{
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 38,
-                    height: 38,
-                    borderRadius: 'var(--r-md)',
-                    border: '1px solid var(--accent)',
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    cursor: submittingComment || !commentInput.trim() ? 'not-allowed' : 'pointer',
-                    opacity: submittingComment || !commentInput.trim() ? 0.5 : 1,
-                    transition: 'var(--transition)',
-                  }}
-                >
-                  <Icon name="chevR" size={16} sw={2.2} />
-                </button>
-              </div>
-            </div>
+          {eventId && (
+            <CommentThread eventId={eventId} currentUserId={currentUserId} />
           )}
 
-          {/* Footer actions */}
-          <div style={{
-            display: 'flex',
-            gap: 10,
-            paddingTop: 4,
-            position: 'sticky',
-            bottom: 0,
-            background: 'var(--surface)',
-            paddingBottom: 2,
-          }}>
-            {onEdit && !isDisc && canManage && (
-              <Button
-                variant="secondary"
-                icon="cal"
-                size="lg"
-                onClick={onEdit}
-              >
-                Edit event
-              </Button>
-            )}
-            {isDisc && onSaveToCalendar ? (
-              <>
-                <Button
-                  variant="secondary"
-                  full
-                  size="lg"
-                  icon="bookmark"
-                  onClick={() => onSave?.(data.id)}
-                  active={isSaved}
-                >
-                  {isSaved ? 'Saved' : 'Save'}
-                </Button>
-                <Button
-                  variant="primary"
-                  full
-                  size="lg"
-                  icon="plus"
-                  onClick={() => onSaveToCalendar(data as DiscoveryEvent)}
-                >
-                  Add to calendar
-                </Button>
-              </>
-            ) : (
-              /* CalEvent footer — RSVP handled by the 3-button grid above, just show Edit if available */
-              null
-            )}
-          </div>
         </div>
       </div>
+
+      {/* ── Recurring delete scope chooser ── */}
+      {deleteScope === 'prompt' && (
+        <RecurringScopePrompt
+          mode="delete"
+          onChoose={(scope) => {
+            const calEv = data as CalEvent
+            const date = calEv.start?.split('T')[0] ?? calEv.extendedProps?.occurrenceDate ?? null
+            doDelete(scope, date as string | null)
+          }}
+          onCancel={() => setDeleteScope(null)}
+        />
+      )}
     </div>,
     document.body
   )
-}
-
-/* ── Helpers ────────────────────────────────────────────────── */
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  if (diff < 60000) return 'just now'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
-  return `${Math.floor(diff / 86400000)}d ago`
 }
 
 /* ── ReactionBar ────────────────────────────────────────────── */

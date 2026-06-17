@@ -60,6 +60,8 @@ export interface Group {
   totalTasks?: { all: number; completed: number }
 }
 
+export type Availability = 'yes' | 'maybe' | 'no'
+
 export interface DateOption {
   optionId: number
   startDate: string
@@ -67,7 +69,11 @@ export interface DateOption {
   endDate?: string
   endTime?: string
   position: number
-  votes: { userId: string; username: string }[]
+  votes: { userId: string; username: string; availability: Availability }[]
+  yesCount: number
+  maybeCount: number
+  noCount: number
+  /** Alias of yesCount, kept for the progress-bar callers. */
   voteCount: number
 }
 
@@ -101,22 +107,15 @@ export interface CalEvent {
     pactTargetCompletions?: number
     pactEndsAt?: string
     dateOptions?: DateOption[]
-    myVote?: number | null
+    myVotes?: Record<number, Availability>
     totalGroupMembers?: number
     resolvedHex?: string | null
   }
 }
 
-export interface SavedEvent {
-  discovery_id: string
-  snapshot: import('@/lib/mockData').DiscoveryEvent
-  created_at?: string
-}
-
 export interface ProfileStats {
   eventsThisMonth: number
   groups: number
-  saved: number
 }
 
 export interface TaskList {

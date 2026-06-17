@@ -21,9 +21,7 @@ import groupsRouter from "./routes/groups.js"
 import eventsRouter from "./routes/events.js"
 import todoRouter from "./routes/todo.js"
 import emailRouter from "./routes/email.js"
-import discoveryRouter from "./routes/discovery.js"
 import notificationsRouter from "./routes/notifications.js"
-import savedRouter from "./routes/saved.js"
 import icalRouter from "./routes/ical.js"
 import habitRouter from "./routes/habits.js"
 import timerRouter from "./routes/timers.js"
@@ -45,8 +43,8 @@ const isProd = process.env.NODE_ENV === 'production';
 
 // Content Security Policy. Notes on the non-'self' entries:
 //  - styleSrc 'unsafe-inline': the UI is built almost entirely with inline styles.
-//  - imgSrc https:/data:: event cover images are user-pasted URLs and Ticketmaster
-//    art comes from many CDN hosts, so an exact allowlist isn't feasible.
+//  - imgSrc https:/data:: event cover images are user-pasted URLs from many CDN
+//    hosts, so an exact allowlist isn't feasible.
 //  - connectSrc sentry.*: lets the browser SDK ship error reports.
 // Stripe Checkout/Portal are full-page redirects (not embedded), so no Stripe
 // host needs to be allowed here.
@@ -112,9 +110,7 @@ app.use('/api', groupsRouter);
 app.use('/api', eventsRouter);
 app.use('/api', todoRouter);
 app.use('/api', emailRouter);
-app.use('/api', discoveryRouter);
 app.use('/api', notificationsRouter);
-app.use('/api', savedRouter);
 app.use('/api', icalRouter);
 app.use('/api', habitRouter);
 app.use('/api', timerRouter);

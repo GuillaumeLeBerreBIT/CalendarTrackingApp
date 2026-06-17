@@ -143,38 +143,6 @@ export function RsvpPill({ status }: { status: RsvpStatus }) {
   )
 }
 
-/* ── Source badge ───────────────────────────────────────── */
-import { SOURCE_META } from '@/lib/design'
-
-interface SourceBadgeProps {
-  source: string
-  compact?: boolean
-}
-
-export function SourceBadge({ source, compact = false }: SourceBadgeProps) {
-  const m = SOURCE_META[source]
-  if (!m) return null
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 5,
-      padding: compact ? '3px 7px' : '4px 9px',
-      borderRadius: 'var(--r-full)',
-      background: 'rgba(0,0,0,0.42)',
-      backdropFilter: 'blur(8px)',
-      border: '1px solid rgba(255,255,255,0.14)',
-      fontSize: 11,
-      fontWeight: 600,
-      color: '#fff',
-      letterSpacing: '0.01em',
-    }}>
-      <span style={{ width: 7, height: 7, borderRadius: '50%', background: m.color, flex: '0 0 auto' }} />
-      {!compact && m.label}
-    </span>
-  )
-}
-
 /* ── Section wrapper ────────────────────────────────────── */
 interface SectionProps {
   title: string

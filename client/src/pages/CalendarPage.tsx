@@ -1116,6 +1116,7 @@ export default function CalendarPage() {
           data={selectedEvent}
           onClose={closeModal}
           onEdit={() => { setEditEvent(selectedEvent); setModalMode('edit') }}
+          onDeleted={() => { closeModal(); loadEvents() }}
           currentUserId={currentUserId ?? undefined}
           onRsvp={loadEvents}
         />
