@@ -1,11 +1,23 @@
 import express from "express";
+import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire, { createEventObj } from "../utils/utils.js";
 import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
+import { syncEventToGoogle } from "../utils/google.js";
 import { expandRecurringEvent, capRuleUntil } from "../utils/recurrence.js";
 
 const router = express.Router()
+
+// Tighter limit on the public (no-auth) guest-vote endpoint than the global
+// /api limiter — blunts ballot-stuffing from a single IP.
+const publicVoteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Max candidate date slots a tentative event may carry (set at creation + added later).
 export const MAX_DATE_OPTIONS = 6;
@@ -170,6 +182,9 @@ router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), 
     userId: pr.user_id,
     rsvpStatus: rsvpByUser.get(pr.user_id),
   }));
+
+  // Mirror to connected participants' Google calendars (non-blocking).
+  syncEventToGoogle(eventData[0].event_id, 'upsert');
 
   return res.json({ success: true, eventData, participants });
 });
@@ -349,6 +364,8 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
       { title: 'Event updated', body: `"${editedTitle}" was updated.`, link: '/calendar' }
     );
 
+    syncEventToGoogle(parseInt(req.params.eventId), 'upsert');
+
     return res.json({ success: true, eventData: updateEvent, participants: newParticipants });
   } catch (err) {
     console.error('PUT /parseEvent error:', err);
@@ -398,6 +415,8 @@ router.patch('/parseEvent/:eventId', authRequire, async (req, res) => {
     if (updateError) {
       return res.status(500).json({ success: false, error: updateError.message });
     }
+
+    syncEventToGoogle(eventId, 'upsert');
 
     return res.json({ success: true, eventData: updatedEvent });
   } catch (err) {
@@ -451,6 +470,7 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
         .delete()
         .eq('event_id', eventId)
         .gte('occurrence_date', occurrenceDate);
+      syncEventToGoogle(eventId, 'upsert'); // re-push capped recurrence rule
       return res.sendStatus(204);
     }
 
@@ -459,6 +479,10 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
       .from('profiles_events')
       .select('user_id')
       .eq('event_id', eventId);
+
+    // Remove the mirrored Google events first — deleting the event row cascades
+    // google_event_links away, losing the ids we need to delete on Google's side.
+    await syncEventToGoogle(eventId, 'delete');
 
     const {error: deleteEventError } = await req.supabase
     .from('events')
@@ -653,8 +677,8 @@ router.get('/renderEvents', authRequire, async (req, res) => {
       (votesByEvent[v.event_id] ||= []).push(v);
     });
 
-    // Fetch usernames for all voters at once
-    const voterIds = [...new Set(allVotes.map(v => v.user_id))];
+    // Fetch usernames for all voters at once (guests have a null user_id — skip them here)
+    const voterIds = [...new Set(allVotes.map(v => v.user_id).filter(Boolean))];
     if (voterIds.length > 0) {
       const { data: voterProfiles } = await supabaseAdmin
         .from('profiles')
@@ -740,8 +764,11 @@ router.get('/renderEvents', authRequire, async (req, res) => {
               endTime: opt.end_time ? opt.end_time.slice(0, 5) : null,
               position: opt.position,
               votes: optVotes.map(v => ({
-                userId: v.user_id,
-                username: voterProfileMap[v.user_id] || null,
+                // Guests have no user_id — give them a stable synthetic id (so the
+                // voter-count Set doesn't collapse every guest into one) and show
+                // their chosen display name.
+                userId: v.user_id || `guest:${v.guest_token}`,
+                username: v.user_id ? (voterProfileMap[v.user_id] || null) : (v.guest_name || 'Guest'),
                 availability: v.availability,
               })),
               yesCount,
@@ -761,8 +788,8 @@ router.get('/renderEvents', authRequire, async (req, res) => {
           end: end_date ?? undefined,
           backgroundColor: eventColor,
           borderColor: eventColor,
-          // Recurring instances aren't drag/resizable (ambiguous which occurrences to move)
-          editable: !isRecurringInstance,
+          // Recurring instances aren't drag/resizable; nor are read-only Google imports.
+          editable: !isRecurringInstance && e.external_source !== 'google',
           extendedProps : {
             description: e.event_description,
             participants: participants,
@@ -777,9 +804,10 @@ router.get('/renderEvents', authRequire, async (req, res) => {
             isRecurring: !!e.recurrence_rule,
             recurringEventId: e.event_id,
             occurrenceDate: e._occurrenceDate || null,
-            canManage: e.created_by === req.cookies.userId || adminGroupSet.has(e.groups_id),
+            canManage: e.external_source !== 'google' && (e.created_by === req.cookies.userId || adminGroupSet.has(e.groups_id)),
             reminderMinutes: e.reminder_minutes ?? null,
             status: e.status || 'confirmed',
+            externalSource: e.external_source || null,
             ...(isTentative && {
               dateOptions: dateOptionsData,
               myVotes,
@@ -900,12 +928,37 @@ router.get('/e/:token', async (req, res) => {
 
   const { data: event, error: eventError } = await supabaseAdmin
     .from('events')
-    .select('event_id, event_title, event_description, start_date, start_time, end_date, end_time, all_day, location, groups_id, created_by')
+    .select('event_id, event_title, event_description, start_date, start_time, end_date, end_time, all_day, location, groups_id, created_by, status')
     .eq('public_token', token)
     .single();
 
   if (eventError || !event) {
     return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
+
+  // For tentative events, surface the candidate date slots + availability tallies
+  // so guests can vote on the public page. Mirrors renderEvents' aggregation.
+  let dateOptions = null;
+  if (event.status === 'tentative') {
+    const [optsResult, votesResult] = await Promise.all([
+      supabaseAdmin.from('event_date_options').select('*').eq('event_id', event.event_id).order('position'),
+      supabaseAdmin.from('event_date_votes').select('option_id, availability').eq('event_id', event.event_id),
+    ]);
+    const allVotes = votesResult.data || [];
+    dateOptions = (optsResult.data || []).map(opt => {
+      const optVotes = allVotes.filter(v => v.option_id === opt.option_id);
+      return {
+        optionId: opt.option_id,
+        startDate: opt.start_date,
+        startTime: opt.start_time ? opt.start_time.slice(0, 5) : null,
+        endDate: opt.end_date || null,
+        endTime: opt.end_time ? opt.end_time.slice(0, 5) : null,
+        position: opt.position,
+        yesCount: optVotes.filter(v => v.availability === 'yes').length,
+        maybeCount: optVotes.filter(v => v.availability === 'maybe').length,
+        noCount: optVotes.filter(v => v.availability === 'no').length,
+      };
+    });
   }
 
   // Fetch group name, organiser username, and going-count in parallel
@@ -947,8 +1000,131 @@ router.get('/e/:token', async (req, res) => {
       groupName: groupResult.data?.groups_title || null,
       organiserUsername: organiserResult.data?.username || null,
       goingCount: rsvpResult.count ?? 0,
+      status: event.status,
+      dateOptions,
     },
   });
+});
+
+/**
+ * POST /api/e/:token/vote
+ * PUBLIC — no auth. Lets a guest (no account) cast availability on one candidate
+ * slot of a tentative event reached via its share link.
+ * Body: { optionId, availability: 'yes'|'maybe'|'no'|'clear', guestToken?, guestName, guestEmail? }
+ *   - No guestToken on first vote → the server mints one and returns it; the
+ *     client stores it so the guest can edit their answers later.
+ *   - 'clear' retracts this slot's answer (deletes the row).
+ * Rate-limited to blunt ballot-stuffing; one row per (event, option, guest_token).
+ */
+router.post('/e/:token/vote', publicVoteLimiter, async (req, res) => {
+  const { token } = req.params;
+  if (!UUID_RE.test(token)) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
+
+  const optionId = parseInt(req.body.optionId);
+  const availability = req.body.availability;
+  const guestName = (req.body.guestName || '').toString().trim().slice(0, 80);
+  const guestEmail = (req.body.guestEmail || '').toString().trim().slice(0, 254) || null;
+  let guestToken = (req.body.guestToken || '').toString().trim();
+
+  if (isNaN(optionId)) {
+    return res.status(400).json({ success: false, error: 'Invalid optionId.' });
+  }
+  if (availability !== 'clear' && !VOTE_AVAILABILITY.includes(availability)) {
+    return res.status(400).json({ success: false, error: 'Invalid availability.' });
+  }
+  if (!guestToken && !guestName) {
+    return res.status(400).json({ success: false, error: 'A name is required to vote.' });
+  }
+  if (guestToken && !UUID_RE.test(guestToken)) {
+    return res.status(400).json({ success: false, error: 'Invalid guest token.' });
+  }
+
+  // Resolve the tentative event from the public token.
+  const { data: event, error: eventError } = await supabaseAdmin
+    .from('events')
+    .select('event_id, status')
+    .eq('public_token', token)
+    .single();
+
+  if (eventError || !event) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
+  if (event.status !== 'tentative') {
+    return res.status(400).json({ success: false, error: 'Voting is closed for this event.' });
+  }
+
+  // The option must belong to this event (stops cross-event tampering).
+  const { data: option } = await supabaseAdmin
+    .from('event_date_options')
+    .select('option_id')
+    .eq('option_id', optionId)
+    .eq('event_id', event.event_id)
+    .maybeSingle();
+
+  if (!option) {
+    return res.status(404).json({ success: false, error: 'Date option not found.' });
+  }
+
+  // First vote from this guest → mint a token they'll store and reuse.
+  if (!guestToken) guestToken = crypto.randomUUID();
+
+  if (availability === 'clear') {
+    const { error: delError } = await supabaseAdmin
+      .from('event_date_votes')
+      .delete()
+      .eq('event_id', event.event_id)
+      .eq('option_id', optionId)
+      .eq('guest_token', guestToken);
+    if (delError) {
+      return res.status(500).json({ success: false, error: delError.message });
+    }
+    return res.json({ success: true, guestToken, optionId, availability: null });
+  }
+
+  const row = { event_id: event.event_id, option_id: optionId, guest_token: guestToken, availability, guest_name: guestName || undefined };
+  if (guestEmail) row.guest_email = guestEmail;
+
+  const { error: voteError } = await supabaseAdmin
+    .from('event_date_votes')
+    .upsert(row, { onConflict: 'event_id,option_id,guest_token' });
+
+  if (voteError) {
+    return res.status(500).json({ success: false, error: voteError.message });
+  }
+
+  return res.json({ success: true, guestToken, optionId, availability });
+});
+
+/**
+ * GET /api/e/:token/my-votes?guestToken=...
+ * PUBLIC — returns a returning guest's prior answers so the page can pre-fill them.
+ * Body-less; { [optionId]: 'yes'|'maybe'|'no' }.
+ */
+router.get('/e/:token/my-votes', async (req, res) => {
+  const { token } = req.params;
+  const guestToken = (req.query.guestToken || '').toString();
+  if (!UUID_RE.test(token) || !UUID_RE.test(guestToken)) {
+    return res.json({ success: true, votes: {} });
+  }
+
+  const { data: event } = await supabaseAdmin
+    .from('events')
+    .select('event_id')
+    .eq('public_token', token)
+    .single();
+  if (!event) return res.json({ success: true, votes: {} });
+
+  const { data: rows } = await supabaseAdmin
+    .from('event_date_votes')
+    .select('option_id, availability')
+    .eq('event_id', event.event_id)
+    .eq('guest_token', guestToken);
+
+  const votes = {};
+  (rows || []).forEach(r => { votes[r.option_id] = r.availability; });
+  return res.json({ success: true, votes });
 });
 
 /**
@@ -1231,6 +1407,9 @@ router.post('/confirmEventDate', authRequire, async (req, res) => {
       link: '/calendar',
     });
   }
+
+  // Now that the event has a real date, mirror it to connected calendars.
+  syncEventToGoogle(eventId, 'upsert');
 
   return res.json({ success: true });
 });

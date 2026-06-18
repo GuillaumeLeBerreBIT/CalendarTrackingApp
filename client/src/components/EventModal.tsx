@@ -465,6 +465,17 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
                 {(data as CalEvent).extendedProps?.groupsId && <Icon name="chevR" size={12} sw={2} style={{ color: groupHex, opacity: 0.6 }} />}
               </div>
             )}
+            {isCalEvent && (data as CalEvent).extendedProps?.externalSource === 'google' && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7, alignSelf: 'flex-start',
+                padding: '3px 10px', borderRadius: 'var(--r-full)',
+                background: 'rgba(66,133,244,0.12)', border: '1px solid rgba(66,133,244,0.30)',
+                color: '#4285F4', fontSize: 12, fontWeight: 650,
+              }}>
+                <Icon name="calendar" size={13} sw={1.9} style={{ color: '#4285F4', flexShrink: 0 }} />
+                From Google Calendar · read-only
+              </div>
+            )}
             {isCalEvent && typeof (data as CalEvent).extendedProps?.reminderMinutes === 'number' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--text-3)' }}>
                 <Icon name="bell" size={14} sw={1.8} style={{ color: 'var(--text-3)', flexShrink: 0 }} />

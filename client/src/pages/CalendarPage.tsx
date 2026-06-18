@@ -31,6 +31,10 @@ const GROUP_COLORS: Record<string, string> = {
   self:    'var(--accent)',
 }
 
+// Google-imported events get their own filter "calendar" + a distinct colour.
+const GOOGLE_SOURCE_ID = 'google'
+const GOOGLE_COLOR = '#4285F4'
+
 function groupColor(tagName?: string, groupId?: string | number): string {
   if (!tagName && !groupId) return 'var(--accent)'
   const key = (tagName ?? '').toLowerCase().replace(/[^a-z]/g, '')
@@ -80,6 +84,7 @@ function hashHue(str: string): number {
 // extendedProps.resolvedHex so all renderers stay in sync with the DB-stored member color.
 function eventHex(extendedProps?: Record<string, unknown>): string {
   if (!extendedProps) return '#7c6ef2'
+  if (extendedProps.externalSource === GOOGLE_SOURCE_ID) return GOOGLE_COLOR
   if (extendedProps.resolvedHex) return extendedProps.resolvedHex as string
   // Fallback for events not yet remapped (e.g. newly added before reload)
   const participants = extendedProps.participants as Array<{ userId: string }> | undefined
@@ -348,9 +353,10 @@ interface GroupFilterPanelProps {
 function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilterPanelProps) {
   // Count events per group
   const counts = useMemo(() => {
-    const map: Record<string, number> = { self: 0 }
+    const map: Record<string, number> = { self: 0, [GOOGLE_SOURCE_ID]: 0 }
     for (const g of groups) map[g.groups_id] = 0
     for (const ev of events) {
+      if (ev.extendedProps?.externalSource === GOOGLE_SOURCE_ID) { map[GOOGLE_SOURCE_ID] += 1; continue }
       const gid = ev.extendedProps?.groupsId
       if (!gid) map['self'] = (map['self'] ?? 0) + 1
       else if (gid in map) map[gid] = (map[gid] ?? 0) + 1
@@ -372,6 +378,7 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
 
   const allEntries = [
     { id: 'self', label: 'Personal', tagName: 'self' },
+    ...(counts[GOOGLE_SOURCE_ID] > 0 ? [{ id: GOOGLE_SOURCE_ID, label: 'Google', tagName: GOOGLE_SOURCE_ID }] : []),
     ...groups.map(g => ({ id: String(g.groups_id), label: g.groups_title, tagName: g.tag_name })),
   ]
 
@@ -384,7 +391,7 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {allEntries.map(entry => {
           const active = activeGroups.has(entry.id)
-          const color = groupColor(entry.tagName)
+          const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
           const count = counts[entry.id] ?? 0
 
           return (
@@ -473,7 +480,7 @@ export default function CalendarPage() {
   const [quickAddText, setQuickAddText] = useState('')
   const [calView, setCalView] = useState<CalView>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['self']))
+  const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['self', GOOGLE_SOURCE_ID]))
   const [isMobile, setIsMobile] = useState(false)
   const [mobileLayout, setMobileLayout] = useState<MobileLayout>(() => {
     try {
@@ -516,7 +523,9 @@ export default function CalendarPage() {
         const remapped = (data.events as CalEvent[]).map((ev) => {
           const parts = (ev.extendedProps?.participants as Array<{ userId: string }> | undefined) ?? []
           let hex: string
-          if (parts.length <= 1) {
+          if (ev.extendedProps?.externalSource === GOOGLE_SOURCE_ID) {
+            hex = GOOGLE_COLOR
+          } else if (parts.length <= 1) {
             // Use the DB-stored per-member color (profiles_groups.color) returned by backend
             hex = ev.backgroundColor && ev.backgroundColor !== '#3D82F6' && ev.backgroundColor !== '#6B7280'
               ? ev.backgroundColor
@@ -647,6 +656,7 @@ export default function CalendarPage() {
   const filteredEvents = useMemo(() => {
     if (!groupsLoaded) return events  // show everything until user can see the filter panel
     return events.filter(ev => {
+      if (ev.extendedProps?.externalSource === GOOGLE_SOURCE_ID) return activeGroups.has(GOOGLE_SOURCE_ID)
       const gid = String(ev.extendedProps?.groupsId ?? '')
       if (!gid) return activeGroups.has('self')
       return activeGroups.has(gid)
@@ -989,10 +999,12 @@ export default function CalendarPage() {
           }}>
             {[
               { id: 'self', label: 'Personal', tagName: 'self' },
+              ...(events.some(ev => ev.extendedProps?.externalSource === GOOGLE_SOURCE_ID)
+                ? [{ id: GOOGLE_SOURCE_ID, label: 'Google', tagName: GOOGLE_SOURCE_ID }] : []),
               ...groups.map(g => ({ id: String(g.groups_id), label: g.groups_title, tagName: g.tag_name })),
             ].map(entry => {
               const active = activeGroups.has(entry.id)
-              const color = groupColor(entry.tagName)
+              const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
               return (
                 <button
                   key={entry.id}

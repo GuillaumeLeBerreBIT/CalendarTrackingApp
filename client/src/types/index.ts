@@ -110,6 +110,8 @@ export interface CalEvent {
     myVotes?: Record<number, Availability>
     totalGroupMembers?: number
     resolvedHex?: string | null
+    /** Provenance: 'google' for events pulled from a Google calendar. */
+    externalSource?: string | null
   }
 }
 

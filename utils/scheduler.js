@@ -3,6 +3,7 @@ import supabase, { supabaseAdmin } from '../db/supabase.js';
 import { sendDigestForUser } from '../routes/email.js';
 import { expandRecurringEvent } from './recurrence.js';
 import { notifyUsers } from './notifications.js';
+import { reconcileGoogleSync, isGoogleConfigured, pullAllUsers, renewExpiringChannels } from './google.js';
 
 /**
  * Build a server-local Date for an occurrence given its date string and a time string.
@@ -326,4 +327,26 @@ export function startScheduler() {
   });
 
   console.log('[scheduler] Habit reminder cron registered (20:00 server time).');
+
+  // 0 * * * *  →  hourly: re-push any upcoming events missing from connected
+  // Google calendars (safety net for inline pushes that failed).
+  if (isGoogleConfigured()) {
+    cron.schedule('0 * * * *', () => {
+      reconcileGoogleSync();
+    });
+    console.log('[scheduler] Google Calendar reconcile cron registered (hourly).');
+
+    // */15 * * * *  →  pull (Google → Eventli): incremental sync of enabled
+    // calendars. Reliable baseline even if a webhook is missed.
+    cron.schedule('*/15 * * * *', () => {
+      pullAllUsers();
+    });
+    console.log('[scheduler] Google Calendar pull cron registered (every 15 minutes).');
+
+    // 0 */6 * * *  →  renew webhook channels nearing expiry (no-op without HTTPS).
+    cron.schedule('0 */6 * * *', () => {
+      renewExpiringChannels();
+    });
+    console.log('[scheduler] Google Calendar channel renewal cron registered (every 6 hours).');
+  }
 }

@@ -23,6 +23,7 @@ import todoRouter from "./routes/todo.js"
 import emailRouter from "./routes/email.js"
 import notificationsRouter from "./routes/notifications.js"
 import icalRouter from "./routes/ical.js"
+import googleRouter from "./routes/google.js"
 import habitRouter from "./routes/habits.js"
 import timerRouter from "./routes/timers.js"
 import challengeRouter from "./routes/challenges.js"
@@ -112,6 +113,7 @@ app.use('/api', todoRouter);
 app.use('/api', emailRouter);
 app.use('/api', notificationsRouter);
 app.use('/api', icalRouter);
+app.use('/api', googleRouter);
 app.use('/api', habitRouter);
 app.use('/api', timerRouter);
 app.use('/api', challengeRouter);
