@@ -1,11 +1,23 @@
 import express from "express";
+import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire, { createEventObj } from "../utils/utils.js";
 import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
+import { syncEventToGoogle } from "../utils/google.js";
 import { expandRecurringEvent, capRuleUntil } from "../utils/recurrence.js";
 
 const router = express.Router()
+
+// Tighter limit on the public (no-auth) guest-vote endpoint than the global
+// /api limiter — blunts ballot-stuffing from a single IP.
+const publicVoteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Max candidate date slots a tentative event may carry (set at creation + added later).
 export const MAX_DATE_OPTIONS = 6;
@@ -170,6 +182,9 @@ router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), 
     userId: pr.user_id,
     rsvpStatus: rsvpByUser.get(pr.user_id),
   }));
+
+  // Mirror to connected participants' Google calendars (non-blocking).
+  syncEventToGoogle(eventData[0].event_id, 'upsert');
 
   return res.json({ success: true, eventData, participants });
 });
@@ -349,6 +364,8 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
       { title: 'Event updated', body: `"${editedTitle}" was updated.`, link: '/calendar' }
     );
 
+    syncEventToGoogle(parseInt(req.params.eventId), 'upsert');
+
     return res.json({ success: true, eventData: updateEvent, participants: newParticipants });
   } catch (err) {
     console.error('PUT /parseEvent error:', err);
@@ -398,6 +415,8 @@ router.patch('/parseEvent/:eventId', authRequire, async (req, res) => {
     if (updateError) {
       return res.status(500).json({ success: false, error: updateError.message });
     }
+
+    syncEventToGoogle(eventId, 'upsert');
 
     return res.json({ success: true, eventData: updatedEvent });
   } catch (err) {
@@ -451,6 +470,7 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
         .delete()
         .eq('event_id', eventId)
         .gte('occurrence_date', occurrenceDate);
+      syncEventToGoogle(eventId, 'upsert'); // re-push capped recurrence rule
       return res.sendStatus(204);
     }
 
@@ -459,6 +479,10 @@ router.delete('/parseEvent/:eventId', authRequire, async (req, res) => {
       .from('profiles_events')
       .select('user_id')
       .eq('event_id', eventId);
+
+    // Remove the mirrored Google events first — deleting the event row cascades
+    // google_event_links away, losing the ids we need to delete on Google's side.
+    await syncEventToGoogle(eventId, 'delete');
 
     const {error: deleteEventError } = await req.supabase
     .from('events')
@@ -761,8 +785,8 @@ router.get('/renderEvents', authRequire, async (req, res) => {
           end: end_date ?? undefined,
           backgroundColor: eventColor,
           borderColor: eventColor,
-          // Recurring instances aren't drag/resizable (ambiguous which occurrences to move)
-          editable: !isRecurringInstance,
+          // Recurring instances aren't drag/resizable; nor are read-only Google imports.
+          editable: !isRecurringInstance && e.external_source !== 'google',
           extendedProps : {
             description: e.event_description,
             participants: participants,
@@ -777,9 +801,10 @@ router.get('/renderEvents', authRequire, async (req, res) => {
             isRecurring: !!e.recurrence_rule,
             recurringEventId: e.event_id,
             occurrenceDate: e._occurrenceDate || null,
-            canManage: e.created_by === req.cookies.userId || adminGroupSet.has(e.groups_id),
+            canManage: e.external_source !== 'google' && (e.created_by === req.cookies.userId || adminGroupSet.has(e.groups_id)),
             reminderMinutes: e.reminder_minutes ?? null,
             status: e.status || 'confirmed',
+            externalSource: e.external_source || null,
             ...(isTentative && {
               dateOptions: dateOptionsData,
               myVotes,
@@ -1231,6 +1256,9 @@ router.post('/confirmEventDate', authRequire, async (req, res) => {
       link: '/calendar',
     });
   }
+
+  // Now that the event has a real date, mirror it to connected calendars.
+  syncEventToGoogle(eventId, 'upsert');
 
   return res.json({ success: true });
 });

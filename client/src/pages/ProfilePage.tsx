@@ -308,6 +308,82 @@ export default function ProfilePage() {
     }
   }
 
+  // ── Google Calendar 2-way sync (Plus) ──────────────────────────────────
+  const [gcal, setGcal] = useState<{ configured: boolean; connected: boolean; lastSyncAt: string | null } | null>(null)
+  const [gcalBusy, setGcalBusy] = useState(false)
+  const [gcalNotice, setGcalNotice] = useState<string | null>(null)
+
+  function loadGcalStatus() {
+    api.get('/calendar/google/status')
+      .then(({ data }) => { if (data.success) setGcal({ configured: data.configured, connected: data.connected, lastSyncAt: data.lastSyncAt }) })
+      .catch(() => {})
+  }
+  useEffect(() => {
+    loadGcalStatus()
+    // Surface the result of the OAuth redirect, then clean the URL.
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('gcal') === 'connected') setGcalNotice('Google Calendar connected — your events are syncing.')
+    else if (params.get('gcal') === 'error') setGcalNotice('Could not connect Google Calendar. Please try again.')
+    if (params.has('gcal')) window.history.replaceState({}, '', window.location.pathname)
+  }, [])
+
+  async function connectGoogle() {
+    setGcalBusy(true)
+    try {
+      const { data } = await api.get('/calendar/google/auth')
+      if (data.success && data.url) window.location.href = data.url
+    } catch {
+      // 403 UPGRADE_REQUIRED is handled by the axios interceptor (upgrade modal)
+    } finally {
+      setGcalBusy(false)
+    }
+  }
+
+  async function disconnectGoogle() {
+    setGcalBusy(true)
+    try {
+      await api.delete('/calendar/google')
+      setGcal(g => g ? { ...g, connected: false, lastSyncAt: null } : g)
+      setGcalCalendars([])
+    } catch {
+      // ignore
+    } finally {
+      setGcalBusy(false)
+    }
+  }
+
+  // ── Pull: which Google calendars to import ──────────────────────────────
+  type GCalCalendar = { id: string; summary: string; primary: boolean; enabled: boolean; lastPulledAt: string | null }
+  const [gcalCalendars, setGcalCalendars] = useState<GCalCalendar[]>([])
+  const [gcalCalLoading, setGcalCalLoading] = useState(false)
+  const [gcalReconnect, setGcalReconnect] = useState(false)
+  const [togglingCal, setTogglingCal] = useState<string | null>(null)
+
+  function loadGcalCalendars() {
+    setGcalCalLoading(true)
+    setGcalReconnect(false)
+    api.get('/calendar/google/calendars')
+      .then(({ data }) => { if (data.success) setGcalCalendars(data.calendars) })
+      .catch((err) => { if (err?.response?.data?.code === 'RECONNECT_REQUIRED') setGcalReconnect(true) })
+      .finally(() => setGcalCalLoading(false))
+  }
+  useEffect(() => {
+    if (gcal?.connected) loadGcalCalendars()
+  }, [gcal?.connected])
+
+  async function toggleCalendar(id: string, enabled: boolean) {
+    setTogglingCal(id)
+    // optimistic
+    setGcalCalendars(cs => cs.map(c => c.id === id ? { ...c, enabled } : c))
+    try {
+      await api.post(`/calendar/google/calendars/${encodeURIComponent(id)}`, { enabled })
+    } catch {
+      setGcalCalendars(cs => cs.map(c => c.id === id ? { ...c, enabled: !enabled } : c)) // revert
+    } finally {
+      setTogglingCal(null)
+    }
+  }
+
   async function handleCalendarImport(e: FormEvent) {
     e.preventDefault()
     if (!importFile) return
@@ -794,6 +870,104 @@ export default function ProfilePage() {
               <Button variant="primary" size="sm" icon="plus" onClick={generateCalLink} disabled={genLink}>
                 {genLink ? 'Generating…' : 'Generate subscribe link'}
               </Button>
+            </div>
+          )}
+
+          {/* ── Google Calendar 2-way sync (Plus) ── */}
+          {gcal?.configured && (
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 'var(--r-sm)',
+                  background: 'var(--surface-3)', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', flexShrink: 0, color: 'var(--accent)',
+                }}>
+                  <Icon name="calendar" size={17} sw={1.8} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Google Calendar</p>
+                    <Tag tone="ghost">Plus</Tag>
+                    {gcal.connected && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        fontSize: 11.5, fontWeight: 650, color: 'var(--g-work)',
+                      }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--g-work)' }} />
+                        Connected
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0', lineHeight: 1.5 }}>
+                    {gcal.connected
+                      ? 'Your Eventli events are mirrored into a dedicated "Eventli" calendar in Google — created, updated and removed automatically.'
+                      : 'Connect to push your Eventli events live into your Google Calendar.'}
+                    {gcal.connected && gcal.lastSyncAt && (
+                      <> Last synced {new Date(gcal.lastSyncAt).toLocaleString()}.</>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {gcalNotice && (
+                <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '0 0 10px' }}>{gcalNotice}</p>
+              )}
+
+              {gcal.connected ? (
+                <Button variant="outline" size="sm" icon="close" onClick={disconnectGoogle} disabled={gcalBusy}>
+                  {gcalBusy ? 'Working…' : 'Disconnect'}
+                </Button>
+              ) : (
+                <Button variant="primary" size="sm" icon="plus" onClick={connectGoogle} disabled={gcalBusy}>
+                  {gcalBusy ? 'Connecting…' : 'Connect Google Calendar'}
+                </Button>
+              )}
+
+              {/* Import: choose which Google calendars to pull into Eventli */}
+              {gcal.connected && (
+                <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 2px' }}>Import into Eventli</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 10px', lineHeight: 1.5 }}>
+                    Pick which Google calendars show up in Eventli. Imported events are read-only copies.
+                  </p>
+
+                  {gcalReconnect ? (
+                    <div style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                      Reconnect to grant calendar access, then choose calendars to import.{' '}
+                      <button onClick={connectGoogle} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontWeight: 650, fontSize: 12.5, cursor: 'pointer' }}>
+                        Reconnect
+                      </button>
+                    </div>
+                  ) : gcalCalLoading ? (
+                    <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>Loading calendars…</p>
+                  ) : gcalCalendars.length === 0 ? (
+                    <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>No calendars found.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {gcalCalendars.map((c, i) => (
+                        <div key={c.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0',
+                          borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.summary}{c.primary ? ' · Primary' : ''}
+                            </p>
+                            {c.enabled && c.lastPulledAt && (
+                              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>
+                                Last imported {new Date(c.lastPulledAt).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                          <div style={{ opacity: togglingCal === c.id ? 0.5 : 1, pointerEvents: togglingCal === c.id ? 'none' : 'auto' }}>
+                            <Switch on={c.enabled} onChange={() => toggleCalendar(c.id, !c.enabled)} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

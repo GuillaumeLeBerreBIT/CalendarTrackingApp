@@ -26,6 +26,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^8.5.2",
     "fullcalendar": "^6.1.18",
+    "googleapis": "^173.0.0",
     "helmet": "^8.2.0",
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
