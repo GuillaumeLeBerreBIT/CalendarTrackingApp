@@ -379,6 +379,32 @@ function DayPanel({ dateStr, headerLabel, events, onEventClick, onAddEvent, even
             </span>
           )}
         </div>
+
+        {/* Always-present add button — creates an event on the selected day with
+            its date prefilled (the empty-state button only shows when the day
+            has no events, so this covers days that already have some). */}
+        <button
+          aria-label="Add event on this day"
+          onClick={() => onAddEvent(dateStr)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 32,
+            height: 32,
+            borderRadius: 'var(--r-sm)',
+            border: '1px solid var(--border)',
+            background: 'var(--surface-2)',
+            color: 'var(--accent)',
+            cursor: 'pointer',
+            flexShrink: 0,
+            transition: 'background 150ms ease-out',
+          }}
+          onTouchStart={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-3)' }}
+          onTouchEnd={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)' }}
+        >
+          <Icon name="plus" size={16} sw={2.2} />
+        </button>
       </div>
 
       {/* Events list / empty state */}

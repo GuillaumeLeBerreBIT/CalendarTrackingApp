@@ -6,7 +6,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import type { DateSelectArg, EventClickArg, EventDropArg } from '@fullcalendar/core'
-import type { EventResizeDoneArg } from '@fullcalendar/interaction'
+import type { EventResizeDoneArg, DateClickArg } from '@fullcalendar/interaction'
 import api from '@/api/client'
 import type { CalEvent, Group } from '@/types'
 import EventModal from '@/components/EventModal'
@@ -588,6 +588,14 @@ export default function CalendarPage() {
     setModalMode('create')
   }
 
+  // Single tap/click on a day cell → create modal with that date prefilled.
+  // `select` only fires after a long-press on touch, so `dateClick` is what
+  // makes tap-to-create work on mobile (detailed layout) as well as desktop.
+  function handleDateClick(info: DateClickArg) {
+    setNlPrefill(null)
+    handleGridAddEvent(info.dateStr.split('T')[0])
+  }
+
   function handleEventClick(info: EventClickArg) {
     const ev = events.find((e) => String(e.id) === String(info.event.id))
     if (ev) {
@@ -1069,6 +1077,7 @@ export default function CalendarPage() {
                 editable
                 droppable
                 select={handleDateSelect}
+                dateClick={handleDateClick}
                 eventClick={handleEventClick}
                 eventDrop={handleEventDrop}
                 eventResize={handleEventResize}
