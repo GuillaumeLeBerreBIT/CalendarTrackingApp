@@ -1073,7 +1073,10 @@ export default function CalendarPage() {
                 headerToolbar={false}
                 firstDay={1}
                 events={filteredEvents}
-                selectable
+                // On mobile, range-select needs a long-press that also triggers the
+                // native text magnifier ("weirdly zoomed" view). Disable it so a clean
+                // single tap fires dateClick → prefilled form, just like the + button.
+                selectable={!isMobile}
                 editable
                 droppable
                 select={handleDateSelect}

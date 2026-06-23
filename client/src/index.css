@@ -378,4 +378,17 @@ input, textarea, select {
     letter-spacing: -0.01em;
   }
   .mobile-detailed .fc .fc-daygrid-event-harness { margin-top: 2px; }
+
+  /* ── Mobile tap-to-create: clean single tap, no native long-press cruft ──
+     Tapping an empty day cell fires dateClick → opens the prefilled form.
+     touch-action: manipulation kills the 300ms double-tap-zoom delay; the
+     callout/user-select resets stop the long-press text magnifier ("weirdly
+     zoomed" view) so a tap reads as a tap, not a text selection. */
+  .mobile-detailed .fc {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .mobile-detailed .fc .fc-daygrid-day-frame { cursor: pointer; }
 }
