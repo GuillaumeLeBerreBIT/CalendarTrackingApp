@@ -34,35 +34,6 @@ const REMINDER_OPTIONS: { value: number | null; label: string }[] = [
   { value: 1440, label: '1 day before' },
 ]
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--surface-3)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '10px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-  transition: 'var(--transition)',
-  fontFamily: 'inherit',
-  minHeight: 44,
-  boxSizing: 'border-box',
-  // iOS native date/time inputs have a wide intrinsic min-width; without this
-  // they refuse to shrink inside a 2-col grid and overflow the modal edge.
-  minWidth: 0,
-}
-
-// Date/time inputs only: reset the native WebKit appearance so the control
-// honours its box width exactly (iOS/Chrome-iOS otherwise let the internal
-// value text bleed to the box edge, making the two columns look like they
-// overlap at the seam). Kept separate from inputStyle so the <select> fields
-// keep their native dropdown chevron.
-const dateTimeStyle: React.CSSProperties = {
-  ...inputStyle,
-  WebkitAppearance: 'none',
-  appearance: 'none',
-  textAlign: 'left',
-}
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
@@ -355,6 +326,38 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const isGroupType = eventType === 'appointment' || eventType === 'social'
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
+  // On iOS, inputs with font-size < 16px trigger viewport auto-zoom when focused.
+  // Use 16px on mobile to prevent that; keep 13.5px on desktop for visual density.
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--surface-3)',
+    border: '1px solid var(--border-2)',
+    borderRadius: 'var(--r-sm)',
+    padding: '10px 12px',
+    fontSize: isMobile ? 16 : 13.5,
+    color: 'var(--text-1)',
+    outline: 'none',
+    transition: 'var(--transition)',
+    fontFamily: 'inherit',
+    minHeight: 44,
+    boxSizing: 'border-box',
+    // iOS native date/time inputs have a wide intrinsic min-width; without this
+    // they refuse to shrink inside a 2-col grid and overflow the modal edge.
+    minWidth: 0,
+  }
+
+  // Date/time inputs only: reset the native WebKit appearance so the control
+  // honours its box width exactly (iOS/Chrome-iOS otherwise let the internal
+  // value text bleed to the box edge, making the two columns look like they
+  // overlap at the seam). Kept separate from inputStyle so the <select> fields
+  // keep their native dropdown chevron.
+  const dateTimeStyle: React.CSSProperties = {
+    ...inputStyle,
+    WebkitAppearance: 'none',
+    appearance: 'none',
+    textAlign: 'left',
+  }
+
   // Portal to <body> so the fixed overlay escapes the .app-viewport
   // (overflow:hidden + 100dvh) wrapper. On iOS Safari a position:fixed
   // descendant of an overflow:hidden ancestor gets clipped and renders
@@ -593,7 +596,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
             <label style={labelStyle}>Title</label>
             <input
               required
-              autoFocus
+              autoFocus={!isMobile}
               value={form.title}
               onChange={e => set('title', e.target.value)}
               placeholder={
