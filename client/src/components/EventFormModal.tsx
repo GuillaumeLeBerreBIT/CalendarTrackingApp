@@ -364,7 +364,11 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   // *behind* the bottom nav — portalling lifts it above everything.
   return createPortal(
     <div
-      onClick={onClose}
+      // Close on pointerdown, not click: on touch, FullCalendar's dateClick fires
+      // on touchend and the browser's compatibility click for that same tap is then
+      // hit-tested against the freshly mounted backdrop — closing the modal it just
+      // opened. pointerdown only fires for a *new* touch, so the ghost can't reach it.
+      onPointerDown={onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -379,7 +383,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
       }}
     >
       <div
-        onClick={e => e.stopPropagation()}
+        onPointerDown={e => e.stopPropagation()}
         className="scroll"
         style={isMobile ? {
           width: '100%',
