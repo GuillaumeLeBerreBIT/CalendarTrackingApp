@@ -163,10 +163,12 @@ export default function GroupDetailPage() {
   const [groupTitle, setGroupTitle] = useState('')
   const [groupTag, setGroupTag] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
-  const [sharedColor, setSharedColor] = useState('#3b82f6')
+  // null = no creator-picked shared color yet → fall back to the stable hash color,
+  // same rule as groupColorFor() on GroupsPage so card and detail banner match.
+  const [sharedColor, setSharedColor] = useState<string | null>(null)
   const [myColor, setMyColor] = useState('#3b82f6')
   const [loading, setLoading] = useState(true)
-  const groupColor = groupColorById(groupId ?? '')
+  const groupColor = sharedColor || groupColorById(groupId ?? '')
 
   // ── Edit group modal state ───────────────────────────────────────────────────
   const [showEditModal, setShowEditModal] = useState(false)
@@ -358,7 +360,7 @@ export default function GroupDetailPage() {
       const membersRes = await api.get(`/getGroupMembers/${groupId}`)
       if (membersRes.data.success) {
         setMembers(membersRes.data.members)
-        setSharedColor(membersRes.data.sharedColor ?? '#3b82f6')
+        setSharedColor(membersRes.data.sharedColor ?? null)
         const me = membersRes.data.members.find((m: Member) => m.user_id === currentUserId)
         if (me?.color) setMyColor(me.color)
       }
@@ -708,7 +710,7 @@ export default function GroupDetailPage() {
       marginBottom: 28,
     }}>
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600, cursor: 'pointer' }}>
-        <input type="color" value={sharedColor} onChange={(e) => handleSharedColor(e.target.value)}
+        <input type="color" value={groupColor} onChange={(e) => handleSharedColor(e.target.value)}
           style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid var(--border-2)', cursor: 'pointer', background: 'none', padding: 0 }} />
         Shared color
       </label>

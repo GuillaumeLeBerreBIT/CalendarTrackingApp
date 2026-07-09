@@ -98,7 +98,7 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
 
   function handleDelete() {
     const calEv = data as CalEvent
-    const isRecurring = calEv.extendedProps?.isRecurring || calEv.extendedProps?.recurringEventId
+    const isRecurring = !!calEv.extendedProps?.isRecurring
     if (isRecurring) {
       setDeleteScope('prompt')
       return
@@ -247,7 +247,11 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
   // (overflow:hidden) is clipped behind the mobile bottom nav on iOS Safari.
   return createPortal(
     <div
-      onClick={onClose}
+      // Close on pointerdown, not click: the tap that opens the modal (fired from
+      // FullCalendar on touchend) is followed by a compatibility click hit-tested
+      // against the freshly mounted backdrop, which would instantly close it.
+      // pointerdown only fires for a *new* touch, so the ghost click can't reach it.
+      onPointerDown={onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -262,7 +266,7 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
         style={isMobile ? {
           position: 'fixed',
           bottom: 0,
