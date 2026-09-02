@@ -50,6 +50,17 @@ const NOTIF_PREF_ROWS: { key: keyof NotificationPrefs; label: string; sub: strin
   { key: 'event_changes', label: 'Event changes', sub: 'When an event you\'re in is edited or cancelled' },
 ]
 
+// Maps a subscribeToPush() failure reason → user-facing explanation.
+const PUSH_ERROR_COPY: Record<string, string> = {
+  unsupported: 'This device or browser can’t receive push notifications. On iPhone/iPad you must first add Eventli to your Home Screen and open it from there (iOS 16.4+).',
+  'insecure-context': 'Push needs a secure (HTTPS) connection. Open Eventli over https://.',
+  'permission-denied': 'Notifications are blocked for Eventli. Enable them in your browser/OS settings for this site, then try again.',
+  'permission-dismissed': 'The permission prompt wasn’t granted. Tap Enable again and choose Allow.',
+  'no-vapid-key': 'The server isn’t configured for push yet (missing VAPID key). Contact the admin.',
+  'subscribe-failed': 'Could not register with the push service. Try again in a moment.',
+  'server-failed': 'Subscribed on this device but the server didn’t save it. Try again.',
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const inputStyle: React.CSSProperties = {
@@ -415,6 +426,7 @@ export default function ProfilePage() {
 
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
+  const [pushMsg, setPushMsg] = useState('')
   useEffect(() => {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready
@@ -426,13 +438,16 @@ export default function ProfilePage() {
 
   async function handleEnablePush() {
     setPushLoading(true)
+    setPushMsg('')
     try {
-      await subscribeToPush()
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
-      setPushEnabled(!!sub)
-    } catch {
-      // ignore — subscribeToPush handles its own errors
+      const result = await subscribeToPush()
+      if (result.ok) {
+        setPushEnabled(true)
+        setPushMsg('')
+      } else {
+        setPushEnabled(false)
+        setPushMsg(PUSH_ERROR_COPY[result.reason] ?? `Couldn’t enable push (${result.reason}).`)
+      }
     } finally {
       setPushLoading(false)
     }
@@ -764,6 +779,7 @@ export default function ProfilePage() {
           {/* Push subscription row */}
           <div style={{
             display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
             gap: 14,
             padding: '13px 16px',
@@ -783,6 +799,17 @@ export default function ProfilePage() {
                 {pushLoading ? 'Enabling…' : 'Enable'}
               </Button>
             )}
+            {pushMsg ? (
+              <p style={{
+                flexBasis: '100%',
+                fontSize: 12,
+                color: '#fb7185',
+                margin: '4px 0 0',
+                lineHeight: 1.5,
+              }}>
+                {pushMsg}
+              </p>
+            ) : null}
           </div>
 
           {NOTIF_PREF_ROWS.map((row, i) => (

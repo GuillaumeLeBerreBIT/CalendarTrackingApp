@@ -30,10 +30,14 @@ const MobileCalendarHarness = import.meta.env.DEV
 function AppInner() {
   const { user } = useAuthStore()
 
-  // Silently subscribe to push once the user is authenticated.
-  // subscribeToPush() is idempotent — it checks for an existing subscription first.
+  // Silently refresh the push subscription once the user is authenticated — but
+  // only when permission was already granted on a prior visit. The first opt-in
+  // must come from a user gesture (the Enable button in ProfilePage); prompting
+  // from here is a no-op on Safari/iOS and just burns the one-shot prompt.
   useEffect(() => {
-    if (user) subscribeToPush()
+    if (user && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      subscribeToPush()
+    }
   }, [user])
 
   // Show onboarding only when auth is resolved (user !== null) and the flag is

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
-import { StaleWhileRevalidate, NetworkFirst } from 'workbox-strategies'
+import { NetworkFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { clientsClaim } from 'workbox-core'
 
@@ -16,25 +16,21 @@ clientsClaim()
 // Workbox injects the precache manifest here at build time
 precacheAndRoute(self.__WB_MANIFEST)
 
-// Cache calendar + group reads — serve stale instantly, refresh in background
+// All API GET reads — always try the network first so a read that follows a
+// write (new event, RSVP change, new group, drag/resize…) reflects the change
+// immediately. Fall back to the last cached response only when the network is
+// slow or the device is offline.
+//
+// NOTE: renderEvents/groups previously used StaleWhileRevalidate here, which
+// served the pre-write list on the refetch that CalendarPage fires right after
+// saving — so a newly created event only appeared after a full page reload.
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/renderEvents') || url.pathname.startsWith('/api/groups'),
-  new StaleWhileRevalidate({
-    cacheName: 'api-reads',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 }), // 24h max
-    ],
-  })
-)
-
-// Other API calls — network first, fall back to cache when offline
-registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
+  ({ url, request }) => request.method === 'GET' && url.pathname.startsWith('/api/'),
   new NetworkFirst({
-    cacheName: 'api-fallback',
+    cacheName: 'api-cache',
     networkTimeoutSeconds: 5,
     plugins: [
-      new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 6 }), // 6h max
+      new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 60 * 60 * 6 }), // 6h max
     ],
   })
 )

@@ -89,9 +89,12 @@ export async function notifyUsers(client, recipients, type, buildPayload) {
                 },
               }
             ).catch(err => {
-              // 410 Gone = subscription expired, clean it up
-              if (err.statusCode === 410) {
+              // 404/410 = subscription gone; 403 = key mismatch (VAPID rotated) —
+              // in all cases the row is dead weight, delete it so we stop retrying.
+              if ([403, 404, 410].includes(err.statusCode)) {
                 supabaseAdmin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint).catch(() => {});
+              } else {
+                console.warn(`web-push ${err.statusCode ?? "?"} for ${sub.user_id}:`, err.body || err.message);
               }
             });
           });
