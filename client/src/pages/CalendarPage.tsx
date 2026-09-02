@@ -470,7 +470,9 @@ export default function CalendarPage() {
   const { userId: currentUserId } = useAuthStore()
   const [events, setEvents] = useState<CalEvent[]>([])
   const [groups, setGroups] = useState<Group[]>([])
+  // `loading` = cold-open skeleton only; `refreshing` = silent post-mutation refetch.
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [groupsLoaded, setGroupsLoaded] = useState(false)
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null)
@@ -490,6 +492,7 @@ export default function CalendarPage() {
     return 'compact'
   })
   const calRef = useRef<FullCalendar>(null)
+  const loadSeq = useRef(0) // only the latest loadEvents() call may write state
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024)
@@ -515,10 +518,18 @@ export default function CalendarPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calView, currentDate])
 
-  async function loadEvents() {
-    setLoading(true)
+  async function loadEvents(opts?: { silent?: boolean }) {
+    const silent = opts?.silent === true
+    const seq = ++loadSeq.current
+    // Show the pill only if the refetch is still outstanding after a beat.
+    let pillTimer: ReturnType<typeof setTimeout> | undefined
+    if (silent) pillTimer = setTimeout(() => {
+      if (seq === loadSeq.current) setRefreshing(true)
+    }, 180)
+    else setLoading(true)
     try {
       const { data } = await api.get('/renderEvents')
+      if (seq !== loadSeq.current) return
       if (data.success) {
         const remapped = (data.events as CalEvent[]).map((ev) => {
           const parts = (ev.extendedProps?.participants as Array<{ userId: string }> | undefined) ?? []
@@ -556,7 +567,11 @@ export default function CalendarPage() {
     } catch {
       // silently fail — auth interceptor handles 401
     } finally {
-      setLoading(false)
+      if (pillTimer) clearTimeout(pillTimer)
+      if (seq === loadSeq.current) {
+        if (silent) setRefreshing(false)
+        else setLoading(false)
+      }
     }
   }
 
@@ -628,7 +643,7 @@ export default function CalendarPage() {
         endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
         allDay: event.allDay,
       })
-      loadEvents()
+      loadEvents({ silent: true })
     } catch {
       info.revert()
     }
@@ -644,7 +659,7 @@ export default function CalendarPage() {
         endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
         allDay: event.allDay,
       })
-      loadEvents()
+      loadEvents({ silent: true })
     } catch {
       info.revert()
     }
@@ -674,6 +689,26 @@ export default function CalendarPage() {
   // Month label
   const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long' })
   const yearLabel = currentDate.getFullYear()
+
+  // Live region stays mounted so the transition is announced; the dot is decorative.
+  const refreshIndicator = (
+    <>
+      <span className="sr-only" role="status" aria-live="polite">
+        {refreshing ? 'Updating events' : ''}
+      </span>
+      {refreshing && (
+        <span
+          aria-hidden="true"
+          title="Updating…"
+          style={{
+            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+            background: 'var(--accent)',
+            animation: 'pulse-dot 1.1s ease-in-out infinite',
+          }}
+        />
+      )}
+    </>
+  )
 
   // Whether the compact grid is mounted (no calRef available)
   const isCompactGridActive = isMobile && calView === 'month' && mobileLayout === 'compact'
@@ -830,6 +865,7 @@ export default function CalendarPage() {
                 onChange={v => setCalView(v as CalView)}
                 size="sm"
               />
+              {refreshIndicator}
               <div style={{ flex: 1 }} />
               {/* Layout toggle — only visible when showing month on mobile */}
               {calView === 'month' && (
@@ -925,6 +961,7 @@ export default function CalendarPage() {
                 <IconButton name="chevR" size={34} isz={15} onClick={navNext} title="Next" />
               </div>
               <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
+              {refreshIndicator}
             </div>
 
             {/* Right: view toggle + countdowns */}
@@ -1131,7 +1168,7 @@ export default function CalendarPage() {
           currentUserId={currentUserId}
           prefill={nlPrefill ?? undefined}
           onClose={() => { setNlPrefill(null); closeModal() }}
-          onSaved={() => { setNlPrefill(null); closeModal(); loadEvents() }}
+          onSaved={() => { setNlPrefill(null); closeModal(); loadEvents({ silent: true }) }}
         />
       )}
 
@@ -1140,9 +1177,9 @@ export default function CalendarPage() {
           data={selectedEvent}
           onClose={closeModal}
           onEdit={() => { setEditEvent(selectedEvent); setModalMode('edit') }}
-          onDeleted={() => { closeModal(); loadEvents() }}
+          onDeleted={() => { closeModal(); loadEvents({ silent: true }) }}
           currentUserId={currentUserId ?? undefined}
-          onRsvp={loadEvents}
+          onRsvp={() => loadEvents({ silent: true })}
         />
       )}
 
@@ -1153,7 +1190,7 @@ export default function CalendarPage() {
           groups={groups}
           currentUserId={currentUserId}
           onClose={closeModal}
-          onSaved={() => { closeModal(); loadEvents() }}
+          onSaved={() => { closeModal(); loadEvents({ silent: true }) }}
         />
       )}
     </div>
