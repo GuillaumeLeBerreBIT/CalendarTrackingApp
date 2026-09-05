@@ -36,6 +36,20 @@ export function createUserClient(accessToken) {
 // kept as a fallback for deployments that still use it. Falls back to the anon
 // client if neither is configured.
 const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+
+if (!secretKey) {
+  // Without a secret key, supabaseAdmin would silently be the anon client:
+  // every cross-user job (reminder/countdown/habit crons, notifyUsers, the
+  // public iCal feed) then runs as `anon` and is blocked by RLS — a total,
+  // invisible failure. Fail loudly in production; allow the fallback only in dev.
+  const msg =
+    "supabaseAdmin: neither SUPABASE_SECRET_KEY nor legacy SUPABASE_KEY is set.";
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`${msg} Cross-user server jobs cannot bypass RLS — refusing to boot.`);
+  }
+  console.warn(`[supabase] ${msg} Falling back to the anon client (dev only).`);
+}
+
 export const supabaseAdmin = secretKey
   ? createClient(process.env.SUPABASE_URL, secretKey, {
       auth: serverAuthConfig,

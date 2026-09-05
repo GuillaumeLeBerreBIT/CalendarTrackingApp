@@ -63,7 +63,12 @@ export async function notifyUsers(client, recipients, type, buildPayload) {
     if (rows.length > 0) {
       // Privileged cross-user write — see JSDoc. supabaseAdmin bypasses RLS so
       // the permissive "insert any notification" policy can be removed.
-      await supabaseAdmin.from("notifications").insert(rows);
+      const { error: insertErr } = await supabaseAdmin.from("notifications").insert(rows);
+      if (insertErr) {
+        // Usually means supabaseAdmin fell back to the anon client (missing
+        // SUPABASE_SECRET_KEY) and RLS is blocking the cross-user insert.
+        console.warn("notifyUsers: notifications insert failed:", insertErr.message);
+      }
 
       // Fire-and-forget web push to all recipients who have subscriptions
       try {
