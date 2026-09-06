@@ -50,7 +50,11 @@ utils/
                            retrieveTodoLists, retrieveEvents, retrieveAllTasks
   notifications.js       — notifyUsers() helper (in-app + web push)
   scheduler.js           — node-cron jobs: digest 07:00, reminders every 5min,
-                           countdown 08:00, pact resolution 00:05, habit reminder 20:00
+                           countdown 08:00, pact resolution 00:05, habit reminder 20:00,
+                           daily summary sweep every 15min
+  dailySummary.js        — pure helpers for the daily "events today" push (time
+                           normalisation, tz-aware local slot, summary text)
+  dailySummarySweep.js   — runDailySummarySweep(): per-user tz-matched morning summary push
   recurrence.js          — RRULE expansion for recurring events
   ical.js                — buildICS() RFC 5545 serialiser
 tests/

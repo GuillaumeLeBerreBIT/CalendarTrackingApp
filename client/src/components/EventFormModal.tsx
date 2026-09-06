@@ -29,10 +29,17 @@ type EventType = 'personal' | 'appointment' | 'social'
 // Reminder options → minutes-before value sent to the backend (null = off)
 const REMINDER_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: 'None' },
+  { value: 5, label: '5 minutes before' },
   { value: 10, label: '10 minutes before' },
+  { value: 15, label: '15 minutes before' },
+  { value: 30, label: '30 minutes before' },
   { value: 60, label: '1 hour before' },
+  { value: 120, label: '2 hours before' },
   { value: 1440, label: '1 day before' },
 ]
+
+// New events default to a 15-minute reminder; editing keeps whatever was saved.
+const DEFAULT_REMINDER_MINUTES = 15
 
 
 const labelStyle: React.CSSProperties = {
@@ -127,9 +134,10 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     setDateOptions(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Per-event reminder (minutes before; null = off). Pre-filled when editing.
+  // Per-event reminder (minutes before; null = off). Pre-filled when editing;
+  // new events start at the 15-minute default.
   const [reminderMinutes, setReminderMinutes] = useState<number | null>(
-    event?.extendedProps?.reminderMinutes ?? null
+    event ? (event.extendedProps?.reminderMinutes ?? null) : DEFAULT_REMINDER_MINUTES
   )
 
   // Recurrence editor state (parsed from an existing rule when editing)

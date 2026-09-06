@@ -25,6 +25,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         const profile: Profile = { ...data }
         set({ user: profile, userId: data.userId ?? null, loading: false })
         subscribeToPush().catch(() => {})
+        // Keep the stored IANA timezone current (used by the daily-summary sweep).
+        try {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+          if (tz) api.patch('/notification-prefs', { prefs: { timezone: tz } }).catch(() => {})
+        } catch { /* Intl unavailable — ignore */ }
         return true
       }
     } catch {

@@ -1,6 +1,7 @@
 import express from "express";
 import authRequire from "../utils/utils.js";
 import webpush from "web-push";
+import { normalizeTime, isValidTimeZone } from "../utils/dailySummary.js";
 
 webpush.setVapidDetails(
   "mailto:leberreguillaume.glb@gmail.com",
@@ -97,6 +98,22 @@ router.patch("/notification-prefs", authRequire, async (req, res) => {
   const merged = { ...(existing?.notification_prefs || {}) };
   for (const key of PREF_KEYS) {
     if (key in incoming) merged[key] = !!incoming[key];
+  }
+
+  // Daily "events today" summary settings live in the same JSON blob.
+  if ("daily_summary_enabled" in incoming) {
+    merged.daily_summary_enabled = !!incoming.daily_summary_enabled;
+  }
+  if ("daily_summary_time" in incoming) {
+    const t = normalizeTime(incoming.daily_summary_time);
+    if (!t) return res.status(400).json({ success: false, error: "Invalid daily_summary_time." });
+    merged.daily_summary_time = t;
+  }
+  if ("timezone" in incoming) {
+    if (!isValidTimeZone(incoming.timezone)) {
+      return res.status(400).json({ success: false, error: "Invalid timezone." });
+    }
+    merged.timezone = incoming.timezone;
   }
 
   const { error } = await req.supabase

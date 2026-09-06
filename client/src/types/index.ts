@@ -175,4 +175,8 @@ export interface NotificationPrefs {
   event_invites: boolean
   rsvp_replies: boolean
   event_changes: boolean
+  /** Daily "events today" push summary */
+  daily_summary_enabled: boolean
+  /** Local send time, "HH:MM" on a 15-minute grid */
+  daily_summary_time: string
 }

@@ -4,6 +4,7 @@ import { sendDigestForUser } from '../routes/email.js';
 import { expandRecurringEvent } from './recurrence.js';
 import { notifyUsers } from './notifications.js';
 import { reconcileGoogleSync, isGoogleConfigured, pullAllUsers, renewExpiringChannels } from './google.js';
+import { runDailySummarySweep } from './dailySummarySweep.js';
 
 /**
  * Build a server-local Date for an occurrence given its date string and a time string.
@@ -327,6 +328,14 @@ export function startScheduler() {
   });
 
   console.log('[scheduler] Habit reminder cron registered (20:00 server time).');
+
+  // */15 * * * *  →  every 15 minutes: send each opted-in user their "events
+  // today" summary when their local time matches their chosen send time.
+  cron.schedule('*/15 * * * *', () => {
+    runDailySummarySweep();
+  });
+
+  console.log('[scheduler] Daily summary sweep cron registered (every 15 minutes).');
 
   // 0 * * * *  →  hourly: re-push any upcoming events missing from connected
   // Google calendars (safety net for inline pushes that failed).

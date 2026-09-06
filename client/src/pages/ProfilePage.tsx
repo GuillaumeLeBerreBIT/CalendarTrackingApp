@@ -43,7 +43,23 @@ function Switch({ on, onChange }: { on: boolean; onChange: () => void }) {
   )
 }
 
-const NOTIF_PREF_ROWS: { key: keyof NotificationPrefs; label: string; sub: string }[] = [
+// Browser's IANA zone, e.g. "Europe/Paris" — sent with daily-summary saves.
+const BROWSER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+// Snap a "HH:MM" string to the nearest 15-minute grid point (mirrors the
+// server's normalizeTime so the optimistic UI matches what gets stored).
+function snap15(t: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t)
+  if (!m) return t
+  let hh = +m[1]
+  let mm = Math.round(+m[2] / 15) * 15
+  if (mm === 60) { mm = 0; hh = (hh + 1) % 24 }
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
+type NotifToggleKey = 'group_invites' | 'event_invites' | 'rsvp_replies' | 'event_changes'
+
+const NOTIF_PREF_ROWS: { key: NotifToggleKey; label: string; sub: string }[] = [
   { key: 'group_invites', label: 'Group invites', sub: 'When someone invites you to a group' },
   { key: 'event_invites', label: 'Event invites', sub: 'When you\'re added to a group event' },
   { key: 'rsvp_replies',  label: 'RSVP replies',  sub: 'When people respond to your events' },
@@ -461,11 +477,13 @@ export default function ProfilePage() {
         event_invites: data.prefs.event_invites !== false,
         rsvp_replies: data.prefs.rsvp_replies !== false,
         event_changes: data.prefs.event_changes !== false,
+        daily_summary_enabled: data.prefs.daily_summary_enabled === true,
+        daily_summary_time: data.prefs.daily_summary_time || '08:00',
       }) })
       .catch(() => {})
   }, [])
 
-  async function togglePref(key: keyof NotificationPrefs) {
+  async function togglePref(key: NotifToggleKey) {
     if (!prefs) return
     const next = { ...prefs, [key]: !prefs[key] }
     setPrefs(next) // optimistic
@@ -473,6 +491,21 @@ export default function ProfilePage() {
       await api.patch('/notification-prefs', { prefs: { [key]: next[key] } })
     } catch {
       setPrefs(prefs) // revert on failure
+    }
+  }
+
+  // The daily-summary time is stored/sent in the user's own timezone; capture it
+  // from the browser on every save so it stays current across travel/DST.
+  async function updateSummary(patch: Partial<Pick<NotificationPrefs, 'daily_summary_enabled' | 'daily_summary_time'>>) {
+    if (!prefs) return
+    const prev = prefs
+    setPrefs({ ...prefs, ...patch }) // optimistic
+    try {
+      await api.patch('/notification-prefs', {
+        prefs: { ...patch, ...(BROWSER_TZ ? { timezone: BROWSER_TZ } : {}) },
+      })
+    } catch {
+      setPrefs(prev) // revert on failure
     }
   }
 
@@ -831,6 +864,59 @@ export default function ProfilePage() {
               <Switch on={prefs ? prefs[row.key] : true} onChange={() => togglePref(row.key)} />
             </div>
           ))}
+
+          {/* Daily "events today" summary */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: '13px 16px',
+            minHeight: 44,
+            borderTop: '1px solid var(--border)',
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Daily summary</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>A morning push listing that day’s events</p>
+            </div>
+            <Switch
+              on={prefs ? prefs.daily_summary_enabled : false}
+              onChange={() => updateSummary({ daily_summary_enabled: !prefs?.daily_summary_enabled })}
+            />
+          </div>
+
+          {prefs?.daily_summary_enabled && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '13px 16px',
+              minHeight: 44,
+              borderTop: '1px solid var(--border)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Summary time</p>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>
+                  Sent at this time in your timezone ({BROWSER_TZ})
+                </p>
+              </div>
+              <input
+                type="time"
+                step={900}
+                value={prefs.daily_summary_time}
+                onChange={e => updateSummary({ daily_summary_time: snap15(e.target.value) })}
+                style={{
+                  background: 'var(--surface-3)',
+                  border: '1px solid var(--border-2)',
+                  borderRadius: 'var(--r-sm)',
+                  padding: '8px 10px',
+                  fontSize: 14,
+                  color: 'var(--text-1)',
+                  fontFamily: 'inherit',
+                  minHeight: 40,
+                }}
+              />
+            </div>
+          )}
         </div>
       </Section>
 
