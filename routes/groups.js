@@ -4,6 +4,7 @@ import authRequire ,{retrieveEvents, retrieveTodoLists, retrieveAllTasks } from 
 import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
 import { format } from "date-fns";
+import { sanitizeOrTerm } from "../utils/postgrestFilter.js";
 const router = express.Router();
 
 
@@ -130,10 +131,15 @@ router.post('/checkUser', authRequire ,async (req, res) => {
   try {
     const callerId = req.cookies.userId;
 
+    const term = sanitizeOrTerm(req.body.isUser);
+    if (term.length < 2) {
+      return res.json({ success: true, match: false });
+    }
+
     const {data: isUserFound, error: noUser} = await req.supabase
     .from('profiles')
     .select('username, user_id, email, searchable')
-    .or(`username.ilike.${req.body.isUser},email.ilike.${req.body.isUser}`)
+    .or(`username.ilike.${term},email.ilike.${term}`)
     .limit(1)
 
     if (noUser) {
@@ -195,7 +201,7 @@ router.get('/users/search', authRequire, async (req, res) => {
     }
 
     // Sanitize for PostgREST or() filter syntax — strip injection-capable chars
-    const q = raw.replace(/[,()%*]/g, '');
+    const q = sanitizeOrTerm(raw);
     if (q.length < 2) {
       return res.json({ success: true, users: [] });
     }
