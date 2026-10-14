@@ -106,6 +106,15 @@ export function capRuleUntil(recurrenceRule, beforeDateStr) {
   return parts.join(";");
 }
 
+const ruleParts = (rule) =>
+  rule.split(";").filter((p) => p && !/^WKST=MO$/i.test(p)).map((p) => p.toUpperCase()).sort().join(";");
+
+/** Same rule, ignoring part order and the default week start (WKST=MO). */
+export function sameRule(a, b) {
+  if (!a || !b) return a === b;
+  return ruleParts(a) === ruleParts(b);
+}
+
 /**
  * Rule for the new master created by a "this and following" split at
  * `occurrenceDate`. A COUNT rule only gets the occurrences that were left;

@@ -6,7 +6,7 @@ import authRequire, { createEventObj } from "../utils/utils.js";
 import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
 import { syncEventToGoogle } from "../utils/google.js";
-import { expandRecurringEvent, capRuleUntil, followingRule, expansionWindow } from "../utils/recurrence.js";
+import { expandRecurringEvent, capRuleUntil, followingRule, expansionWindow, sameRule } from "../utils/recurrence.js";
 import { isGroupMember, canAccessEvent } from "../utils/groupAccess.js";
 
 const router = express.Router()
@@ -227,7 +227,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     if (eventCheck.recurrence_rule && recurrenceScope === 'following' && req.body.occurrenceDate) {
       const occurrenceDate = req.body.occurrenceDate;
       // Keep the series length for COUNT rules; respect a rule the user edited.
-      const ruleEdited = updateEventObj.recurrence_rule && updateEventObj.recurrence_rule !== eventCheck.recurrence_rule;
+      const ruleEdited = updateEventObj.recurrence_rule && !sameRule(updateEventObj.recurrence_rule, eventCheck.recurrence_rule);
       const nextRule = ruleEdited ? updateEventObj.recurrence_rule : followingRule(eventCheck, occurrenceDate);
       if (!nextRule) {
         return res.status(400).json({ success: false, error: 'This series has no occurrences from that date.' });
