@@ -474,6 +474,7 @@ export default function CalendarPage() {
   const [groups, setGroups] = useState<Group[]>([])
   // `loading` = cold-open skeleton only; `refreshing` = silent post-mutation refetch.
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [groupsLoaded, setGroupsLoaded] = useState(false)
   const [modalMode, setModalMode] = useState<ModalMode>('none')
@@ -532,6 +533,7 @@ export default function CalendarPage() {
     try {
       const { data } = await api.get('/renderEvents')
       if (seq !== loadSeq.current) return
+      setLoadError(!data.success)
       if (data.success) {
         const remapped = (data.events as CalEvent[]).map((ev) => {
           const parts = (ev.extendedProps?.participants as Array<{ userId: string }> | undefined) ?? []
@@ -567,7 +569,8 @@ export default function CalendarPage() {
         }
       }
     } catch {
-      // silently fail — auth interceptor handles 401
+      // 401 is handled by the auth interceptor; anything else is shown to the user.
+      if (seq === loadSeq.current) setLoadError(true)
     } finally {
       if (pillTimer) clearTimeout(pillTimer)
       if (seq === loadSeq.current) {
@@ -1084,6 +1087,21 @@ export default function CalendarPage() {
                 </button>
               )
             })}
+          </div>
+        )}
+
+        {loadError && !loading && (
+          <div
+            role="alert"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              margin: '8px 24px', padding: '10px 14px', borderRadius: 'var(--r-sm)',
+              background: 'var(--surface-2)', border: '1px solid var(--border-2)',
+              color: 'var(--text-2)', fontSize: 13.5,
+            }}
+          >
+            Couldn't load your events.
+            <Button variant="soft" size="sm" onClick={() => loadEvents()}>Retry</Button>
           </div>
         )}
 
