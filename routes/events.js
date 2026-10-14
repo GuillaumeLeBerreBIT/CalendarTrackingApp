@@ -772,8 +772,9 @@ router.get('/renderEvents', authRequire, async (req, res) => {
               votes: optVotes.map(v => ({
                 // Guests have no user_id — give them a stable synthetic id (so the
                 // voter-count Set doesn't collapse every guest into one) and show
-                // their chosen display name.
-                userId: v.user_id || `guest:${v.guest_token}`,
+                // their chosen display name. The id is a hash: the raw guest_token
+                // authorises changing that guest's votes and must not reach members.
+                userId: v.user_id || `guest:${crypto.createHash('sha256').update(String(v.guest_token)).digest('hex').slice(0, 16)}`,
                 username: v.user_id ? (voterProfileMap[v.user_id] || null) : (v.guest_name || 'Guest'),
                 availability: v.availability,
               })),
