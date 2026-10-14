@@ -10,6 +10,7 @@ import {
   WEEKDAYS, WEEKDAY_LABEL, parseRRule, buildRRule, summarize,
 } from '@/lib/recurrence'
 import { parseNL, type ParsedEvent } from '@/lib/nlParser'
+import { fromCalendarAllDayEnd } from '@/lib/allDayDates'
 
 // Max candidate date slots per tentative event (mirrors MAX_DATE_OPTIONS on the backend).
 const MAX_DATE_OPTIONS = 6
@@ -71,9 +72,21 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     description: event?.extendedProps?.description ?? '',
     location: (event?.extendedProps?.location as string | undefined) ?? prefill?.location ?? '',
     imageUrl: (event?.extendedProps?.imageUrl as string | undefined) ?? '',
-    allDay: event?.allDay ?? false,
+    // API events carry no allDay field; a date-only start means all-day.
+    // A selection spanning several days is an all-day range; a single click stays timed.
+    allDay: event
+      ? (event.allDay ?? !event.start.includes('T'))
+      : !!selectInfo?.allDay &&
+        fromCalendarAllDayEnd(selectInfo.startStr, selectInfo.endStr) > selectInfo.startStr.split('T')[0],
     startDate: event?.start?.split('T')[0] ?? selectInfo?.startStr?.split('T')[0] ?? prefill?.date ?? '',
-    endDate: (event?.end ?? event?.start ?? '')?.split('T')[0] ?? selectInfo?.endStr?.split('T')[0] ?? prefill?.date ?? '',
+    // Edit: stored end is already inclusive. Drag-select: FullCalendar's end is exclusive.
+    endDate: event
+      ? (event.end ?? event.start).split('T')[0]
+      : selectInfo
+        ? (selectInfo.allDay
+            ? fromCalendarAllDayEnd(selectInfo.startStr, selectInfo.endStr)
+            : selectInfo.endStr.split('T')[0])
+        : (prefill?.date ?? ''),
     startTime: event?.start?.includes('T') ? event.start.split('T')[1].slice(0, 5) : (prefill?.time ?? ''),
     endTime: event?.end?.includes('T') ? event.end.split('T')[1].slice(0, 5) : '',
     groupsId: String(event?.extendedProps?.groupsId ?? ''),

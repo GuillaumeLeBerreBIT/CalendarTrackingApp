@@ -13,6 +13,8 @@ import EventModal from '@/components/EventModal'
 import EventFormModal from '@/components/EventFormModal'
 import MobileMonthGrid from '@/components/MobileMonthGrid'
 import { parseNL, type ParsedEvent } from '@/lib/nlParser'
+import { addDaysStr, fromCalendarAllDayEnd } from '@/lib/allDayDates'
+import { normalizeApiEvent, toFullCalendarEvents, agendaDayKey } from '@/lib/calendarEvents'
 import Button, { IconButton } from '@/components/ui/Button'
 import { Segmented, RsvpPill } from '@/components/ui/Primitives'
 import Icon from '@/components/ui/Icon'
@@ -117,8 +119,8 @@ function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
     const todayKey = localDateKey(new Date())
     const map = new Map<string, CalEvent[]>()
     for (const ev of events) {
-      const day = ev.start.split('T')[0]
-      if (day < todayKey) continue
+      const day = agendaDayKey(ev, todayKey)
+      if (!day) continue
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(ev)
     }
@@ -548,12 +550,12 @@ export default function CalendarPage() {
               ev.extendedProps?.groupsId as string | undefined
             )
           }
-          return {
+          return normalizeApiEvent({
             ...ev,
             backgroundColor: hex + '22',
             borderColor: hex,
             extendedProps: { ...(ev.extendedProps ?? {}), resolvedHex: hex },
-          }
+          })
         })
         setEvents(remapped)
         if (data.groupsTagNames && typeof data.groupsTagNames === 'object' && !Array.isArray(data.groupsTagNames)) {
@@ -638,7 +640,9 @@ export default function CalendarPage() {
     try {
       await api.patch(`/parseEvent/${event.id}`, {
         startDate: event.startStr.split('T')[0],
-        endDate: event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
+        endDate: event.allDay
+          ? fromCalendarAllDayEnd(event.startStr, event.endStr)
+          : event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
         startTime: event.allDay ? null : event.startStr.split('T')[1]?.slice(0, 5),
         endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
         allDay: event.allDay,
@@ -654,7 +658,9 @@ export default function CalendarPage() {
     try {
       await api.patch(`/parseEvent/${event.id}`, {
         startDate: event.startStr.split('T')[0],
-        endDate: event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
+        endDate: event.allDay
+          ? fromCalendarAllDayEnd(event.startStr, event.endStr)
+          : event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
         startTime: event.allDay ? null : event.startStr.split('T')[1]?.slice(0, 5),
         endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
         allDay: event.allDay,
@@ -675,7 +681,7 @@ export default function CalendarPage() {
     })
   }
 
-  // Filter events for FullCalendar based on active groups
+  // Filter events for the calendar views based on active groups.
   const filteredEvents = useMemo(() => {
     if (!groupsLoaded) return events  // show everything until user can see the filter panel
     return events.filter(ev => {
@@ -685,6 +691,9 @@ export default function CalendarPage() {
       return activeGroups.has(gid)
     })
   }, [events, activeGroups, groupsLoaded])
+
+  // FullCalendar alone gets exclusive all-day ends. Never store or pass this elsewhere.
+  const fullCalendarEvents = useMemo(() => toFullCalendarEvents(filteredEvents), [filteredEvents])
 
   // Month label
   const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long' })
@@ -757,7 +766,7 @@ export default function CalendarPage() {
       start,
       end,
       startStr: dateStr,
-      endStr: dateStr,
+      endStr: addDaysStr(dateStr, 1),
       allDay: true,
       jsEvent: null as never,
       view: null as never,
@@ -1109,7 +1118,7 @@ export default function CalendarPage() {
                 initialView="dayGridMonth"
                 headerToolbar={false}
                 firstDay={1}
-                events={filteredEvents}
+                events={fullCalendarEvents}
                 // On mobile, range-select needs a long-press that also triggers the
                 // native text magnifier ("weirdly zoomed" view). Disable it so a clean
                 // single tap fires dateClick → prefilled form, just like the + button.
