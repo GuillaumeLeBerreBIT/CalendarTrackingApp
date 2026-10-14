@@ -94,12 +94,46 @@ export function expandRecurringEvent(event, windowStart, windowEnd, overrides = 
 /**
  * Set/replace the UNTIL of an RRULE string so the series ends the day before
  * `beforeDateStr`. Used for "this and following" deletes/edits.
+ * UNTIL is inclusive, so cap at 23:59:59 of the previous day: an all-day
+ * occurrence (or one at 00:00) on beforeDateStr must not survive.
  */
 export function capRuleUntil(recurrenceRule, beforeDateStr) {
-  const untilStr = beforeDateStr.replace(/-/g, "") + "T000000Z";
+  const untilStr = addDaysStr(beforeDateStr, -1).replace(/-/g, "") + "T235959Z";
   const parts = recurrenceRule
     .split(";")
     .filter((p) => p && !/^UNTIL=/i.test(p) && !/^COUNT=/i.test(p));
   parts.push(`UNTIL=${untilStr}`);
   return parts.join(";");
+}
+
+/**
+ * Rule for the new master created by a "this and following" split at
+ * `occurrenceDate`. A COUNT rule only gets the occurrences that were left;
+ * returns null when none are left.
+ */
+export function followingRule(event, occurrenceDate) {
+  let options;
+  try {
+    options = RRule.parseString(event.recurrence_rule);
+  } catch {
+    return event.recurrence_rule;
+  }
+  if (!options.count) return event.recurrence_rule;
+
+  const [sy, sm, sd] = event.start_date.split("-").map(Number);
+  const [shh, smin] = event.start_time ? event.start_time.split(":").map(Number) : [0, 0];
+  options.dtstart = new Date(Date.UTC(sy, sm - 1, sd, shh || 0, smin || 0, 0));
+  const [oy, om, od] = occurrenceDate.split("-").map(Number);
+  const splitAt = new Date(Date.UTC(oy, om - 1, od));
+
+  const consumed = new RRule(options)
+    .between(options.dtstart, splitAt, true)
+    .filter((d) => d < splitAt).length;
+  const remaining = options.count - consumed;
+  if (remaining <= 0) return null;
+
+  return event.recurrence_rule
+    .split(";")
+    .map((p) => (/^COUNT=/i.test(p) ? `COUNT=${remaining}` : p))
+    .join(";");
 }
