@@ -1,5 +1,3 @@
-import { MOCK_MEMBERS } from '@/lib/mockData'
-
 interface AvatarProps {
   id: string
   size?: number
@@ -20,15 +18,14 @@ function hashHue(str: string): number {
 }
 
 export function Avatar({ id, size = 28, ring = false, ringColor, hue, label, name }: AvatarProps) {
-  const mock = MOCK_MEMBERS[id]
   const isYou = id === 'you'
 
-  // Resolve the displayed initial: explicit name → mock → id[0] → '?'
+  // Resolve the displayed initial: explicit name → id[0] → '?'
   // (name wins so the logged-in user's real initial shows even for id="you")
-  const initial = name?.[0]?.toUpperCase() || mock?.first?.[0] || id?.[0]?.toUpperCase() || '?'
+  const initial = name?.[0]?.toUpperCase() || id?.[0]?.toUpperCase() || '?'
 
-  // Resolve hue: mock → explicit prop → stable hash of id → 252
-  const resolvedHue = mock?.hue ?? hue ?? (id ? hashHue(id) : 252)
+  // Resolve hue: explicit prop → stable hash of id → 252
+  const resolvedHue = hue ?? (id ? hashHue(id) : 252)
 
   const bg = isYou
     ? 'var(--accent)'
@@ -36,7 +33,7 @@ export function Avatar({ id, size = 28, ring = false, ringColor, hue, label, nam
 
   return (
     <div
-      title={label ?? name ?? mock?.name ?? id}
+      title={label ?? name ?? id}
       style={{
         width: size,
         height: size,
