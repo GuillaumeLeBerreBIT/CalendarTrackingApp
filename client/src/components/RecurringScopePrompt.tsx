@@ -10,6 +10,9 @@ export default function RecurringScopePrompt({ mode, onChoose, onCancel }: Recur
   return createPortal(
     <div
       onClick={onCancel}
+      // React bubbles portal events to the host modal, whose backdrop closes on
+      // pointerdown — which would unmount this prompt before a choice registers.
+      onPointerDown={(e) => e.stopPropagation()}
       style={{
         position: 'fixed', inset: 0, zIndex: 600,
         background: 'var(--scrim)', backdropFilter: 'blur(4px)',
