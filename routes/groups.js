@@ -5,6 +5,7 @@ import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
 import { format } from "date-fns";
 import { sanitizeOrTerm } from "../utils/postgrestFilter.js";
+import { isGroupMember } from "../utils/groupAccess.js";
 const router = express.Router();
 
 
@@ -504,7 +505,11 @@ router.post('/declineInviteGroup', authRequire, async (req, res) => {
 });
 
 router.get('/getGroupMembers/:groupId', authRequire, async (req, res) => {
-  const { groupId } = req.params;
+  const groupId = parseInt(req.params.groupId, 10);
+  if (isNaN(groupId)) return res.status(400).json({ success: false, error: 'Invalid group ID.' });
+  if (!(await isGroupMember(req.supabase, req.cookies.userId, groupId))) {
+    return res.status(403).json({ success: false, error: 'Not a group member.' });
+  }
 
   const [{ data: members, error }, { data: group, error: groupError }] = await Promise.all([
     req.supabase

@@ -124,6 +124,14 @@ app.post('/api/refresh-session', authRequire, (req, res) => {
   return res.json({ success: true });
 });
 
+// Last resort for errors thrown in /api handlers (e.g. a failed access check):
+// keep the { success, error } JSON contract instead of Express's HTML page.
+app.use('/api', (err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error('[api]', req.method, req.path, err.message);
+  res.status(err.status || 500).json({ success: false, error: 'Something went wrong.' });
+});
+
 app.get('/healthz', (req, res) => {
   return res.json({ success: true, datetime: new Date().toISOString() });
 });

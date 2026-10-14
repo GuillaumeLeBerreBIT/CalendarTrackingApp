@@ -7,6 +7,7 @@ import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
 import { syncEventToGoogle } from "../utils/google.js";
 import { expandRecurringEvent, capRuleUntil, followingRule, expansionWindow } from "../utils/recurrence.js";
+import { isGroupMember, canAccessEvent } from "../utils/groupAccess.js";
 
 const router = express.Router()
 
@@ -39,6 +40,10 @@ async function canManageEvent(reqSupabase, event, userId) {
 router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), async (req, res) => {
 
   const insertEventObj = createEventObj(req.body)
+  const targetGroupId = insertEventObj.tagNames ? parseInt(insertEventObj.tagNames) : null;
+  if (targetGroupId && !(await isGroupMember(req.supabase, req.cookies.userId, targetGroupId))) {
+    return res.status(403).json({ success: false, error: 'Not a member of that group.' });
+  }
   const eventStatus = req.body.status === 'tentative' ? 'tentative' : 'confirmed';
   const dateOptions = Array.isArray(req.body.dateOptions) ? req.body.dateOptions : [];
 
@@ -209,6 +214,10 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     }
 
     const updateEventObj = createEventObj(req.body);
+    const targetGroupId = updateEventObj.tagNames ? parseInt(updateEventObj.tagNames) : null;
+    if (targetGroupId && !(await isGroupMember(req.supabase, req.cookies.userId, targetGroupId))) {
+      return res.status(403).json({ success: false, error: 'Not a member of that group.' });
+    }
     const newParticipants = updateEventObj.participants || [];
 
     // Recurring "this occurrence only" → store a per-occurrence override, leave the series intact.
@@ -838,6 +847,9 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
   const groupId = parseInt(req.query.groupId);
   if (isNaN(groupId)) return res.status(400).json({ success: false, error: 'Invalid group ID.' });
+  if (!(await isGroupMember(req.supabase, req.cookies.userId, groupId))) {
+    return res.status(403).json({ success: false, error: 'Not a group member.' });
+  }
 
   const {data: groupUsers, error: groupUsersError } = await req.supabase
   .from('profiles_groups')
@@ -872,6 +884,9 @@ router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
 router.patch('/rsvp/:eventId', authRequire, async (req, res) => {
   const eventId = parseInt(req.params.eventId)
   if (isNaN(eventId)) return res.status(400).json({ success: false, error: 'Invalid event ID.' })
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
 
   const { status } = req.body
   if (!['going', 'maybe', 'no'].includes(status)) {
@@ -1435,6 +1450,9 @@ router.get("/events/:eventId/reactions", authRequire, async (req, res) => {
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
   }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
 
   const userId = req.cookies.userId;
 
@@ -1471,6 +1489,9 @@ router.post("/events/:eventId/reactions", authRequire, async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
   }
 
   const { emoji } = req.body;
@@ -1524,6 +1545,9 @@ router.get("/events/:eventId/comments", authRequire, async (req, res) => {
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
   }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
 
   const { data: rows, error } = await req.supabase
     .from("event_comments")
@@ -1554,6 +1578,9 @@ router.post("/events/:eventId/comments", authRequire, async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
   }
 
   const { body } = req.body;
