@@ -22,7 +22,12 @@ async function resolvePactIfExpired(pact) {
   const newStatus = pact.completions_count >= pact.target_completions ? 'succeeded' : 'failed';
   const eventStatus = newStatus === 'succeeded' ? 'confirmed' : 'failed';
 
-  await supabaseAdmin.from('pacts').update({ status: newStatus }).eq('pact_id', pact.pact_id);
+  // Only the first resolver wins; a concurrent cron or habit log may have resolved it already.
+  const { data: changed } = await supabaseAdmin
+    .from('pacts').update({ status: newStatus })
+    .eq('pact_id', pact.pact_id).eq('status', 'active')
+    .select('pact_id');
+  if (!changed?.length) return { ...pact, status: newStatus };
   if (pact.reward_event_id) {
     await supabaseAdmin.from('events').update({ status: eventStatus }).eq('event_id', pact.reward_event_id);
   }

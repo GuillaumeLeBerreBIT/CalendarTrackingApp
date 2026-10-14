@@ -268,7 +268,11 @@ export function startScheduler() {
       for (const pact of expired || []) {
         const newStatus = pact.completions_count >= pact.target_completions ? 'succeeded' : 'failed';
         const eventStatus = newStatus === 'succeeded' ? 'confirmed' : 'failed';
-        await supabaseAdmin.from('pacts').update({ status: newStatus }).eq('pact_id', pact.pact_id);
+        const { data: changed } = await supabaseAdmin
+          .from('pacts').update({ status: newStatus })
+          .eq('pact_id', pact.pact_id).eq('status', 'active')
+          .select('pact_id');
+        if (!changed?.length) continue;
         if (pact.reward_event_id) {
           await supabaseAdmin.from('events').update({ status: eventStatus }).eq('event_id', pact.reward_event_id);
         }
