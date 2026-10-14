@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeApiEvent, toFullCalendarEvents, eventDays, agendaDayKey } from "../client/src/lib/calendarEvents.ts";
+import { normalizeApiEvent, toFullCalendarEvents, eventDays, agendaDayKey, eventWindow } from "../client/src/lib/calendarEvents.ts";
 
 const ev = (start, end) => ({ id: "1", title: "t", start, end });
 
@@ -54,5 +54,17 @@ describe("agendaDayKey", () => {
   });
   it("finished event is dropped", () => {
     expect(agendaDayKey(ev("2026-10-10", "2026-10-13"), today)).toBeNull();
+  });
+});
+
+describe("eventWindow", () => {
+  it("covers the visible month grid and the agenda's year ahead", () => {
+    expect(eventWindow(new Date(2026, 9, 1), new Date(2026, 9, 14))).toEqual({ from: "2026-09-24", to: "2027-10-14" });
+  });
+  it("a month far in the future reaches its own end", () => {
+    expect(eventWindow(new Date(2028, 1, 1), new Date(2026, 9, 14))).toEqual({ from: "2026-10-14", to: "2028-03-14" });
+  });
+  it("a past month starts there", () => {
+    expect(eventWindow(new Date(2025, 0, 1), new Date(2026, 9, 14)).from).toBe("2024-12-25");
   });
 });

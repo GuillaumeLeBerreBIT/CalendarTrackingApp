@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { expandRecurringEvent, capRuleUntil, followingRule } from "../utils/recurrence.js";
+import { expandRecurringEvent, capRuleUntil, followingRule, expansionWindow } from "../utils/recurrence.js";
 
 const win = [new Date("2027-01-01T00:00:00Z"), new Date("2027-12-31T00:00:00Z")];
 const days = (ev) => expandRecurringEvent(ev, ...win, []).map((o) => o.start_date);
@@ -40,5 +40,25 @@ describe("followingRule keeps the series length", () => {
   });
   it("null when nothing remains", () => {
     expect(followingRule({ ...at9, recurrence_rule: "FREQ=WEEKLY;COUNT=2" }, "2027-04-01")).toBeNull();
+  });
+});
+
+describe("expansionWindow", () => {
+  const now = new Date("2026-10-14T12:00:00Z");
+  it("defaults to 60 days back and 365 ahead", () => {
+    const { windowStart, windowEnd } = expansionWindow({}, now);
+    expect(windowStart.toISOString().slice(0, 10)).toBe("2026-08-15");
+    expect(windowEnd.toISOString().slice(0, 10)).toBe("2027-10-14");
+  });
+  it("uses from/to when valid", () => {
+    const { windowStart, windowEnd } = expansionWindow({ from: "2028-01-25", to: "2028-03-14" }, now);
+    expect(windowStart.toISOString()).toBe("2028-01-25T00:00:00.000Z");
+    expect(windowEnd.toISOString()).toBe("2028-03-14T23:59:59.000Z");
+  });
+  it("ignores malformed or inverted ranges and caps the span at two years", () => {
+    expect(expansionWindow({ from: "x", to: "2026-01-01" }, now).windowStart.toISOString().slice(0, 10)).toBe("2026-08-15");
+    expect(expansionWindow({ from: "2027-01-01", to: "2026-01-01" }, now).windowStart.toISOString().slice(0, 10)).toBe("2026-08-15");
+    const wide = expansionWindow({ from: "2020-01-01", to: "2030-01-01" }, now);
+    expect((wide.windowEnd - wide.windowStart) / 864e5).toBeLessThanOrEqual(731);
   });
 });

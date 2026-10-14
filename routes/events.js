@@ -6,7 +6,7 @@ import authRequire, { createEventObj } from "../utils/utils.js";
 import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
 import { syncEventToGoogle } from "../utils/google.js";
-import { expandRecurringEvent, capRuleUntil, followingRule } from "../utils/recurrence.js";
+import { expandRecurringEvent, capRuleUntil, followingRule, expansionWindow } from "../utils/recurrence.js";
 
 const router = express.Router()
 
@@ -623,8 +623,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
     });
   }
 
-  const windowStart = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-  const windowEnd = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+  const { windowStart, windowEnd } = expansionWindow(req.query);
 
   const expandedEvents = [];
   for (const e of combinedEvents) {

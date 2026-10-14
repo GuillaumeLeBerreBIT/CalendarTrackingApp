@@ -137,3 +137,23 @@ export function followingRule(event, occurrenceDate) {
     .map((p) => (/^COUNT=/i.test(p) ? `COUNT=${remaining}` : p))
     .join(";");
 }
+
+const DAY_MS = 86400000;
+const isDay = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+/**
+ * Window for expanding recurring events: the client's visible range when it
+ * sends a valid ?from=&to= (YYYY-MM-DD), otherwise 60 days back / 365 ahead.
+ */
+export function expansionWindow(query = {}, now = new Date()) {
+  const fallback = {
+    windowStart: new Date(now.getTime() - 60 * DAY_MS),
+    windowEnd: new Date(now.getTime() + 365 * DAY_MS),
+  };
+  if (!isDay(query.from) || !isDay(query.to)) return fallback;
+  const windowStart = new Date(`${query.from}T00:00:00Z`);
+  const windowEnd = new Date(`${query.to}T23:59:59Z`);
+  if (Number.isNaN(windowStart.getTime()) || Number.isNaN(windowEnd.getTime()) || windowEnd <= windowStart) return fallback;
+  if (windowEnd - windowStart > 731 * DAY_MS) return { windowStart, windowEnd: new Date(windowStart.getTime() + 731 * DAY_MS) };
+  return { windowStart, windowEnd };
+}

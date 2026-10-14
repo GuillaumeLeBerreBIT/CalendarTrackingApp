@@ -33,3 +33,18 @@ export function agendaDayKey(ev: CalEvent, todayKey: string): string | null {
   if (end < todayKey) return null
   return start < todayKey ? todayKey : start
 }
+
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/**
+ * Date range to request from /renderEvents: the month grid (with its leading
+ * and trailing days) plus a year from today for the agenda.
+ */
+export function eventWindow(monthDate: Date, today: Date = new Date()): { from: string; to: string } {
+  const gridFrom = addDaysStr(ymd(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)), -7)
+  const gridTo = addDaysStr(ymd(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)), 14)
+  const t = ymd(today)
+  const yearOut = addDaysStr(t, 365)
+  return { from: gridFrom < t ? gridFrom : t, to: gridTo > yearOut ? gridTo : yearOut }
+}

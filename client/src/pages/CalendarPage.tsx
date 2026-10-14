@@ -14,7 +14,7 @@ import EventFormModal from '@/components/EventFormModal'
 import MobileMonthGrid from '@/components/MobileMonthGrid'
 import { parseNL, type ParsedEvent } from '@/lib/nlParser'
 import { addDaysStr, fromCalendarAllDayEnd } from '@/lib/allDayDates'
-import { normalizeApiEvent, toFullCalendarEvents, agendaDayKey } from '@/lib/calendarEvents'
+import { normalizeApiEvent, toFullCalendarEvents, agendaDayKey, eventWindow } from '@/lib/calendarEvents'
 import Button, { IconButton } from '@/components/ui/Button'
 import { Segmented, RsvpPill } from '@/components/ui/Primitives'
 import Icon from '@/components/ui/Icon'
@@ -531,7 +531,7 @@ export default function CalendarPage() {
     }, 180)
     else setLoading(true)
     try {
-      const { data } = await api.get('/renderEvents')
+      const { data } = await api.get('/renderEvents', { params: eventWindow(currentDate) })
       if (seq !== loadSeq.current) return
       setLoadError(!data.success)
       if (data.success) {
@@ -573,15 +573,25 @@ export default function CalendarPage() {
       if (seq === loadSeq.current) setLoadError(true)
     } finally {
       if (pillTimer) clearTimeout(pillTimer)
+      // The latest load clears both indicators: a silent load can supersede a
+      // spinner load (month change during the first fetch, StrictMode re-run).
       if (seq === loadSeq.current) {
-        if (silent) setRefreshing(false)
-        else setLoading(false)
+        setRefreshing(false)
+        setLoading(false)
       }
     }
   }
 
+  // Refetch when the visible month changes; the first load shows the spinner.
+  const monthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`
+  const firstLoad = useRef(true)
   useEffect(() => {
-    loadEvents()
+    loadEvents({ silent: !firstLoad.current })
+    firstLoad.current = false
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey])
+
+  useEffect(() => {
     // Load groups for the filter panel (groups_id, groups_title, tag_name)
     api.get('/groups').then(({ data }) => {
       if (data.success && Array.isArray(data.userGroups)) {
