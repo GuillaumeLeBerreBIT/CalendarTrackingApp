@@ -93,11 +93,14 @@ export async function notifyUsers(client, recipients, type, buildPayload) {
                   privateKey: process.env.VAPID_PRIVATE_KEY,
                 },
               }
-            ).catch(err => {
+            ).catch(async err => {
               // 404/410 = subscription gone; 403 = key mismatch (VAPID rotated) —
               // in all cases the row is dead weight, delete it so we stop retrying.
               if ([403, 404, 410].includes(err.statusCode)) {
-                supabaseAdmin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint).catch(() => {});
+                // Query builders are lazy and have no .catch(): await to actually send it.
+                const { error: delError } = await supabaseAdmin
+                  .from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+                if (delError) console.warn("[push] could not delete dead subscription:", delError.message);
               } else {
                 console.warn(`web-push ${err.statusCode ?? "?"} for ${sub.user_id}:`, err.body || err.message);
               }
