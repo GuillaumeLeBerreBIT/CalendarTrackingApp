@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { google } from "googleapis";
 import { supabaseAdmin } from "../db/supabase.js";
+import { toWallClock } from "./wallClock.js";
 
 // ── Config ───────────────────────────────────────────────────────────────
 // Google Cloud OAuth client (consent screen + Calendar API enabled). Least-
@@ -429,19 +430,6 @@ async function withBackoff(fn, label) {
       attempt++;
     }
   }
-}
-
-// Convert a tz-aware instant (Date) to naive wall-clock in `tz`. Eventli stores
-// naive date + time, so we render the instant in the user's configured timezone.
-function toWallClock(instant, tz) {
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  });
-  const p = Object.fromEntries(fmt.formatToParts(instant).map((x) => [x.type, x.value]));
-  const hour = p.hour === "24" ? "00" : p.hour; // some ICU builds emit "24"
-  return { date: `${p.year}-${p.month}-${p.day}`, time: `${hour}:${p.minute}:${p.second}` };
 }
 
 // Map a Google Calendar event resource → Eventli event fields (inverse of

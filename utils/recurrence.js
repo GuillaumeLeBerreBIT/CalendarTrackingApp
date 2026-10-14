@@ -6,7 +6,7 @@ function toDateStr(d) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-function addDaysStr(dateStr, days) {
+export function addDaysStr(dateStr, days) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return toDateStr(new Date(Date.UTC(y, m - 1, d + days)));
 }
