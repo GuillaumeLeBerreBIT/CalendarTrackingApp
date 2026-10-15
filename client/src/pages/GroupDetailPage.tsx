@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button'
 import { Tag, Section, Empty, Progress, Segmented } from '@/components/ui/Primitives'
 import { QRCodeSVG } from 'qrcode.react'
 import { groupColorById } from './GroupsPage'
+import GroupDeletePreview from '@/components/GroupDeletePreview'
 import EventFormModal from '@/components/EventFormModal'
 import GroupChallengeCard from '@/components/GroupChallengeCard'
 import PactModal from '@/components/PactModal'
@@ -180,6 +181,7 @@ export default function GroupDetailPage() {
   // ── Delete group state ───────────────────────────────────────────────────────
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // ── Leave group state ────────────────────────────────────────────────────────
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
@@ -533,9 +535,16 @@ export default function GroupDetailPage() {
   // ── Delete group ─────────────────────────────────────────────────────────────
   async function deleteGroup() {
     setDeleting(true)
+    setDeleteError(null)
     try {
       await api.delete(`/groups/${groupId}`)
       navigate('/groups')
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Could not delete the group.'
+          : 'Could not delete the group.'
+      setDeleteError(msg)
     } finally {
       setDeleting(false)
     }
@@ -1774,14 +1783,18 @@ export default function GroupDetailPage() {
               padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10,
             }}>
               <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-                Are you sure? This permanently deletes all events and tasks in this group and cannot be undone.
+                Are you sure? This permanently deletes the group and everything in it, and cannot be undone:
               </p>
+              <GroupDeletePreview groupId={groupId!} />
+              {deleteError && (
+                <p role="alert" style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{deleteError}</p>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Button variant="danger" size="sm" disabled={deleting} onClick={deleteGroup}>
                   {deleting ? 'Deleting…' : 'Yes, delete'}
                 </Button>
                 <button
-                  onClick={() => setShowDeleteConfirm(false)}
+                  onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}
                 >
                   Cancel

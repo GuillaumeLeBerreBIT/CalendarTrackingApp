@@ -5,6 +5,9 @@ import ical from "node-ical";
 import { supabaseAdmin } from "../db/supabase.js";
 import authRequire from "../utils/utils.js";
 import { buildICS } from "../utils/ical.js";
+import { icsEventToRow, MAX_IMPORT_EVENTS } from "../utils/icsImport.js";
+import { toWallClock } from "../utils/wallClock.js";
+import { isValidTimeZone } from "../utils/dailySummary.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -141,58 +144,41 @@ router.post("/calendar/import", authRequire, upload.single("ics"), async (req, r
   }
 
   const userId = req.cookies.userId;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+
+  // Times are stored as naive wall-clock values, so convert into the user's zone.
+  const { data: profile } = await req.supabase
+    .from("profiles")
+    .select("notification_prefs")
+    .eq("user_id", userId)
+    .single();
+  const storedTz = profile?.notification_prefs?.timezone;
+  const userTz = isValidTimeZone(storedTz) ? storedTz : "UTC";
+  const todayStr = toWallClock(new Date(), userTz).date;
 
   let parsed;
   try {
     parsed = ical.parseICS(req.file.buffer.toString("utf8"));
-  } catch (parseErr) {
+  } catch {
     return res.status(400).json({ success: false, error: "Could not parse ICS file." });
   }
 
   const vevents = Object.values(parsed).filter((e) => e.type === "VEVENT");
+  if (vevents.length > MAX_IMPORT_EVENTS) {
+    return res.status(400).json({ success: false, error: `Files with more than ${MAX_IMPORT_EVENTS} events are not supported.` });
+  }
 
   let imported = 0;
   let skipped = 0;
 
-  for (const event of vevents) {
-    // Skip events with no title or no start date
-    if (!event.summary || !event.start) {
+  for (const vevent of vevents) {
+    const row = icsEventToRow(vevent, userTz);
+    // Skip unreadable events and one-off events that are already over.
+    if (!row || (!row.recurrence_rule && row.end_date < todayStr)) {
       skipped++;
       continue;
     }
 
-    // Resolve start as a JS Date
-    const startDate = event.start instanceof Date ? event.start : new Date(event.start);
-    if (isNaN(startDate.getTime()) || startDate < today) {
-      skipped++;
-      continue;
-    }
-
-    const isAllDay = event.datetype === "date";
-
-    // Format dates as YYYY-MM-DD
-    const toDateStr = (d) => {
-      const dt = d instanceof Date ? d : new Date(d);
-      return dt.toISOString().slice(0, 10);
-    };
-
-    const toTimeStr = (d) => {
-      const dt = d instanceof Date ? d : new Date(d);
-      const hh = String(dt.getUTCHours()).padStart(2, "0");
-      const mm = String(dt.getUTCMinutes()).padStart(2, "0");
-      return `${hh}:${mm}`;
-    };
-
-    const startDateStr = toDateStr(startDate);
-    const endDate = event.end ? (event.end instanceof Date ? event.end : new Date(event.end)) : startDate;
-    const endDateStr = toDateStr(endDate);
-    const startTimeStr = isAllDay ? null : toTimeStr(startDate);
-    const endTimeStr = isAllDay ? null : (event.end ? toTimeStr(endDate) : null);
-    const externalUid = event.uid || null;
-
-    // Skip duplicates: check if this UID already exists for this user
+    const externalUid = vevent.uid || null;
     if (externalUid) {
       const { data: existing } = await req.supabase
         .from("events")
@@ -200,25 +186,19 @@ router.post("/calendar/import", authRequire, upload.single("ics"), async (req, r
         .eq("external_uid", externalUid)
         .eq("created_by", userId)
         .maybeSingle();
-
       if (existing) {
         skipped++;
         continue;
       }
     }
 
-    // Insert event
     const { data: inserted, error: insertError } = await req.supabase
       .from("events")
       .insert({
-        event_title: String(event.summary),
-        event_description: event.description ? String(event.description) : "",
-        location: event.location ? String(event.location) : "",
-        all_day: isAllDay,
-        start_date: startDateStr,
-        end_date: endDateStr,
-        start_time: startTimeStr,
-        end_time: endTimeStr,
+        event_title: String(vevent.summary),
+        event_description: vevent.description ? String(vevent.description) : "",
+        location: vevent.location ? String(vevent.location) : "",
+        ...row,
         created_by: userId,
         external_uid: externalUid,
       })
@@ -230,11 +210,13 @@ router.post("/calendar/import", authRequire, upload.single("ics"), async (req, r
       continue;
     }
 
-    // Add creator as a participant with rsvp_status 'going'
-    await req.supabase
+    // Query builders have no .catch(): await and inspect the error instead.
+    const { error: participantError } = await req.supabase
       .from("profiles_events")
-      .insert({ user_id: userId, event_id: inserted.event_id, rsvp_status: "going" })
-      .catch(() => {}); // non-fatal
+      .insert({ user_id: userId, event_id: inserted.event_id, rsvp_status: "going" });
+    if (participantError) {
+      console.warn("[ical import] participant insert failed:", participantError.message);
+    }
 
     imported++;
   }

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import type { CalEvent } from '@/types'
+import { eventDays } from '@/lib/calendarEvents'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 
@@ -117,9 +118,10 @@ export default function MobileMonthGrid({
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalEvent[]>()
     for (const ev of events) {
-      const dateStr = ev.start.split('T')[0]
-      if (!map.has(dateStr)) map.set(dateStr, [])
-      map.get(dateStr)!.push(ev)
+      for (const dateStr of eventDays(ev)) {
+        if (!map.has(dateStr)) map.set(dateStr, [])
+        map.get(dateStr)!.push(ev)
+      }
     }
     return map
   }, [events])

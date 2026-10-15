@@ -6,6 +6,7 @@ import Icon from '@/components/ui/Icon'
 import { AvatarStack } from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
 import { Progress, Stat, Empty } from '@/components/ui/Primitives'
+import GroupDeletePreview from '@/components/GroupDeletePreview'
 
 export const GROUP_COLOR_PALETTE = ['#f59e0b', '#ec4899', '#22d3aa', '#38bdf8', '#c084fc', '#818cf8']
 export function groupColorByIndex(idx: number) {
@@ -355,6 +356,7 @@ export default function GroupsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
 
   async function load() {
     setError(null)
@@ -438,11 +440,23 @@ export default function GroupsPage() {
 
   async function handleBulkDelete() {
     setBulkDeleting(true)
-    await Promise.allSettled([...selectedIds].map(id => api.delete(`/groups/${id}`)))
+    setBulkDeleteError(null)
+    const ids = [...selectedIds]
+    const results = await Promise.allSettled(ids.map(id => api.delete(`/groups/${id}`)))
+    const failedIds = ids.filter((_, i) => results[i].status === 'rejected')
     setBulkDeleting(false)
-    setShowDeleteConfirm(false)
-    exitSelectMode()
     load()
+    if (failedIds.length === 0) {
+      setShowDeleteConfirm(false)
+      exitSelectMode()
+      return
+    }
+    // Keep the failed groups selected and say which ones, with the server's reason.
+    const first = results.find(r => r.status === 'rejected') as PromiseRejectedResult
+    const reason = (first.reason as { response?: { data?: { error?: string } } })?.response?.data?.error
+    const names = groups.filter(g => failedIds.includes(g.groups_id)).map(g => g.groups_title).join(', ')
+    setSelectedIds(new Set(failedIds))
+    setBulkDeleteError(reason ? `${names}: ${reason}` : `Could not delete ${names}.`)
   }
 
   return (
@@ -465,7 +479,7 @@ export default function GroupsPage() {
                 variant="danger"
                 size="md"
                 icon="trash"
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={() => { setBulkDeleteError(null); setShowDeleteConfirm(true) }}
                 disabled={selectedIds.size === 0}
               >
                 Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
@@ -714,20 +728,27 @@ export default function GroupsPage() {
               borderRadius: 'var(--r-md)',
               padding: '10px 14px',
               marginBottom: 24,
-              maxHeight: 140,
+              maxHeight: 260,
               overflowY: 'auto',
             }}>
               {groups.filter(g => selectedIds.has(g.groups_id)).map(g => (
                 <div key={g.groups_id} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
                   padding: '4px 0',
                   fontSize: 13.5, color: 'var(--text-1)',
                 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
-                  {g.groups_title}
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0, marginTop: 7 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span>{g.groups_title}</span>
+                    <GroupDeletePreview groupId={g.groups_id} />
+                  </div>
                 </div>
               ))}
             </div>
+
+            {bulkDeleteError && (
+              <p role="alert" style={{ fontSize: 13, color: '#fb7185', margin: '-12px 0 16px' }}>{bulkDeleteError}</p>
+            )}
 
             <div style={{ display: 'flex', gap: 10 }}>
               <Button

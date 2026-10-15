@@ -1,6 +1,7 @@
 import express from "express";
 import supabase from "../db/supabase.js";
 import authRequire from "../utils/utils.js";
+import { isGroupMember } from "../utils/groupAccess.js";
 
 const router = express.Router();
 
@@ -66,6 +67,7 @@ router.get("/todo", authRequire, async (req, res) => {
           title: tl.task_list_title,
           desc: tl.task_list_description,
           tag_group: tl.groups.tag_name,
+          group_title: tl.groups.groups_title,
           idTl: tl.task_list_id,
           idG: tl.groups_id,
         },
@@ -80,6 +82,7 @@ router.get("/todo", authRequire, async (req, res) => {
         title: tl.task_list_title,
         desc: tl.task_list_description,
         tag_group: tl.groups.tag_name,
+        group_title: tl.groups.groups_title,
         idTl: tl.task_list_id,
         idG: tl.groups_id,
       },
@@ -122,6 +125,10 @@ router.get("/todo", authRequire, async (req, res) => {
 });
 
 router.post("/createTaskList", authRequire, async (req, res) => {
+  const groupId = parseInt(req.body.groups_id, 10);
+  if (isNaN(groupId) || !(await isGroupMember(req.supabase, req.cookies.userId, groupId))) {
+    return res.status(403).json({ success: false, error: 'Not a group member.' });
+  }
   const { data: createTaskList, error: createTaskListError } = await req.supabase
     .from("task_list")
     .insert([
@@ -152,6 +159,11 @@ router.post("/createTaskList", authRequire, async (req, res) => {
 });
 
 router.post("/createTask", authRequire, async (req, res) => {
+  const { data: list } = await req.supabase
+    .from("task_list").select("groups_id").eq("task_list_id", req.body.task_list_id).maybeSingle();
+  if (!list || !(await isGroupMember(req.supabase, req.cookies.userId, list.groups_id))) {
+    return res.status(403).json({ success: false, error: 'Not a group member.' });
+  }
   const { data: insertTask, error: insertTaskError } = await req.supabase
     .from("task")
     .insert([
@@ -376,6 +388,9 @@ router.get("/membersTaskList/", authRequire, async (req, res) => {
       .select("groups_id")
       .eq("task_list_id", taskListId)
       .single();
+    if (!taskList || !(await isGroupMember(req.supabase, req.cookies.userId, taskList.groups_id))) {
+      return res.status(403).json({ success: false, error: 'Not a group member.' });
+    }
 
     const { data: taskMembers, error: taskMembersError } = await req.supabase
       .from("profiles_groups")

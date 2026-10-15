@@ -6,7 +6,8 @@ import authRequire, { createEventObj } from "../utils/utils.js";
 import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
 import { syncEventToGoogle } from "../utils/google.js";
-import { expandRecurringEvent, capRuleUntil } from "../utils/recurrence.js";
+import { expandRecurringEvent, capRuleUntil, followingRule, expansionWindow, sameRule } from "../utils/recurrence.js";
+import { isGroupMember, canAccessEvent } from "../utils/groupAccess.js";
 
 const router = express.Router()
 
@@ -39,6 +40,10 @@ async function canManageEvent(reqSupabase, event, userId) {
 router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), async (req, res) => {
 
   const insertEventObj = createEventObj(req.body)
+  const targetGroupId = insertEventObj.tagNames ? parseInt(insertEventObj.tagNames) : null;
+  if (targetGroupId && !(await isGroupMember(req.supabase, req.cookies.userId, targetGroupId))) {
+    return res.status(403).json({ success: false, error: 'Not a member of that group.' });
+  }
   const eventStatus = req.body.status === 'tentative' ? 'tentative' : 'confirmed';
   const dateOptions = Array.isArray(req.body.dateOptions) ? req.body.dateOptions : [];
 
@@ -196,7 +201,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
 
     const { data: eventCheck, error: eventCheckError } = await req.supabase
       .from('events')
-      .select('created_by, recurrence_rule, groups_id')
+      .select('created_by, recurrence_rule, groups_id, start_date, start_time')
       .eq('event_id', eventId)
       .single();
 
@@ -209,6 +214,10 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     }
 
     const updateEventObj = createEventObj(req.body);
+    const targetGroupId = updateEventObj.tagNames ? parseInt(updateEventObj.tagNames) : null;
+    if (targetGroupId && !(await isGroupMember(req.supabase, req.cookies.userId, targetGroupId))) {
+      return res.status(403).json({ success: false, error: 'Not a member of that group.' });
+    }
     const newParticipants = updateEventObj.participants || [];
 
     // Recurring "this occurrence only" → store a per-occurrence override, leave the series intact.
@@ -217,6 +226,12 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
     // Recurring "this and following" → cap the original series, then split off a new master.
     if (eventCheck.recurrence_rule && recurrenceScope === 'following' && req.body.occurrenceDate) {
       const occurrenceDate = req.body.occurrenceDate;
+      // Keep the series length for COUNT rules; respect a rule the user edited.
+      const ruleEdited = updateEventObj.recurrence_rule && !sameRule(updateEventObj.recurrence_rule, eventCheck.recurrence_rule);
+      const nextRule = ruleEdited ? updateEventObj.recurrence_rule : followingRule(eventCheck, occurrenceDate);
+      if (!nextRule) {
+        return res.status(400).json({ success: false, error: 'This series has no occurrences from that date.' });
+      }
       const cappedRule = capRuleUntil(eventCheck.recurrence_rule, occurrenceDate);
 
       const { error: capError } = await req.supabase
@@ -225,7 +240,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
         .eq('event_id', eventId);
       if (capError) return res.status(500).json({ success: false, error: capError.message });
 
-      // Create the new split master, carrying the original rule so the rest of the series continues.
+      // Create the new split master; nextRule carries the rest of the series.
       const { data: newMaster, error: newMasterError } = await req.supabase
         .from('events')
         .insert([
@@ -241,7 +256,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
             location: updateEventObj.location || null,
             image_url: updateEventObj.image_url || null,
             event_type: updateEventObj.event_type || 'appointment',
-            recurrence_rule: eventCheck.recurrence_rule,
+            recurrence_rule: nextRule,
             reminder_minutes: updateEventObj.reminder_minutes != null ? parseInt(updateEventObj.reminder_minutes) : null,
             created_by: req.cookies.userId,
           },
@@ -617,8 +632,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
     });
   }
 
-  const windowStart = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-  const windowEnd = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+  const { windowStart, windowEnd } = expansionWindow(req.query);
 
   const expandedEvents = [];
   for (const e of combinedEvents) {
@@ -766,8 +780,9 @@ router.get('/renderEvents', authRequire, async (req, res) => {
               votes: optVotes.map(v => ({
                 // Guests have no user_id — give them a stable synthetic id (so the
                 // voter-count Set doesn't collapse every guest into one) and show
-                // their chosen display name.
-                userId: v.user_id || `guest:${v.guest_token}`,
+                // their chosen display name. The id is a hash: the raw guest_token
+                // authorises changing that guest's votes and must not reach members.
+                userId: v.user_id || `guest:${crypto.createHash('sha256').update(String(v.guest_token)).digest('hex').slice(0, 16)}`,
                 username: v.user_id ? (voterProfileMap[v.user_id] || null) : (v.guest_name || 'Guest'),
                 availability: v.availability,
               })),
@@ -832,6 +847,9 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
   const groupId = parseInt(req.query.groupId);
   if (isNaN(groupId)) return res.status(400).json({ success: false, error: 'Invalid group ID.' });
+  if (!(await isGroupMember(req.supabase, req.cookies.userId, groupId))) {
+    return res.status(403).json({ success: false, error: 'Not a group member.' });
+  }
 
   const {data: groupUsers, error: groupUsersError } = await req.supabase
   .from('profiles_groups')
@@ -866,6 +884,9 @@ router.get('/retrieveUsersSelectedGroup', authRequire, async (req, res) => {
 router.patch('/rsvp/:eventId', authRequire, async (req, res) => {
   const eventId = parseInt(req.params.eventId)
   if (isNaN(eventId)) return res.status(400).json({ success: false, error: 'Invalid event ID.' })
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
 
   const { status } = req.body
   if (!['going', 'maybe', 'no'].includes(status)) {
@@ -1429,6 +1450,9 @@ router.get("/events/:eventId/reactions", authRequire, async (req, res) => {
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
   }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
 
   const userId = req.cookies.userId;
 
@@ -1465,6 +1489,9 @@ router.post("/events/:eventId/reactions", authRequire, async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
   }
 
   const { emoji } = req.body;
@@ -1518,6 +1545,9 @@ router.get("/events/:eventId/comments", authRequire, async (req, res) => {
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
   }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
+  }
 
   const { data: rows, error } = await req.supabase
     .from("event_comments")
@@ -1548,6 +1578,9 @@ router.post("/events/:eventId/comments", authRequire, async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) {
     return res.status(400).json({ success: false, error: "Invalid event ID." });
+  }
+  if (!(await canAccessEvent(req.supabase, req.cookies.userId, eventId))) {
+    return res.status(404).json({ success: false, error: 'Event not found.' });
   }
 
   const { body } = req.body;

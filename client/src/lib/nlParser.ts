@@ -11,8 +11,9 @@ const DAY_NAMES: Record<string, number> = {
   sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
 }
 
+// Local calendar date; toISOString() would shift it near midnight east of UTC.
 function toYMD(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function nextWeekday(weekday: number): string {

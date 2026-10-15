@@ -13,6 +13,8 @@ import EventModal from '@/components/EventModal'
 import EventFormModal from '@/components/EventFormModal'
 import MobileMonthGrid from '@/components/MobileMonthGrid'
 import { parseNL, type ParsedEvent } from '@/lib/nlParser'
+import { addDaysStr, fromCalendarAllDayEnd } from '@/lib/allDayDates'
+import { normalizeApiEvent, toFullCalendarEvents, agendaDayKey, eventWindow } from '@/lib/calendarEvents'
 import Button, { IconButton } from '@/components/ui/Button'
 import { Segmented, RsvpPill } from '@/components/ui/Primitives'
 import Icon from '@/components/ui/Icon'
@@ -117,8 +119,8 @@ function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
     const todayKey = localDateKey(new Date())
     const map = new Map<string, CalEvent[]>()
     for (const ev of events) {
-      const day = ev.start.split('T')[0]
-      if (day < todayKey) continue
+      const day = agendaDayKey(ev, todayKey)
+      if (!day) continue
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(ev)
     }
@@ -472,6 +474,7 @@ export default function CalendarPage() {
   const [groups, setGroups] = useState<Group[]>([])
   // `loading` = cold-open skeleton only; `refreshing` = silent post-mutation refetch.
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [groupsLoaded, setGroupsLoaded] = useState(false)
   const [modalMode, setModalMode] = useState<ModalMode>('none')
@@ -528,8 +531,9 @@ export default function CalendarPage() {
     }, 180)
     else setLoading(true)
     try {
-      const { data } = await api.get('/renderEvents')
+      const { data } = await api.get('/renderEvents', { params: eventWindow(currentDate) })
       if (seq !== loadSeq.current) return
+      setLoadError(!data.success)
       if (data.success) {
         const remapped = (data.events as CalEvent[]).map((ev) => {
           const parts = (ev.extendedProps?.participants as Array<{ userId: string }> | undefined) ?? []
@@ -548,12 +552,12 @@ export default function CalendarPage() {
               ev.extendedProps?.groupsId as string | undefined
             )
           }
-          return {
+          return normalizeApiEvent({
             ...ev,
             backgroundColor: hex + '22',
             borderColor: hex,
             extendedProps: { ...(ev.extendedProps ?? {}), resolvedHex: hex },
-          }
+          })
         })
         setEvents(remapped)
         if (data.groupsTagNames && typeof data.groupsTagNames === 'object' && !Array.isArray(data.groupsTagNames)) {
@@ -565,18 +569,29 @@ export default function CalendarPage() {
         }
       }
     } catch {
-      // silently fail — auth interceptor handles 401
+      // 401 is handled by the auth interceptor; anything else is shown to the user.
+      if (seq === loadSeq.current) setLoadError(true)
     } finally {
       if (pillTimer) clearTimeout(pillTimer)
+      // The latest load clears both indicators: a silent load can supersede a
+      // spinner load (month change during the first fetch, StrictMode re-run).
       if (seq === loadSeq.current) {
-        if (silent) setRefreshing(false)
-        else setLoading(false)
+        setRefreshing(false)
+        setLoading(false)
       }
     }
   }
 
+  // Refetch when the visible month changes; the first load shows the spinner.
+  const monthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`
+  const firstLoad = useRef(true)
   useEffect(() => {
-    loadEvents()
+    loadEvents({ silent: !firstLoad.current })
+    firstLoad.current = false
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey])
+
+  useEffect(() => {
     // Load groups for the filter panel (groups_id, groups_title, tag_name)
     api.get('/groups').then(({ data }) => {
       if (data.success && Array.isArray(data.userGroups)) {
@@ -638,7 +653,9 @@ export default function CalendarPage() {
     try {
       await api.patch(`/parseEvent/${event.id}`, {
         startDate: event.startStr.split('T')[0],
-        endDate: event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
+        endDate: event.allDay
+          ? fromCalendarAllDayEnd(event.startStr, event.endStr)
+          : event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
         startTime: event.allDay ? null : event.startStr.split('T')[1]?.slice(0, 5),
         endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
         allDay: event.allDay,
@@ -654,7 +671,9 @@ export default function CalendarPage() {
     try {
       await api.patch(`/parseEvent/${event.id}`, {
         startDate: event.startStr.split('T')[0],
-        endDate: event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
+        endDate: event.allDay
+          ? fromCalendarAllDayEnd(event.startStr, event.endStr)
+          : event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
         startTime: event.allDay ? null : event.startStr.split('T')[1]?.slice(0, 5),
         endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
         allDay: event.allDay,
@@ -675,7 +694,7 @@ export default function CalendarPage() {
     })
   }
 
-  // Filter events for FullCalendar based on active groups
+  // Filter events for the calendar views based on active groups.
   const filteredEvents = useMemo(() => {
     if (!groupsLoaded) return events  // show everything until user can see the filter panel
     return events.filter(ev => {
@@ -685,6 +704,9 @@ export default function CalendarPage() {
       return activeGroups.has(gid)
     })
   }, [events, activeGroups, groupsLoaded])
+
+  // FullCalendar alone gets exclusive all-day ends. Never store or pass this elsewhere.
+  const fullCalendarEvents = useMemo(() => toFullCalendarEvents(filteredEvents), [filteredEvents])
 
   // Month label
   const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long' })
@@ -757,7 +779,7 @@ export default function CalendarPage() {
       start,
       end,
       startStr: dateStr,
-      endStr: dateStr,
+      endStr: addDaysStr(dateStr, 1),
       allDay: true,
       jsEvent: null as never,
       view: null as never,
@@ -1078,6 +1100,21 @@ export default function CalendarPage() {
           </div>
         )}
 
+        {loadError && !loading && (
+          <div
+            role="alert"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              margin: '8px 24px', padding: '10px 14px', borderRadius: 'var(--r-sm)',
+              background: 'var(--surface-2)', border: '1px solid var(--border-2)',
+              color: 'var(--text-2)', fontSize: 13.5,
+            }}
+          >
+            Couldn't load your events.
+            <Button variant="soft" size="sm" onClick={() => loadEvents()}>Retry</Button>
+          </div>
+        )}
+
         {/* Loading indicator */}
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-3)', fontSize: 14 }}>
@@ -1109,7 +1146,7 @@ export default function CalendarPage() {
                 initialView="dayGridMonth"
                 headerToolbar={false}
                 firstDay={1}
-                events={filteredEvents}
+                events={fullCalendarEvents}
                 // On mobile, range-select needs a long-press that also triggers the
                 // native text magnifier ("weirdly zoomed" view). Disable it so a clean
                 // single tap fires dateClick → prefilled form, just like the + button.

@@ -3,6 +3,7 @@ import supabase, { supabaseAdmin } from '../db/supabase.js';
 import { sendDigestForUser } from '../routes/email.js';
 import { expandRecurringEvent } from './recurrence.js';
 import { notifyUsers } from './notifications.js';
+import { alreadySent } from './reminderDedupe.js';
 import { reconcileGoogleSync, isGoogleConfigured, pullAllUsers, renewExpiringChannels } from './google.js';
 import { runDailySummarySweep } from './dailySummarySweep.js';
 
@@ -78,13 +79,15 @@ export async function runReminderSweep() {
 
         if (!(now >= reminderTime && now < occurrenceStart)) continue;
 
-        // Skip if we already fired for this (event, occurrence).
-        const { data: sent } = await db
-          .from('event_reminders_sent')
-          .select('event_id')
-          .eq('event_id', event.event_id)
-          .eq('occurrence_date', occurrenceDate)
-          .maybeSingle();
+        // Skip if we already fired this reminder. On a failed check, skip too:
+        // a missed reminder is better than one re-sent every 5 minutes.
+        let sent;
+        try {
+          sent = await alreadySent(db, { eventId: event.event_id, occurrenceDate, reminderType: 'reminder' });
+        } catch (err) {
+          console.error('[scheduler]', err.message);
+          continue;
+        }
         if (sent) continue;
 
         const { data: parts } = await db
@@ -155,13 +158,13 @@ async function runCountdownSweep() {
       if (!type) continue;
 
       // Deduplicate: skip if this reminder_type already fired for this event
-      const { data: sent } = await db
-        .from('event_reminders_sent')
-        .select('event_id')
-        .eq('event_id', event.event_id)
-        .eq('occurrence_date', event.start_date)
-        .eq('reminder_type', type)
-        .maybeSingle();
+      let sent;
+      try {
+        sent = await alreadySent(db, { eventId: event.event_id, occurrenceDate: event.start_date, reminderType: type });
+      } catch (err) {
+        console.error('[scheduler]', err.message);
+        continue;
+      }
       if (sent) continue;
 
       const { data: parts } = await db
@@ -265,7 +268,11 @@ export function startScheduler() {
       for (const pact of expired || []) {
         const newStatus = pact.completions_count >= pact.target_completions ? 'succeeded' : 'failed';
         const eventStatus = newStatus === 'succeeded' ? 'confirmed' : 'failed';
-        await supabaseAdmin.from('pacts').update({ status: newStatus }).eq('pact_id', pact.pact_id);
+        const { data: changed } = await supabaseAdmin
+          .from('pacts').update({ status: newStatus })
+          .eq('pact_id', pact.pact_id).eq('status', 'active')
+          .select('pact_id');
+        if (!changed?.length) continue;
         if (pact.reward_event_id) {
           await supabaseAdmin.from('events').update({ status: eventStatus }).eq('event_id', pact.reward_event_id);
         }

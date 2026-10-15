@@ -7,9 +7,10 @@ import type { CalEvent, Group, Member } from '@/types'
 import RecurringScopePrompt from '@/components/RecurringScopePrompt'
 import {
   type RecurrenceState, type RepeatFreq, type EndMode,
-  WEEKDAYS, WEEKDAY_LABEL, parseRRule, buildRRule, summarize,
+  WEEKDAYS, WEEKDAY_LABEL, parseRRule, summarize, ruleToSave, isFullyEditable,
 } from '@/lib/recurrence'
 import { parseNL, type ParsedEvent } from '@/lib/nlParser'
+import { fromCalendarAllDayEnd } from '@/lib/allDayDates'
 
 // Max candidate date slots per tentative event (mirrors MAX_DATE_OPTIONS on the backend).
 const MAX_DATE_OPTIONS = 6
@@ -71,9 +72,21 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     description: event?.extendedProps?.description ?? '',
     location: (event?.extendedProps?.location as string | undefined) ?? prefill?.location ?? '',
     imageUrl: (event?.extendedProps?.imageUrl as string | undefined) ?? '',
-    allDay: event?.allDay ?? false,
+    // API events carry no allDay field; a date-only start means all-day.
+    // A selection spanning several days is an all-day range; a single click stays timed.
+    allDay: event
+      ? (event.allDay ?? !event.start.includes('T'))
+      : !!selectInfo?.allDay &&
+        fromCalendarAllDayEnd(selectInfo.startStr, selectInfo.endStr) > selectInfo.startStr.split('T')[0],
     startDate: event?.start?.split('T')[0] ?? selectInfo?.startStr?.split('T')[0] ?? prefill?.date ?? '',
-    endDate: (event?.end ?? event?.start ?? '')?.split('T')[0] ?? selectInfo?.endStr?.split('T')[0] ?? prefill?.date ?? '',
+    // Edit: stored end is already inclusive. Drag-select: FullCalendar's end is exclusive.
+    endDate: event
+      ? (event.end ?? event.start).split('T')[0]
+      : selectInfo
+        ? (selectInfo.allDay
+            ? fromCalendarAllDayEnd(selectInfo.startStr, selectInfo.endStr)
+            : selectInfo.endStr.split('T')[0])
+        : (prefill?.date ?? ''),
     startTime: event?.start?.includes('T') ? event.start.split('T')[1].slice(0, 5) : (prefill?.time ?? ''),
     endTime: event?.end?.includes('T') ? event.end.split('T')[1].slice(0, 5) : '',
     groupsId: String(event?.extendedProps?.groupsId ?? ''),
@@ -141,7 +154,12 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   )
 
   // Recurrence editor state (parsed from an existing rule when editing)
-  const [rec, setRec] = useState<RecurrenceState>(() => parseRRule(event?.extendedProps?.recurrenceRule))
+  const originalRule = (event?.extendedProps?.recurrenceRule as string | null | undefined) ?? null
+  const [initialRec] = useState<RecurrenceState>(() => parseRRule(originalRule))
+  const [rec, setRec] = useState<RecurrenceState>(initialRec)
+  // Imported rules can use parts the editor has no controls for; they are kept
+  // as-is unless the user changes the repeat settings.
+  const customRuleKept = !isFullyEditable(originalRule) && JSON.stringify(rec) === JSON.stringify(initialRec)
   // When editing/deleting a recurring event, ask the user the scope first
   const [scopePrompt, setScopePrompt] = useState<null | 'save' | 'delete'>(null)
 
@@ -215,7 +233,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
       endDate,
       startTime: (isTentative || form.allDay) ? '' : form.startTime,
       endTime: (isTentative || form.allDay) ? '' : form.endTime,
-      recurrence_rule: buildRRule(rec),
+      recurrence_rule: ruleToSave(originalRule, initialRec, rec),
       reminder_minutes: reminderMinutes,
       status: isTentative ? 'tentative' : 'confirmed',
       dateOptions: isTentative ? filledOptions : undefined,
@@ -836,7 +854,13 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
             </select>
+            {customRuleKept && (
+              <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '8px 0 0' }}>
+                Custom repeat from another calendar ({originalRule}). It is kept unless you change these settings.
+              </p>
+            )}
 
             {rec.repeat !== 'none' && (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
@@ -849,7 +873,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                     style={{ ...inputStyle, width: 72, minHeight: 38 }}
                   />
                   <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
-                    {rec.repeat === 'daily' ? 'day(s)' : rec.repeat === 'weekly' ? 'week(s)' : 'month(s)'}
+                    {rec.repeat === 'daily' ? 'day(s)' : rec.repeat === 'weekly' ? 'week(s)' : rec.repeat === 'monthly' ? 'month(s)' : 'year(s)'}
                   </span>
                 </div>
 

@@ -6,7 +6,7 @@ function toDateStr(d) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-function addDaysStr(dateStr, days) {
+export function addDaysStr(dateStr, days) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return toDateStr(new Date(Date.UTC(y, m - 1, d + days)));
 }
@@ -94,12 +94,75 @@ export function expandRecurringEvent(event, windowStart, windowEnd, overrides = 
 /**
  * Set/replace the UNTIL of an RRULE string so the series ends the day before
  * `beforeDateStr`. Used for "this and following" deletes/edits.
+ * UNTIL is inclusive, so cap at 23:59:59 of the previous day: an all-day
+ * occurrence (or one at 00:00) on beforeDateStr must not survive.
  */
 export function capRuleUntil(recurrenceRule, beforeDateStr) {
-  const untilStr = beforeDateStr.replace(/-/g, "") + "T000000Z";
+  const untilStr = addDaysStr(beforeDateStr, -1).replace(/-/g, "") + "T235959Z";
   const parts = recurrenceRule
     .split(";")
     .filter((p) => p && !/^UNTIL=/i.test(p) && !/^COUNT=/i.test(p));
   parts.push(`UNTIL=${untilStr}`);
   return parts.join(";");
+}
+
+const ruleParts = (rule) =>
+  rule.split(";").filter((p) => p && !/^WKST=MO$/i.test(p)).map((p) => p.toUpperCase()).sort().join(";");
+
+/** Same rule, ignoring part order and the default week start (WKST=MO). */
+export function sameRule(a, b) {
+  if (!a || !b) return a === b;
+  return ruleParts(a) === ruleParts(b);
+}
+
+/**
+ * Rule for the new master created by a "this and following" split at
+ * `occurrenceDate`. A COUNT rule only gets the occurrences that were left;
+ * returns null when none are left.
+ */
+export function followingRule(event, occurrenceDate) {
+  let options;
+  try {
+    options = RRule.parseString(event.recurrence_rule);
+  } catch {
+    return event.recurrence_rule;
+  }
+  if (!options.count) return event.recurrence_rule;
+
+  const [sy, sm, sd] = event.start_date.split("-").map(Number);
+  const [shh, smin] = event.start_time ? event.start_time.split(":").map(Number) : [0, 0];
+  options.dtstart = new Date(Date.UTC(sy, sm - 1, sd, shh || 0, smin || 0, 0));
+  const [oy, om, od] = occurrenceDate.split("-").map(Number);
+  const splitAt = new Date(Date.UTC(oy, om - 1, od));
+
+  const consumed = new RRule(options)
+    .between(options.dtstart, splitAt, true)
+    .filter((d) => d < splitAt).length;
+  const remaining = options.count - consumed;
+  if (remaining <= 0) return null;
+
+  return event.recurrence_rule
+    .split(";")
+    .map((p) => (/^COUNT=/i.test(p) ? `COUNT=${remaining}` : p))
+    .join(";");
+}
+
+const DAY_MS = 86400000;
+const isDay = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+/**
+ * Window for expanding recurring events: the client's visible range when it
+ * sends a valid ?from=&to= (YYYY-MM-DD), otherwise 60 days back / 365 ahead.
+ */
+export function expansionWindow(query = {}, now = new Date()) {
+  const fallback = {
+    windowStart: new Date(now.getTime() - 60 * DAY_MS),
+    windowEnd: new Date(now.getTime() + 365 * DAY_MS),
+  };
+  if (!isDay(query.from) || !isDay(query.to)) return fallback;
+  const windowStart = new Date(`${query.from}T00:00:00Z`);
+  const windowEnd = new Date(`${query.to}T23:59:59Z`);
+  if (Number.isNaN(windowStart.getTime()) || Number.isNaN(windowEnd.getTime()) || windowEnd <= windowStart) return fallback;
+  if (windowEnd - windowStart > 731 * DAY_MS) return { windowStart, windowEnd: new Date(windowStart.getTime() + 731 * DAY_MS) };
+  return { windowStart, windowEnd };
 }

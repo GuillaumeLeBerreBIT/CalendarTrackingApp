@@ -438,8 +438,12 @@ router.post('/habits/:id/log', authRequire, async (req, res) => {
     for (const pact of activePacts || []) {
       const newCount = pact.completions_count + 1;
       if (newCount >= pact.target_completions) {
-        await supabaseAdmin.from('pacts').update({ status: 'succeeded', completions_count: newCount }).eq('pact_id', pact.pact_id);
-        if (pact.reward_event_id) {
+        // Conditional on 'active' so an already-resolved pact is never flipped back.
+        const { data: changed } = await supabaseAdmin
+          .from('pacts').update({ status: 'succeeded', completions_count: newCount })
+          .eq('pact_id', pact.pact_id).eq('status', 'active')
+          .select('pact_id');
+        if (changed?.length && pact.reward_event_id) {
           await supabaseAdmin.from('events').update({ status: 'confirmed' }).eq('event_id', pact.reward_event_id);
         }
       } else {

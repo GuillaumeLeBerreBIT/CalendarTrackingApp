@@ -45,6 +45,8 @@ routes/
   notifications.js       — /api/notifications, /api/notification-prefs
   ical.js                — /api/calendar/token, /api/calendar/:token.ics, /api/calendar/import
   email.js               — daily digest emails via Resend
+  google.js              — /api/calendar/google/* — Google Calendar connect, sync, webhook (Plus)
+  billing.js             — /api/billing/* — Stripe checkout, portal, webhook
 utils/
   utils.js               — authRequire middleware, validatePassword, createEventObj,
                            retrieveTodoLists, retrieveEvents, retrieveAllTasks
@@ -57,8 +59,15 @@ utils/
   dailySummarySweep.js   — runDailySummarySweep(): per-user tz-matched morning summary push
   recurrence.js          — RRULE expansion for recurring events
   ical.js                — buildICS() RFC 5545 serialiser
-tests/
-  authRequire.test.js    — Auth middleware tests
+  icsImport.js           — icsEventToRow(): pure .ics VEVENT → events row mapping
+  wallClock.js           — toWallClock(instant, tz) → naive date/time in a timezone
+  google.js              — Google Calendar sync engine (tokens, push/pull, channels)
+  tier.js                — attachTier / checkLimit middleware (free vs Plus)
+  reminderDedupe.js      — alreadySent() check on event_reminders_sent
+  postgrestFilter.js     — sanitizeOrTerm() for values placed in .or() filters
+  groupAccess.js         — isGroupMember(), canAccessEvent() explicit access checks
+tests/                   — Vitest, one file per module (route tests use a local
+                           Supabase stand-in, no network)
 ```
 
 ### Frontend (`client/`)
@@ -95,9 +104,17 @@ client/
       PactModal.tsx      — Create group pact form (reward event + target)
       PactCelebration.tsx — CSS confetti on pact success
       PWAInstallBanner.tsx — beforeinstallprompt banner (dismissed via localStorage)
+      MobileMonthGrid.tsx — Compact mobile month grid (dot per covered day + day list)
+      OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)
+      CommentThread.tsx  — Self-contained event comment thread
+      RecurringScopePrompt.tsx — "This / following / all" prompt for recurring edits
+      UpgradeModal.tsx   — Plus upgrade prompt (Stripe checkout)
     lib/
       design.ts          — Group color map, design constants
-      mockData.ts        — MOCK_MEMBERS (sample avatars used by EventModal)
+      allDayDates.ts     — Inclusive ↔ FullCalendar-exclusive all-day end conversion
+      calendarEvents.ts  — Calendar event normalisation, FullCalendar conversion,
+                           day coverage, agenda bucketing, fetch window
+      recurrence.ts      — RRULE ⇄ recurrence editor state
       nlParser.ts        — Natural-language event parser ("Lunch Friday 1pm")
       countdown.ts       — Countdown utility helpers
       pushNotifications.ts — subscribeToPush() — VAPID key fetch + browser subscribe
@@ -115,6 +132,9 @@ client/
       LoginPage.tsx      — Dark auth card
       RegisterPage.tsx   — Dark auth card
       PricingPage.tsx    — Free vs Plus tier comparison
+      PublicEventPage.tsx — Public event page; guests vote on date slots
+      JoinGroupPage.tsx  — Join a group from an invite token
+      PrivacyPage.tsx    — Privacy policy (contact placeholders still to fill)
     store/
       authStore.ts       — Zustand: user profile, fetchMe(), logout()
       habitStore.ts      — Habits with streaks, completionHistory, completion logging
@@ -281,6 +301,8 @@ if (error) return res.status(500).json({ success: false, error: error.message })
 | `push_subscriptions`   | `user_id`, `endpoint`, `p256dh`, `auth`                                                      |
 | `event_reminders_sent` | `event_id`, `occurrence_date`, `reminder_type`, `fired_at`                                   |
 
+Also present (not detailed here): `event_overrides`, `event_reactions`, `event_comments`, `group_invite_tokens`, `google_calendar_tokens`, `google_synced_calendars`, `google_event_links`, `subscriptions`, `xp_transactions`, `profiles_task`, `timers`.
+
 ---
 
 ## Route Conventions
@@ -312,6 +334,7 @@ Frontend: `client/src/lib/pushNotifications.ts` exports `subscribeToPush()` — 
 ```bash
 # Backend
 npm test          # Run Vitest tests
+npm run typecheck # Typecheck the client (tsc --noEmit)
 node app.js       # Start Express API on port 3000
 
 # Frontend (separate terminal)
@@ -344,4 +367,7 @@ RESEND_API_KEY=
 - **FullCalendar event colors**: Use `--fc-event-bg-color` and `--fc-event-border-color` CSS custom properties set in `eventDidMount` via `setProperty`. The global override in `index.css` reads these — never use `!important` background on `.fc-daygrid-event`.
 - **supabaseAdmin**: Required for cross-user operations (scheduler crons, pact resolution). The regular `req.supabase` client is scoped to the logged-in user via RLS.
 - **Server-side Supabase clients must keep `persistSession: false, autoRefreshToken: false`** (see `db/supabase.js`). With defaults on, the shared client stores the last user's session and auto-rotates its refresh token in the background — invalidating the token in the browser's cookie and force-logging users out at JWT expiry (~1h). Never create a server client without these options.
+- **All-day `end_date` is inclusive** (10 → 15 Oct covers both days). Only `toFullCalendarEvents()` (FullCalendar), `utils/google.js` and `utils/ical.js` convert to exclusive ends; app state, agenda, mobile grid and the edit form stay inclusive.
+- **Deleting a group goes through `delete_group()`** (`db/migrations/2026-10-15_delete_group_rpc.sql`), one transaction via `supabaseAdmin.rpc` after the route's admin check. Never delete group data piecemeal from a route: a mid-way failure leaves the group half-deleted. Test the SQL with `db/tests/run_delete_group_test.sh` (needs Docker).
+- **Supabase query builders have no `.catch()`**: they are lazy thenables. Always `const { error } = await …`; a bare `.catch()` throws a TypeError and never sends the query.
 - **Date voting**: tentative events store candidate slots in `event_date_options`; members mark availability per slot in `event_date_votes` (one row per `(event_id, option_id, user_id)`, `availability` ∈ yes/maybe/no). `renderEvents` returns per-option `yesCount/maybeCount/noCount` + a `myVotes` map; the creator confirms a slot via `/confirmEventDate`. (Discovery/Ticketmaster removed 2026-06-15.)
