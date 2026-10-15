@@ -127,6 +127,7 @@ export interface TaskList {
     title: string
     desc?: string
     tag_group: string
+    group_title?: string
   }
   taskItems: Task[]
   totalTasks: number

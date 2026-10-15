@@ -373,7 +373,7 @@ interface TaskListCardProps {
 }
 
 function TaskListCard({ tl, isExpanded, onToggleExpand, onAddTask, onToggleTask, onAssign, onScheduleTask }: TaskListCardProps) {
-  const { idTl, idG, title, tag_group } = tl.taskListInfo
+  const { idTl, idG, title, tag_group, group_title } = tl.taskListInfo
   const color = groupColorById(idG)
   const pct = tl.totalTasks > 0 ? Math.round((tl.totalCompletedTasks / tl.totalTasks) * 100) : 0
 
@@ -427,7 +427,7 @@ function TaskListCard({ tl, isExpanded, onToggleExpand, onAddTask, onToggleTask,
             color: 'var(--text-3)',
             flexShrink: 0,
           }}>
-            #{tag_group}
+            {group_title ? `${group_title} · ` : ''}#{tag_group}
           </span>
         </div>
 
