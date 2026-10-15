@@ -911,122 +911,82 @@ router.patch('/groups/:groupId', authRequire, async (req, res) => {
 });
 
 // DELETE /api/groups/:groupId — delete group and all associated data (admin only)
-router.delete('/groups/:groupId', authRequire, async (req, res) => {
-  const { groupId } = req.params;
-  const callerId = req.cookies.userId;
-
-  const { data: membership, error: membershipError } = await req.supabase
+// Is the caller an admin of this group? (Delete and its preview are admin-only.)
+async function isGroupAdmin(client, userId, groupId) {
+  const { data, error } = await client
     .from('profiles_groups')
     .select('role')
     .eq('groups_id', groupId)
-    .eq('user_id', callerId)
+    .eq('user_id', userId)
     .eq('role', 'admin')
     .maybeSingle();
+  if (error) throw new Error(`admin check failed: ${error.message}`);
+  return !!data;
+}
 
-  if (membershipError) {
-    return res.status(500).json({ success: false, error: membershipError.message });
-  }
-  if (!membership) {
+// GET /api/groups/:groupId/delete-preview — what deleting this group removes,
+// so the confirmation can name the task lists and counts before anything goes.
+router.get('/groups/:groupId/delete-preview', authRequire, async (req, res) => {
+  const groupId = parseInt(req.params.groupId, 10);
+  if (isNaN(groupId)) return res.status(400).json({ success: false, error: 'Invalid group ID.' });
+  if (!(await isGroupAdmin(req.supabase, req.cookies.userId, groupId))) {
     return res.status(403).json({ success: false, error: 'Only group admins can delete the group.' });
   }
 
-  // 1. Fetch task_list IDs for this group so we can delete child tasks first
-  const { data: taskLists, error: taskListFetchError } = await req.supabase
-    .from('task_list')
-    .select('task_list_id')
-    .eq('groups_id', groupId);
-
-  if (taskListFetchError) {
-    return res.status(500).json({ success: false, error: taskListFetchError.message });
+  const [{ data: group }, { data: lists, error: listsError }, { data: events, error: eventsError }] = await Promise.all([
+    req.supabase.from('groups').select('groups_title').eq('groups_id', groupId).maybeSingle(),
+    req.supabase.from('task_list').select('task_list_id, task_list_title').eq('groups_id', groupId),
+    req.supabase.from('events').select('event_id').eq('groups_id', groupId),
+  ]);
+  if (listsError || eventsError) {
+    return res.status(500).json({ success: false, error: 'Could not load what this group contains.' });
   }
 
-  if (taskLists && taskLists.length > 0) {
-    const taskListIds = taskLists.map(tl => tl.task_list_id);
+  const listIds = (lists || []).map((l) => l.task_list_id);
+  let tasks = [];
+  if (listIds.length) {
+    const { data, error } = await req.supabase.from('task').select('task_list_id').in('task_list_id', listIds);
+    if (error) return res.status(500).json({ success: false, error: 'Could not load what this group contains.' });
+    tasks = data || [];
+  }
 
-    const { error: taskDeleteError } = await req.supabase
-      .from('task')
-      .delete()
-      .in('task_list_id', taskListIds);
+  return res.json({
+    success: true,
+    groupTitle: group?.groups_title ?? null,
+    taskLists: (lists || []).map((l) => ({
+      title: l.task_list_title,
+      tasks: tasks.filter((t) => t.task_list_id === l.task_list_id).length,
+    })),
+    events: (events || []).length,
+  });
+});
 
-    if (taskDeleteError) {
-      return res.status(500).json({ success: false, error: taskDeleteError.message });
+// DELETE /api/groups/:groupId — admin only. The group and everything in it
+// (task lists, tasks, events and their votes/comments/reactions, pacts,
+// challenges, invites, memberships) go in one transaction via delete_group()
+// (db/migrations/2026-10-15_delete_group_rpc.sql): all of it, or nothing.
+router.delete('/groups/:groupId', authRequire, async (req, res) => {
+  const groupId = parseInt(req.params.groupId, 10);
+  if (isNaN(groupId)) return res.status(400).json({ success: false, error: 'Invalid group ID.' });
+
+  if (!(await isGroupAdmin(req.supabase, req.cookies.userId, groupId))) {
+    return res.status(403).json({ success: false, error: 'Only group admins can delete the group.' });
+  }
+
+  // Service role: the admin check above is the authorization; RLS would
+  // otherwise silently skip other members' rows.
+  const { data: deleted, error } = await supabaseAdmin.rpc('delete_group', { p_group_id: groupId });
+
+  if (error) {
+    console.error('[groups] delete_group failed:', error.code, error.message);
+    if (error.code === 'PGRST202') {
+      return res.status(503).json({ success: false, error: 'Deleting groups needs a database update (delete_group migration). Nothing was deleted.' });
     }
+    return res.status(500).json({ success: false, error: 'Could not delete the group. Nothing was deleted.' });
   }
+  if (!deleted) return res.status(404).json({ success: false, error: 'Group not found.' });
 
-  // 2. Delete task_list rows
-  const { error: taskListDeleteError } = await req.supabase
-    .from('task_list')
-    .delete()
-    .eq('groups_id', groupId);
-
-  if (taskListDeleteError) {
-    return res.status(500).json({ success: false, error: taskListDeleteError.message });
-  }
-
-  // 3. Fetch event IDs for this group so we can delete profiles_events first
-  const { data: events, error: eventFetchError } = await req.supabase
-    .from('events')
-    .select('event_id')
-    .eq('groups_id', groupId);
-
-  if (eventFetchError) {
-    return res.status(500).json({ success: false, error: eventFetchError.message });
-  }
-
-  if (events && events.length > 0) {
-    const eventIds = events.map(e => e.event_id);
-
-    const { error: profilesEventsDeleteError } = await req.supabase
-      .from('profiles_events')
-      .delete()
-      .in('event_id', eventIds);
-
-    if (profilesEventsDeleteError) {
-      return res.status(500).json({ success: false, error: profilesEventsDeleteError.message });
-    }
-  }
-
-  // 4. Delete events
-  const { error: eventsDeleteError } = await req.supabase
-    .from('events')
-    .delete()
-    .eq('groups_id', groupId);
-
-  if (eventsDeleteError) {
-    return res.status(500).json({ success: false, error: eventsDeleteError.message });
-  }
-
-  // 5. Delete group_invite_tokens
-  const { error: tokensDeleteError } = await req.supabase
-    .from('group_invite_tokens')
-    .delete()
-    .eq('groups_id', groupId);
-
-  if (tokensDeleteError) {
-    return res.status(500).json({ success: false, error: tokensDeleteError.message });
-  }
-
-  // 6. Delete profiles_groups
-  const { error: profilesGroupsDeleteError } = await req.supabase
-    .from('profiles_groups')
-    .delete()
-    .eq('groups_id', groupId);
-
-  if (profilesGroupsDeleteError) {
-    return res.status(500).json({ success: false, error: profilesGroupsDeleteError.message });
-  }
-
-  // 7. Delete the group itself
-  const { error: groupDeleteError } = await req.supabase
-    .from('groups')
-    .delete()
-    .eq('groups_id', groupId);
-
-  if (groupDeleteError) {
-    return res.status(500).json({ success: false, error: groupDeleteError.message });
-  }
-
-  return res.json({ success: true });
+  return res.json({ success: true, deleted });
 });
 
 // POST /api/groups/:groupId/leave — leave a group
