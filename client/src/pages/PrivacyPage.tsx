@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 // ── FILL THESE IN BEFORE LAUNCH (tracked in LAUNCH_CHECKLIST.md) ───────────────
 // Real privacy contact address (e.g. a dedicated alias). Shown to users and used
 // for data-subject requests under GDPR.
-const PRIVACY_EMAIL = 'privacy@eventli.app' // TODO: replace with the real mailbox
+const PRIVACY_EMAIL = 'leberre.glb@gmail.com'
 // Data controller identity: your full legal name + city, Belgium.
-const CONTROLLER_NAME = '[Your full name], [City], Belgium' // TODO: fill in
+const CONTROLLER_NAME = 'Guillaume Le Berre, Ooskamp, Belgium'
 const LAST_UPDATED = '13 June 2026'
 
 function Logo() {
