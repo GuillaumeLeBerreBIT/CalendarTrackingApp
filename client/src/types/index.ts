@@ -181,3 +181,18 @@ export interface NotificationPrefs {
   /** Local send time, "HH:MM" on a 15-minute grid */
   daily_summary_time: string
 }
+
+/** One row of GET /routines: a personal weekly-repeating event with its next session. */
+export interface Routine {
+  eventId: number
+  title: string
+  rule: string
+  startDate: string
+  startTime: string | null
+  endTime: string | null
+  allDay: boolean
+  reminderMinutes: number | null
+  timezone: string
+  next: { date: string; time: string | null } | null
+  ended: boolean
+}

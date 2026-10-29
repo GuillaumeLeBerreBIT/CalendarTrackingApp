@@ -40,6 +40,8 @@ routes/
   todo.js                — /api/todo and task/task-list management
   habits.js              — /api/habits CRUD + /api/habits/:id/log (XP, pact increment)
   timers.js              — /api/timers CRUD (Pomodoro/countdown timers)
+  routines.js            — GET /api/routines: own personal weekly-repeating events + next session
+                           (create/edit/stop reuse /parseEvent; a routine is just a recurring event)
   challenges.js          — /api/groups/:id/challenges (group shared goals)
   pacts.js               — /api/groups/:id/pacts (locked-event group bets)
   notifications.js       — /api/notifications, /api/notification-prefs
@@ -57,6 +59,7 @@ utils/
                            normalisation, tz-aware local slot, summary text)
   dailySummarySweep.js   — runDailySummarySweep(): per-user tz-matched morning summary push
   recurrence.js          — RRULE expansion for recurring events
+  routines.js            — nextOccurrence() / routineView() for the routines list
   ical.js                — buildICS() RFC 5545 serialiser
   icsImport.js           — icsEventToRow(): pure .ics VEVENT → events row mapping
   wallClock.js           — toWallClock(instant, tz) → naive date/time in a timezone
@@ -105,6 +108,7 @@ client/
       MobileMonthGrid.tsx — Compact mobile month grid (dot per covered day + day list)
       OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)
       CommentThread.tsx  — Self-contained event comment thread
+      RoutineSheet.tsx   — Quick create/edit sheet for a routine (day chips, time, end preset)
       RecurringScopePrompt.tsx — "This / following / all" prompt for recurring edits
     lib/
       design.ts          — Group color map, design constants
@@ -112,6 +116,7 @@ client/
       calendarEvents.ts  — Calendar event normalisation, FullCalendar conversion,
                            day coverage, agenda bucketing, fetch window
       recurrence.ts      — RRULE ⇄ recurrence editor state
+      routines.ts        — Routine draft → /parseEvent payload, end presets, next-weekday helpers
       nlParser.ts        — Natural-language event parser ("Lunch Friday 1pm")
       countdown.ts       — Countdown utility helpers
       pushNotifications.ts — subscribeToPush() — VAPID key fetch + browser subscribe
@@ -122,6 +127,7 @@ client/
       GroupDetailPage.tsx— Group detail: members, events, tasks, pacts, challenges
       TodoPage.tsx       — Task lists with progress bars and task management
       HabitsPage.tsx     — Personal habits: streak, heatmap, weekly arc (XP UI removed; backend still tracks)
+      RoutinesPage.tsx   — Weekly routines (swim Mon/Tue…): list, quick-create sheet, stop/delete; reached from Calendar header
       CountdownsPage.tsx — Milestone countdowns (trips, big events) — reached from Calendar header; /timers redirects here
       ProfilePage.tsx    — Profile, stats, notification prefs + push enable,
                            calendar sync (subscribe link + .ics import)

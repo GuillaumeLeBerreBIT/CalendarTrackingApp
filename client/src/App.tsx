@@ -16,6 +16,7 @@ import JoinGroupPage from '@/pages/JoinGroupPage'
 import PublicEventPage from '@/pages/PublicEventPage'
 import HabitsPage from '@/pages/HabitsPage'
 import CountdownsPage from '@/pages/CountdownsPage'
+import RoutinesPage from '@/pages/RoutinesPage'
 import { useAuthStore } from '@/store/authStore'
 import { subscribeToPush } from '@/lib/pushNotifications'
 
@@ -83,6 +84,7 @@ function AppInner() {
           <Route path="/todo" element={<TodoPage />} />
           <Route path="/habits" element={<HabitsPage />} />
           <Route path="/countdowns" element={<CountdownsPage />} />
+          <Route path="/routines" element={<RoutinesPage />} />
           {/* Legacy route — old bookmarks/notification links */}
           <Route path="/timers" element={<Navigate to="/countdowns" replace />} />
           <Route path="/profile" element={<ProfilePage />} />
