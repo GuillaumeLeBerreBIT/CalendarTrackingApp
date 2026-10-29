@@ -948,13 +948,13 @@ export default function CalendarPage() {
                 </div>
               )}
               <IconButton
-                name="clock"
+                name="repeat"
                 size={36}
                 onClick={() => navigate('/routines')}
                 title="Routines"
               />
               <IconButton
-                name="timer"
+                name="hourglass"
                 size={36}
                 onClick={() => navigate('/countdowns')}
                 title="Countdowns"
@@ -1003,8 +1003,8 @@ export default function CalendarPage() {
                 onChange={v => setCalView(v as CalView)}
                 size="sm"
               />
-              <IconButton name="clock" size={34} isz={15} onClick={() => navigate('/routines')} title="Routines" />
-              <IconButton name="timer" size={34} isz={15} onClick={() => navigate('/countdowns')} title="Countdowns" />
+              <Button variant="secondary" size="sm" icon="repeat" onClick={() => navigate('/routines')}>Routines</Button>
+              <Button variant="secondary" size="sm" icon="hourglass" onClick={() => navigate('/countdowns')}>Countdowns</Button>
             </div>
           </div>
         )}

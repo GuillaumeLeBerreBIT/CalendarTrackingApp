@@ -87,17 +87,26 @@ export default function RoutineSheet({ routine, onClose, onSaved }: {
   const keepEndLabel = existing?.endMode === 'on' && existing.endDate
     ? `Keep (until ${formatDay(existing.endDate)})` : 'Keep (no end)'
 
+  // Bottom sheet on mobile, centred dialog on desktop (same split as EventFormModal).
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
+
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'flex-end', background: 'hsl(0 0% 0% / 0.5)' }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000, display: 'flex',
+        alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : 16,
+        background: 'hsl(0 0% 0% / 0.5)',
+      }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <form
         onSubmit={save}
         style={{
           width: '100%', maxWidth: 480, margin: '0 auto', maxHeight: '92vh', overflowY: 'auto',
-          background: 'var(--surface)', borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
-          padding: '20px 20px 32px', display: 'flex', flexDirection: 'column', gap: 16,
+          background: 'var(--surface)',
+          borderRadius: isMobile ? 'var(--r-lg) var(--r-lg) 0 0' : 'var(--r-lg)',
+          boxShadow: isMobile ? undefined : 'var(--shadow-lg)',
+          padding: isMobile ? '20px 20px 32px' : 24, display: 'flex', flexDirection: 'column', gap: 16,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

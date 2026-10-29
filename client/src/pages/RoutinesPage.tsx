@@ -147,7 +147,7 @@ export default function RoutinesPage() {
       ) : routines.length === 0 ? (
         <div style={{ padding: '36px 20px', textAlign: 'center', borderRadius: 'var(--r-md)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: 'var(--text-3)' }}>
-            <Icon name="clock" size={32} />
+            <Icon name="repeat" size={32} />
           </div>
           <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>No routines yet</p>
           <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 14 }}>
