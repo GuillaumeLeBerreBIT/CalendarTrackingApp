@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import OnboardingWizard from '@/components/OnboardingWizard'
-import UpgradeModal from '@/components/UpgradeModal'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import CalendarPage from '@/pages/CalendarPage'
@@ -12,7 +11,6 @@ import GroupDetailPage from '@/pages/GroupDetailPage'
 import TodoPage from '@/pages/TodoPage'
 import ProfilePage from '@/pages/ProfilePage'
 import NotificationsPage from '@/pages/NotificationsPage'
-import PricingPage from '@/pages/PricingPage'
 import PrivacyPage from '@/pages/PrivacyPage'
 import JoinGroupPage from '@/pages/JoinGroupPage'
 import PublicEventPage from '@/pages/PublicEventPage'
@@ -49,7 +47,6 @@ function AppInner() {
   return (
     <>
       {showOnboarding && <OnboardingWizard />}
-      <UpgradeModal />
 
       <Routes>
         {/* DEV-only harness */}
@@ -67,7 +64,6 @@ function AppInner() {
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/join/:token" element={<JoinGroupPage />} />
         <Route path="/e/:token" element={<PublicEventPage />} />

@@ -54,6 +54,8 @@ Effort tags: **S** = a couple of hours · **M** = ~a day · **L** = several days
 10. ✅ **Discovery feed dedupe** — backend dedupes TM results on title+date+venue
     (TM returns one entry per ticket pool)
 
+> **2026-10-29:** the Free/Plus tier, Stripe billing and pricing page below were removed — Eventli is a personal-use app with no limits. Kept for history.
+
 ## Phase 4 — Monetization readiness ✅ Done 2026-06-14 (built, dormant)
 
 11. ✅ `plan` + `always_free` columns on profiles + **server-side** entitlement middleware

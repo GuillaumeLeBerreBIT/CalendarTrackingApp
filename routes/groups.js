@@ -2,7 +2,6 @@ import express from "express";
 import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire ,{retrieveEvents, retrieveTodoLists, retrieveAllTasks } from "../utils/utils.js"
 import { notifyUsers } from "../utils/notifications.js";
-import { attachTier, checkLimit } from "../utils/tier.js";
 import { format } from "date-fns";
 import { sanitizeOrTerm } from "../utils/postgrestFilter.js";
 import { isGroupMember } from "../utils/groupAccess.js";
@@ -345,7 +344,7 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
   }
 });
 
-router.post('/createGroup', authRequire, attachTier, checkLimit('groups'), async (req, res) => {
+router.post('/createGroup', authRequire, async (req, res) => {
 
   // Optional creator-picked color (hex only — same validation as setGroupSharedColor)
   const sharedColor = typeof req.body['shared-color'] === 'string' && /^#[0-9a-fA-F]{6}$/.test(req.body['shared-color'])

@@ -76,7 +76,6 @@ export default function PrivacyPage() {
           <Li><strong>Profile data</strong> — optional home city and your notification and discoverability preferences.</Li>
           <Li><strong>Content you create</strong> — groups, events, tasks, habits, countdowns, RSVPs, comments and reactions.</Li>
           <Li><strong>Device data</strong> — if you enable push notifications, the browser push endpoint for your device.</Li>
-          <Li><strong>Billing data</strong> — if you subscribe to Plus, your subscription status (payment details are handled by our payment provider, not stored by us).</Li>
         </ul>
 
         <H>Why we use it (legal bases)</H>

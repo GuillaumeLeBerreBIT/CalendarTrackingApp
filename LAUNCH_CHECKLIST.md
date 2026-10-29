@@ -21,20 +21,6 @@ Code-side GDPR work (delete account, data export, privacy page, Sentry) is track
 - [ ] *(Optional)* set `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` in the Render build env to upload source maps (otherwise the vite plugin self-disables — fine)
 - [ ] After deploy: trigger a test error and confirm it shows up in the Sentry dashboard
 
-## Stripe billing  (code built 2026-06-14 — currently OFF/dormant)
-
-Billing is fully built but disabled. Skip this whole section while running invite-only/free.
-To turn selling on:
-
-- [ ] Create the product in Stripe → "Eventli Plus" recurring €5/mo → copy the **price id**
-- [ ] Add to backend `.env` (and Render env): `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`
-- [ ] Stripe Dashboard → Webhooks → add endpoint `https://<your-domain>/api/billing/webhook`,
-      subscribe to `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
-- [ ] Enable the customer Billing Portal in Stripe settings (used by "Manage billing")
-- [ ] Flip `VITE_BILLING_ENABLED=true` in `client/.env` and rebuild
-- [ ] Test sandbox flow: checkout → webhook flips `profiles.plan` to `plus` → portal cancel → back to `free`
-- [ ] **VAT:** enable Stripe Tax OR plan VAT filing yourself (Stripe is not a Merchant of Record)
-
 ## Supabase security advisors  (run 2026-06-14)
 
 - [x] **RLS hardening migration** — done & validated 2026-06-14 (`db/migrations/2026-06-14_rls_hardening.sql`).
@@ -48,9 +34,6 @@ To turn selling on:
 
 ## Database (Supabase dashboard)
 
-- [x] `always_free = true` set for your own account (done 2026-06-12)
-- [ ] Set `always_free = true` for your girlfriend's account once she registers:
-      `UPDATE profiles SET always_free = true WHERE email = '<her email>';`
 
 ## Pre-launch sanity
 

@@ -3,10 +3,9 @@ import { useAuthStore } from '@/store/authStore'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
-import { Section, Tag, Progress } from '@/components/ui/Primitives'
+import { Section } from '@/components/ui/Primitives'
 import { Link } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
-import { BILLING_ENABLED } from '@/lib/billing'
 import type { NotificationPrefs, ProfileStats } from '@/types'
 
 // ── Toggle switch ───────────────────────────────────────────────────────────────
@@ -203,22 +202,6 @@ export default function ProfilePage() {
     api.patch('/profile', { searchable: next }).catch(() => setSearchable(!next))
   }
 
-  // ── Stripe billing portal ─────────────────────────────────────────────────────
-  const [portalLoading, setPortalLoading] = useState(false)
-
-  async function handleManageBilling() {
-    setPortalLoading(true)
-    try {
-      const { data } = await api.post('/billing/portal')
-      if (data.success && data.url) window.location.href = data.url
-    } catch {
-      setMessage('Could not open billing portal. Please try again.')
-      setIsError(true)
-    } finally {
-      setPortalLoading(false)
-    }
-  }
-
   // ── Data export & account deletion (GDPR) ─────────────────────────────────────
   const [exporting, setExporting] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -264,29 +247,6 @@ export default function ProfilePage() {
       setDeleting(false)
     }
   }
-
-  // ── Plan & usage ─────────────────────────────────────────────────────────────
-  interface Usage {
-    plan: string
-    alwaysFree: boolean
-    tier: string
-    groups: { used: number; max: number }
-    eventsThisMonth: { used: number; max: number }
-  }
-  const [usage, setUsage] = useState<Usage | null>(null)
-  useEffect(() => {
-    api.get('/usage')
-      .then(({ data }) => {
-        if (data.success) setUsage({
-          plan: data.plan,
-          alwaysFree: !!data.alwaysFree,
-          tier: data.tier,
-          groups: data.groups,
-          eventsThisMonth: data.eventsThisMonth,
-        })
-      })
-      .catch(() => {})
-  }, [])
 
   const [stats, setStats] = useState<ProfileStats | null>(null)
   useEffect(() => {
@@ -335,7 +295,7 @@ export default function ProfilePage() {
     }
   }
 
-  // ── Google Calendar 2-way sync (Plus) ──────────────────────────────────
+  // ── Google Calendar 2-way sync ──────────────────────────────────
   const [gcal, setGcal] = useState<{ configured: boolean; connected: boolean; lastSyncAt: string | null } | null>(null)
   const [gcalBusy, setGcalBusy] = useState(false)
   const [gcalNotice, setGcalNotice] = useState<string | null>(null)
@@ -360,7 +320,7 @@ export default function ProfilePage() {
       const { data } = await api.get('/calendar/google/auth')
       if (data.success && data.url) window.location.href = data.url
     } catch {
-      // 403 UPGRADE_REQUIRED is handled by the axios interceptor (upgrade modal)
+      // Leave the connect button available to retry.
     } finally {
       setGcalBusy(false)
     }
@@ -604,74 +564,6 @@ export default function ProfilePage() {
           <StatCard n={stats?.eventsThisMonth ?? 0} label="Events this month" />
           <StatCard n={stats?.groups ?? 0} label="Groups" />
         </div>
-      )}
-
-      {/* Plan & usage */}
-      {usage && (
-        <Section title="Plan & usage">
-          <div style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--r-lg)',
-            padding: '16px',
-          }}>
-            {(usage.plan === 'plus' || usage.alwaysFree) ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
-                <Tag tone="free">
-                  <Icon name="sparkle" size={12} />
-                  Plus — unlimited
-                </Tag>
-                <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-                  Unlimited groups and events. Thanks for being on Plus!
-                </p>
-                {BILLING_ENABLED && !usage.alwaysFree && (
-                  <button
-                    onClick={handleManageBilling}
-                    disabled={portalLoading}
-                    style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--accent)', background: 'none', border: 'none', cursor: portalLoading ? 'not-allowed' : 'pointer', padding: 0, opacity: portalLoading ? 0.6 : 1 }}
-                  >
-                    {portalLoading ? 'Opening…' : 'Manage billing →'}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7 }}>
-                    <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-2)' }}>Groups</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-                      {usage.groups.used} / {usage.groups.max}
-                    </span>
-                  </div>
-                  <Progress value={usage.groups.used} total={usage.groups.max} />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7 }}>
-                    <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-2)' }}>Events this month</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-                      {usage.eventsThisMonth.used} / {usage.eventsThisMonth.max}
-                    </span>
-                  </div>
-                  <Progress value={usage.eventsThisMonth.used} total={usage.eventsThisMonth.max} />
-                </div>
-                {BILLING_ENABLED && (
-                  <Link
-                    to="/pricing"
-                    style={{
-                      fontSize: 12.5,
-                      fontWeight: 650,
-                      color: 'var(--accent)',
-                      textDecoration: 'none',
-                      alignSelf: 'flex-start',
-                    }}
-                  >
-                    Upgrade to Plus →
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-        </Section>
       )}
 
       {/* Account section */}
@@ -986,7 +878,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* ── Google Calendar 2-way sync (Plus) ── */}
+          {/* ── Google Calendar 2-way sync ── */}
           {gcal?.configured && (
             <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
@@ -1000,7 +892,6 @@ export default function ProfilePage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Google Calendar</p>
-                    <Tag tone="ghost">Plus</Tag>
                     {gcal.connected && (
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5,

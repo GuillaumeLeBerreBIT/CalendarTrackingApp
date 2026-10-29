@@ -45,8 +45,7 @@ routes/
   notifications.js       — /api/notifications, /api/notification-prefs
   ical.js                — /api/calendar/token, /api/calendar/:token.ics, /api/calendar/import
   email.js               — daily digest emails via Resend
-  google.js              — /api/calendar/google/* — Google Calendar connect, sync, webhook (Plus)
-  billing.js             — /api/billing/* — Stripe checkout, portal, webhook
+  google.js              — /api/calendar/google/* — Google Calendar connect, sync, webhook
 utils/
   utils.js               — authRequire middleware, validatePassword, createEventObj,
                            retrieveTodoLists, retrieveEvents, retrieveAllTasks
@@ -62,7 +61,6 @@ utils/
   icsImport.js           — icsEventToRow(): pure .ics VEVENT → events row mapping
   wallClock.js           — toWallClock(instant, tz) → naive date/time in a timezone
   google.js              — Google Calendar sync engine (tokens, push/pull, channels)
-  tier.js                — attachTier / checkLimit middleware (free vs Plus)
   reminderDedupe.js      — alreadySent() check on event_reminders_sent
   postgrestFilter.js     — sanitizeOrTerm() for values placed in .or() filters
   groupAccess.js         — isGroupMember(), canAccessEvent() explicit access checks
@@ -108,7 +106,6 @@ client/
       OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)
       CommentThread.tsx  — Self-contained event comment thread
       RecurringScopePrompt.tsx — "This / following / all" prompt for recurring edits
-      UpgradeModal.tsx   — Plus upgrade prompt (Stripe checkout)
     lib/
       design.ts          — Group color map, design constants
       allDayDates.ts     — Inclusive ↔ FullCalendar-exclusive all-day end conversion
@@ -131,7 +128,6 @@ client/
       NotificationsPage.tsx — In-app notification list (bell badge in AppShell)
       LoginPage.tsx      — Dark auth card
       RegisterPage.tsx   — Dark auth card
-      PricingPage.tsx    — Free vs Plus tier comparison
       PublicEventPage.tsx — Public event page; guests vote on date slots
       JoinGroupPage.tsx  — Join a group from an invite token
       PrivacyPage.tsx    — Privacy policy (contact placeholders still to fill)
@@ -165,7 +161,6 @@ client/
 | Push notifications | ✅ Done | VAPID web push, prefs UI, bell badge |
 | PWA install | ✅ Done | Manifest, service worker, install banner |
 | Habit reminders (20:00 cron) | ✅ Done | Sends push for unlogged daily habits |
-| Pricing page | ✅ Done | Free vs Plus tier |
 
 ---
 
@@ -301,7 +296,7 @@ if (error) return res.status(500).json({ success: false, error: error.message })
 | `push_subscriptions`   | `user_id`, `endpoint`, `p256dh`, `auth`                                                      |
 | `event_reminders_sent` | `event_id`, `occurrence_date`, `reminder_type`, `fired_at`                                   |
 
-Also present (not detailed here): `event_overrides`, `event_reactions`, `event_comments`, `group_invite_tokens`, `google_calendar_tokens`, `google_synced_calendars`, `google_event_links`, `subscriptions`, `xp_transactions`, `profiles_task`, `timers`.
+Also present (not detailed here; `subscriptions` and `profiles.plan`/`always_free` are unused leftovers of the removed Free/Plus tier): `event_overrides`, `event_reactions`, `event_comments`, `group_invite_tokens`, `google_calendar_tokens`, `google_synced_calendars`, `google_event_links`, `subscriptions`, `xp_transactions`, `profiles_task`, `timers`.
 
 ---
 

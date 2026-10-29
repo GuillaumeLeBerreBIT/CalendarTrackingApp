@@ -28,7 +28,6 @@ import habitRouter from "./routes/habits.js"
 import timerRouter from "./routes/timers.js"
 import challengeRouter from "./routes/challenges.js"
 import pactRouter from "./routes/pacts.js"
-import billingRouter from "./routes/billing.js"
 import { startScheduler } from "./utils/scheduler.js"
 
 const app = express();
@@ -47,8 +46,6 @@ const isProd = process.env.NODE_ENV === 'production';
 //  - imgSrc https:/data:: event cover images are user-pasted URLs from many CDN
 //    hosts, so an exact allowlist isn't feasible.
 //  - connectSrc sentry.*: lets the browser SDK ship error reports.
-// Stripe Checkout/Portal are full-page redirects (not embedded), so no Stripe
-// host needs to be allowed here.
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
@@ -85,22 +82,16 @@ app.use(cors({
   credentials: true,
 }));
 
-// Stripe webhooks need the raw body — register before express.json()
-app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
-
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 
 // Global rate limit on all /api routes (generous — mainly stops scripted abuse).
-// Skip the Stripe webhook: it's signature-verified, can arrive in bursts, and a
-// 429 would make Stripe mark delivery failed and retry.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.originalUrl.startsWith('/api/billing/webhook'),
 });
 app.use('/api', apiLimiter);
 
@@ -118,7 +109,6 @@ app.use('/api', habitRouter);
 app.use('/api', timerRouter);
 app.use('/api', challengeRouter);
 app.use('/api', pactRouter);
-app.use('/api/billing', billingRouter);
 
 app.post('/api/refresh-session', authRequire, (req, res) => {
   return res.json({ success: true });

@@ -3,7 +3,6 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { supabaseAdmin } from "../db/supabase.js";
 import authRequire from "../utils/utils.js";
-import { attachTier } from "../utils/tier.js";
 import {
   isGoogleConfigured,
   getAuthUrl,
@@ -27,13 +26,6 @@ const webhookLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-// Gate the connect flow behind the Plus tier. Mirrors checkLimit's 403 shape so
-// the client's axios interceptor shows the upgrade modal. Must run after attachTier.
-function requirePlus(req, res, next) {
-  if (req.tier === "plus") return next();
-  return res.status(403).json({ success: false, code: "UPGRADE_REQUIRED", feature: "google_calendar" });
-}
 
 // Signed OAuth state ties the consent redirect back to the initiating user
 // without trusting the (cookie-only) callback. HMAC(userId.timestamp) with a
@@ -62,7 +54,7 @@ function verifyState(state) {
 }
 
 // GET /api/calendar/google/auth → { url } to send the browser to Google consent.
-router.get("/calendar/google/auth", authRequire, attachTier, requirePlus, (req, res) => {
+router.get("/calendar/google/auth", authRequire, (req, res) => {
   if (!isGoogleConfigured()) {
     return res.status(503).json({ success: false, error: "Google Calendar sync is not configured." });
   }
@@ -121,7 +113,7 @@ router.delete("/calendar/google", authRequire, async (req, res) => {
 
 // GET /api/calendar/google/calendars → the user's calendars + which are enabled
 // for import. Requires the calendarlist scope (granted on (re)connect).
-router.get("/calendar/google/calendars", authRequire, attachTier, requirePlus, async (req, res) => {
+router.get("/calendar/google/calendars", authRequire, async (req, res) => {
   try {
     const [calendars, { data: synced }] = await Promise.all([
       listUserCalendars(req.cookies.userId),
@@ -149,7 +141,7 @@ router.get("/calendar/google/calendars", authRequire, attachTier, requirePlus, a
 
 // POST /api/calendar/google/calendars/:calendarId  body { enabled }
 // Enable → subscribe + initial pull. Disable → stop channel + remove its events.
-router.post("/calendar/google/calendars/:calendarId", authRequire, attachTier, requirePlus, async (req, res) => {
+router.post("/calendar/google/calendars/:calendarId", authRequire, async (req, res) => {
   const userId = req.cookies.userId;
   const calendarId = req.params.calendarId;
   const enabled = req.body?.enabled === true || req.body?.enabled === "true";

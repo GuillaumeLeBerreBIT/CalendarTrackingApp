@@ -5,7 +5,6 @@ import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire, { createEventObj } from "../utils/utils.js";
 import { creatorTimeZone } from "../utils/eventTimeZone.js";
 import { notifyUsers } from "../utils/notifications.js";
-import { attachTier, checkLimit } from "../utils/tier.js";
 import { syncEventToGoogle } from "../utils/google.js";
 import { expandRecurringEvent, capRuleUntil, followingRule, expansionWindow, sameRule } from "../utils/recurrence.js";
 import { isGroupMember, canAccessEvent } from "../utils/groupAccess.js";
@@ -38,7 +37,7 @@ async function canManageEvent(reqSupabase, event, userId) {
   return !!data;
 }
 
-router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), async (req, res) => {
+router.post("/parseEvent", authRequire, async (req, res) => {
 
   const insertEventObj = createEventObj(req.body)
   const targetGroupId = insertEventObj.tagNames ? parseInt(insertEventObj.tagNames) : null;
