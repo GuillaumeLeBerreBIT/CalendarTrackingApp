@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { google } from "googleapis";
 import { supabaseAdmin } from "../db/supabase.js";
 import { toWallClock } from "./wallClock.js";
+import { eventTimeZone } from "./eventTimeZone.js";
 
 // ── Config ───────────────────────────────────────────────────────────────
 // Google Cloud OAuth client (consent screen + Calendar API enabled). Least-
@@ -20,8 +21,8 @@ const PULL_HISTORY_DAYS = 365;          // initial import window (1 year back)
 const MAX_EVENTS_PER_PULL = 2000;        // storage-abuse guard per calendar per run
 const WATCH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const EVENTLI_CALENDAR_NAME = "Eventli";
-// Timed events have no per-event timezone in our schema; Google needs one for
-// dateTime values, so fall back to a configurable default.
+// Zone for Google events that don't carry one of their own (and for pulled
+// events); pushed events use events.timezone.
 const DEFAULT_TZ = process.env.GOOGLE_DEFAULT_TZ || "Europe/Brussels";
 
 export function isGoogleConfigured() {
@@ -226,8 +227,9 @@ export function eventToGoogle(event) {
       endDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       endTime = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
     }
-    body.start = { dateTime: startDateTime, timeZone: DEFAULT_TZ };
-    body.end = { dateTime: `${endDate}T${endTime.length === 5 ? endTime + ":00" : endTime}`, timeZone: DEFAULT_TZ };
+    const tz = eventTimeZone(event);
+    body.start = { dateTime: startDateTime, timeZone: tz };
+    body.end = { dateTime: `${endDate}T${endTime.length === 5 ? endTime + ":00" : endTime}`, timeZone: tz };
   }
 
   if (event.recurrence_rule) {
@@ -456,6 +458,7 @@ export function googleToEvent(gEvent, tz = DEFAULT_TZ) {
     event_title: trunc(gEvent.summary, 255),
     event_description: trunc(gEvent.description, 5000) || "",
     location: trunc(gEvent.location, 500) || "",
+    timezone: tz,
   };
 
   if (gEvent.start.date) {
@@ -582,6 +585,7 @@ async function applyPulledEvent(userId, calendarId, gEvent) {
     end_date: m.end_date,
     start_time: m.start_time,
     end_time: m.end_time,
+    timezone: m.timezone,
     recurrence_rule: m.recurrence_rule || null,
     created_by: userId,
     groups_id: null,

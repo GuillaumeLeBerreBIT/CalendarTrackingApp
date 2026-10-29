@@ -7,22 +7,23 @@ import { alreadySent } from './reminderDedupe.js';
 import { reconcileGoogleSync, isGoogleConfigured, pullAllUsers, renewExpiringChannels } from './google.js';
 import { runDailySummarySweep } from './dailySummarySweep.js';
 import { EVENT_TZ, todayIn, toWallClock, wallClockToInstant } from './wallClock.js';
+import { eventTimeZone } from './eventTimeZone.js';
 
 /**
  * The absolute instant an occurrence starts. Events store a naive date and time,
- * read in EVENT_TZ (never the host's zone). timeStr may be 'HH:MM:SS', 'HH:MM',
- * or falsy (→ midnight).
+ * read in the event's own zone (never the host's). timeStr may be 'HH:MM:SS',
+ * 'HH:MM', or falsy (→ midnight).
  */
-function occurrenceStartDate(dateStr, timeStr) {
-  return wallClockToInstant(dateStr, timeStr, EVENT_TZ);
+function occurrenceStartDate(dateStr, timeStr, tz) {
+  return wallClockToInstant(dateStr, timeStr, tz);
 }
 
 /**
- * `instant` shifted so its UTC fields show the EVENT_TZ wall clock. Occurrence
+ * `instant` shifted so its UTC fields show the wall clock in `tz`. Occurrence
  * expansion works on wall clocks encoded as UTC, so its window has to be too.
  */
-function asWallClockUtc(instant) {
-  const { date, time } = toWallClock(instant, EVENT_TZ);
+function asWallClockUtc(instant, tz) {
+  const { date, time } = toWallClock(instant, tz);
   return new Date(`${date}T${time}Z`);
 }
 
@@ -39,7 +40,7 @@ export async function runReminderSweep() {
 
     const { data: events, error } = await db
       .from('events')
-      .select('event_id, event_title, start_date, start_time, all_day, end_date, end_time, recurrence_rule, reminder_minutes')
+      .select('event_id, event_title, start_date, start_time, all_day, end_date, end_time, recurrence_rule, reminder_minutes, timezone')
       .not('reminder_minutes', 'is', null);
 
     if (error) {
@@ -66,12 +67,13 @@ export async function runReminderSweep() {
     for (const event of events) {
       const reminderMinutes = event.reminder_minutes;
       if (reminderMinutes == null) continue;
+      const tz = eventTimeZone(event);
 
       // Candidate occurrences: one for non-recurring, expanded set for recurring.
       let occurrences;
       if (event.recurrence_rule) {
         // Wide on purpose (±1 day of wall clock): the exact instant check below decides.
-        const wallNow = asWallClockUtc(now).getTime();
+        const wallNow = asWallClockUtc(now, tz).getTime();
         const DAY = 24 * 60 * 60 * 1000;
         occurrences = expandRecurringEvent(
           event,
@@ -85,7 +87,7 @@ export async function runReminderSweep() {
 
       for (const occ of occurrences) {
         const occurrenceDate = occ._occurrenceDate || occ.start_date;
-        const occurrenceStart = occurrenceStartDate(occ.start_date, occ.all_day ? '00:00:00' : occ.start_time);
+        const occurrenceStart = occurrenceStartDate(occ.start_date, occ.all_day ? '00:00:00' : occ.start_time, tz);
         const reminderTime = new Date(occurrenceStart.getTime() - reminderMinutes * 60 * 1000);
 
         if (!(now >= reminderTime && now < occurrenceStart)) continue;
@@ -140,13 +142,16 @@ async function runCountdownSweep() {
     const now = new Date();
 
     // Look ahead 8 days so both D-7 and D-1 windows are covered in one query.
+    // Event zones differ from each other and from EVENT_TZ by up to a day, so
+    // fetch a day either side and let the exact instant check below decide.
     const todayStr = todayIn(EVENT_TZ, now);
-    const windowEndStr = addDaysStr(todayStr, 8);
+    const windowStartStr = addDaysStr(todayStr, -1);
+    const windowEndStr = addDaysStr(todayStr, 9);
 
     const { data: events, error } = await db
       .from('events')
-      .select('event_id, event_title, start_date, start_time, all_day')
-      .gte('start_date', todayStr)
+      .select('event_id, event_title, start_date, start_time, all_day, timezone')
+      .gte('start_date', windowStartStr)
       .lte('start_date', windowEndStr);
 
     if (error || !events || events.length === 0) return;
@@ -154,7 +159,7 @@ async function runCountdownSweep() {
     let fired = 0;
 
     for (const event of events) {
-      const occStart = occurrenceStartDate(event.start_date, event.all_day ? '00:00:00' : event.start_time);
+      const occStart = occurrenceStartDate(event.start_date, event.all_day ? '00:00:00' : event.start_time, eventTimeZone(event));
       const diffMs = occStart.getTime() - now.getTime();
       const diffDays = diffMs / 86400000;
 

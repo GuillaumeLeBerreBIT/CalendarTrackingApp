@@ -3,6 +3,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire, { createEventObj } from "../utils/utils.js";
+import { creatorTimeZone } from "../utils/eventTimeZone.js";
 import { notifyUsers } from "../utils/notifications.js";
 import { attachTier, checkLimit } from "../utils/tier.js";
 import { syncEventToGoogle } from "../utils/google.js";
@@ -46,6 +47,7 @@ router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), 
   }
   const eventStatus = req.body.status === 'tentative' ? 'tentative' : 'confirmed';
   const dateOptions = Array.isArray(req.body.dateOptions) ? req.body.dateOptions : [];
+  const timezone = await creatorTimeZone(req.supabase, req.cookies.userId, req.body.timezone);
 
   const { data: eventData, error: eventDataError } = await req.supabase
     .from("events")
@@ -66,6 +68,7 @@ router.post("/parseEvent", authRequire, attachTier, checkLimit('events_month'), 
         recurrence_rule: insertEventObj.recurrence_rule || null,
         reminder_minutes: insertEventObj.reminder_minutes != null ? parseInt(insertEventObj.reminder_minutes) : null,
         status: eventStatus,
+        timezone,
       },
     ])
     .select();
@@ -201,7 +204,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
 
     const { data: eventCheck, error: eventCheckError } = await req.supabase
       .from('events')
-      .select('created_by, recurrence_rule, groups_id, start_date, start_time')
+      .select('created_by, recurrence_rule, groups_id, start_date, start_time, timezone')
       .eq('event_id', eventId)
       .single();
 
@@ -259,6 +262,7 @@ router.put('/parseEvent/:eventId', authRequire, async (req, res) => {
             recurrence_rule: nextRule,
             reminder_minutes: updateEventObj.reminder_minutes != null ? parseInt(updateEventObj.reminder_minutes) : null,
             created_by: req.cookies.userId,
+            timezone: eventCheck.timezone,
           },
         ])
         .select();

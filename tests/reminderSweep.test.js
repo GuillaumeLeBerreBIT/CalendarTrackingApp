@@ -70,4 +70,16 @@ describe("runReminderSweep reads event times in EVENT_TZ, not the host zone", ()
     expect(await sweepAt("2026-07-08T15:35:00Z")).toBe(1);
     expect(await sweepAt("2026-07-08T17:40:00Z")).toBe(0);
   });
+
+  it("reads each event in its own timezone", async () => {
+    // 18:00 in New York on 1 Jul 2026 (UTC-4) is 22:00 UTC; reminder at 21:30 UTC.
+    tables.events = [{ ...evening, timezone: "America/New_York" }];
+    expect(await sweepAt("2026-07-01T21:35:00Z")).toBe(1);
+    expect(await sweepAt("2026-07-01T15:35:00Z")).toBe(0); // the Brussels moment does not apply
+  });
+
+  it("falls back to the default zone for a missing or invalid timezone", async () => {
+    tables.events = [{ ...evening, timezone: "Not/AZone" }];
+    expect(await sweepAt("2026-07-01T15:35:00Z")).toBe(1);
+  });
 });

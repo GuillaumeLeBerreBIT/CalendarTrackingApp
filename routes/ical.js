@@ -199,6 +199,7 @@ router.post("/calendar/import", authRequire, upload.single("ics"), async (req, r
         event_description: vevent.description ? String(vevent.description) : "",
         location: vevent.location ? String(vevent.location) : "",
         ...row,
+        timezone: userTz,
         created_by: userId,
         external_uid: externalUid,
       })
