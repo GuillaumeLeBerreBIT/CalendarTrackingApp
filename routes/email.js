@@ -6,6 +6,8 @@ import express from 'express';
 import { Resend } from 'resend';
 import supabase from '../db/supabase.js';
 import authRequire from '../utils/utils.js';
+import { EVENT_TZ, todayIn } from '../utils/wallClock.js';
+import { addDaysStr } from '../utils/recurrence.js';
 
 const router = express.Router();
 
@@ -31,14 +33,9 @@ export async function fetchDigestData(userId) {
     throw new Error(`Could not fetch profile for userId ${userId}: ${profileError?.message}`);
   }
 
-  const today = new Date();
-  // Use local date parts to build YYYY-MM-DD without timezone drift
-  const pad = (n) => String(n).padStart(2, '0');
-  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-
-  const sevenDaysLater = new Date(today);
-  sevenDaysLater.setDate(today.getDate() + 7);
-  const sevenDaysStr = `${sevenDaysLater.getFullYear()}-${pad(sevenDaysLater.getMonth() + 1)}-${pad(sevenDaysLater.getDate())}`;
+  // "Today" is the calendar day in EVENT_TZ, not the host's (UTC) day.
+  const todayStr = todayIn(EVENT_TZ);
+  const sevenDaysStr = addDaysStr(todayStr, 7);
 
   // -- Today's events --
   const { data: todayEventsRaw, error: todayEventsError } = await supabase

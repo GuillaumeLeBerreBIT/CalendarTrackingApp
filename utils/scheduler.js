@@ -1,25 +1,29 @@
 import cron from 'node-cron';
 import supabase, { supabaseAdmin } from '../db/supabase.js';
 import { sendDigestForUser } from '../routes/email.js';
-import { expandRecurringEvent } from './recurrence.js';
+import { expandRecurringEvent, addDaysStr } from './recurrence.js';
 import { notifyUsers } from './notifications.js';
 import { alreadySent } from './reminderDedupe.js';
 import { reconcileGoogleSync, isGoogleConfigured, pullAllUsers, renewExpiringChannels } from './google.js';
 import { runDailySummarySweep } from './dailySummarySweep.js';
+import { EVENT_TZ, todayIn, toWallClock, wallClockToInstant } from './wallClock.js';
 
 /**
- * Build a server-local Date for an occurrence given its date string and a time string.
- * timeStr may be 'HH:MM:SS', 'HH:MM', or falsy (→ midnight).
+ * The absolute instant an occurrence starts. Events store a naive date and time,
+ * read in EVENT_TZ (never the host's zone). timeStr may be 'HH:MM:SS', 'HH:MM',
+ * or falsy (→ midnight).
  */
 function occurrenceStartDate(dateStr, timeStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  let hh = 0, mm = 0;
-  if (timeStr) {
-    const parts = timeStr.split(':').map(Number);
-    hh = parts[0] || 0;
-    mm = parts[1] || 0;
-  }
-  return new Date(y, m - 1, d, hh, mm, 0, 0);
+  return wallClockToInstant(dateStr, timeStr, EVENT_TZ);
+}
+
+/**
+ * `instant` shifted so its UTC fields show the EVENT_TZ wall clock. Occurrence
+ * expansion works on wall clocks encoded as UTC, so its window has to be too.
+ */
+function asWallClockUtc(instant) {
+  const { date, time } = toWallClock(instant, EVENT_TZ);
+  return new Date(`${date}T${time}Z`);
 }
 
 /**
@@ -66,8 +70,15 @@ export async function runReminderSweep() {
       // Candidate occurrences: one for non-recurring, expanded set for recurring.
       let occurrences;
       if (event.recurrence_rule) {
-        const windowEnd = new Date(now.getTime() + (reminderMinutes + 6) * 60 * 1000);
-        occurrences = expandRecurringEvent(event, now, windowEnd, overridesByEvent[event.event_id] || []);
+        // Wide on purpose (±1 day of wall clock): the exact instant check below decides.
+        const wallNow = asWallClockUtc(now).getTime();
+        const DAY = 24 * 60 * 60 * 1000;
+        occurrences = expandRecurringEvent(
+          event,
+          new Date(wallNow - DAY),
+          new Date(wallNow + (reminderMinutes + 6) * 60 * 1000 + DAY),
+          overridesByEvent[event.event_id] || [],
+        );
       } else {
         occurrences = [{ ...event, _occurrenceDate: event.start_date }];
       }
@@ -129,16 +140,14 @@ async function runCountdownSweep() {
     const now = new Date();
 
     // Look ahead 8 days so both D-7 and D-1 windows are covered in one query.
-    const windowStart = new Date(now);
-    windowStart.setHours(0, 0, 0, 0);
-    const windowEnd = new Date(now);
-    windowEnd.setDate(windowEnd.getDate() + 8);
+    const todayStr = todayIn(EVENT_TZ, now);
+    const windowEndStr = addDaysStr(todayStr, 8);
 
     const { data: events, error } = await db
       .from('events')
       .select('event_id, event_title, start_date, start_time, all_day')
-      .gte('start_date', windowStart.toISOString().slice(0, 10))
-      .lte('start_date', windowEnd.toISOString().slice(0, 10));
+      .gte('start_date', todayStr)
+      .lte('start_date', windowEndStr);
 
     if (error || !events || events.length === 0) return;
 
@@ -198,10 +207,10 @@ async function runCountdownSweep() {
 
 /**
  * Start the cron scheduler.
- * Schedules the daily digest email job at 07:00 server time.
+ * Schedules the daily digest email job at 07:00 in EVENT_TZ.
  */
 export function startScheduler() {
-  // 0 7 * * *  →  every day at 07:00 (server local time)
+  // 0 7 * * *  →  every day at 07:00 (EVENT_TZ)
   cron.schedule('0 7 * * *', async () => {
     console.log('[scheduler] Starting daily digest run...');
 
@@ -238,9 +247,9 @@ export function startScheduler() {
     }
 
     console.log('[scheduler] Daily digest run complete.');
-  });
+  }, { timezone: EVENT_TZ });
 
-  console.log('[scheduler] Daily digest cron registered (07:00 server time).');
+  console.log(`[scheduler] Daily digest cron registered (07:00 ${EVENT_TZ}).`);
 
   // */5 * * * *  →  every 5 minutes: fire any due per-event reminders.
   cron.schedule('*/5 * * * *', () => {
@@ -249,12 +258,12 @@ export function startScheduler() {
 
   console.log('[scheduler] Reminder sweep cron registered (every 5 minutes).');
 
-  // 0 8 * * *  →  every day at 08:00: send D-7 and D-1 countdown notifications.
+  // 0 8 * * *  →  every day at 08:00 (EVENT_TZ): send D-7 and D-1 countdown notifications.
   cron.schedule('0 8 * * *', () => {
     runCountdownSweep();
-  });
+  }, { timezone: EVENT_TZ });
 
-  console.log('[scheduler] Countdown sweep cron registered (08:00 server time).');
+  console.log(`[scheduler] Countdown sweep cron registered (08:00 ${EVENT_TZ}).`);
 
   // 5 0 * * *  →  every day at 00:05 UTC: resolve expired pacts.
   cron.schedule('5 0 * * *', async () => {
@@ -285,10 +294,10 @@ export function startScheduler() {
 
   console.log('[scheduler] Pact resolution cron registered (00:05 UTC).');
 
-  // 0 20 * * *  →  every day at 20:00: remind users who haven't logged their daily habits.
+  // 0 20 * * *  →  every day at 20:00 (EVENT_TZ): remind users who haven't logged their daily habits.
   cron.schedule('0 20 * * *', async () => {
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayIn(EVENT_TZ);
 
       const { data: habits } = await supabaseAdmin
         .from('habits')
@@ -332,9 +341,9 @@ export function startScheduler() {
     } catch (err) {
       console.error('[scheduler] Habit reminder sweep failed:', err.message);
     }
-  });
+  }, { timezone: EVENT_TZ });
 
-  console.log('[scheduler] Habit reminder cron registered (20:00 server time).');
+  console.log(`[scheduler] Habit reminder cron registered (20:00 ${EVENT_TZ}).`);
 
   // */15 * * * *  →  every 15 minutes: send each opted-in user their "events
   // today" summary when their local time matches their chosen send time.

@@ -349,6 +349,7 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=   (publishable key, sb_publishable_… — request-scoped clients)
 SUPABASE_SECRET_KEY= (secret key, sb_secret_… — supabaseAdmin only; legacy var name SUPABASE_KEY still works as fallback)
 PORT=                (optional, defaults to 3000)
+EVENT_TZ=            (optional IANA zone event wall clocks are read in server-side; defaults to GOOGLE_DEFAULT_TZ, then Europe/Brussels)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 RESEND_API_KEY=
@@ -369,5 +370,6 @@ RESEND_API_KEY=
 - **Server-side Supabase clients must keep `persistSession: false, autoRefreshToken: false`** (see `db/supabase.js`). With defaults on, the shared client stores the last user's session and auto-rotates its refresh token in the background — invalidating the token in the browser's cookie and force-logging users out at JWT expiry (~1h). Never create a server client without these options.
 - **All-day `end_date` is inclusive** (10 → 15 Oct covers both days). Only `toFullCalendarEvents()` (FullCalendar), `utils/google.js` and `utils/ical.js` convert to exclusive ends; app state, agenda, mobile grid and the edit form stay inclusive.
 - **Deleting a group goes through `delete_group()`** (`db/migrations/2026-10-15_delete_group_rpc.sql`), one transaction via `supabaseAdmin.rpc` after the route's admin check. Never delete group data piecemeal from a route: a mid-way failure leaves the group half-deleted. Test the SQL with `db/tests/run_delete_group_test.sh` (needs Docker).
+- **Event times are naive wall clocks, read in `EVENT_TZ`** (`utils/wallClock.js`). Server code that needs a real instant (reminders, countdowns, cron times, "today") must use `wallClockToInstant()` / `todayIn()` — never `new Date(y, m, d, hh, mm)`, `getHours()` or `toISOString().slice(0,10)`, which read the host's zone (UTC in production) and made reminders fire ~2h late.
 - **Supabase query builders have no `.catch()`**: they are lazy thenables. Always `const { error } = await …`; a bare `.catch()` throws a TypeError and never sends the query.
 - **Date voting**: tentative events store candidate slots in `event_date_options`; members mark availability per slot in `event_date_votes` (one row per `(event_id, option_id, user_id)`, `availability` ∈ yes/maybe/no). `renderEvents` returns per-option `yesCount/maybeCount/noCount` + a `myVotes` map; the creator confirms a slot via `/confirmEventDate`. (Discovery/Ticketmaster removed 2026-06-15.)
