@@ -136,7 +136,9 @@ router.post('/checkUser', authRequire ,async (req, res) => {
       return res.json({ success: true, match: false });
     }
 
-    const {data: isUserFound, error: noUser} = await req.supabase
+    // Exact-match lookup of any user: RLS only exposes own/shared-group profiles,
+    // so read with the admin client. The searchable/shared-group gate below still applies.
+    const {data: isUserFound, error: noUser} = await supabaseAdmin
     .from('profiles')
     .select('username, user_id, email, searchable')
     .or(`username.ilike.${term},email.ilike.${term}`)
@@ -206,9 +208,11 @@ router.get('/users/search', authRequire, async (req, res) => {
       return res.json({ success: true, users: [] });
     }
 
-    let query = req.supabase
+    // Admin client: the search spans users RLS hides; filters below keep it to
+    // searchable profiles and only username is returned to the caller.
+    let query = supabaseAdmin
       .from('profiles')
-      .select('user_id, username, email')
+      .select('user_id, username')
       .eq('searchable', true)
       .or(`username.ilike.*${q}*,email.ilike.*${q}*`)
       .neq('user_id', req.cookies.userId)
@@ -224,7 +228,7 @@ router.get('/users/search', authRequire, async (req, res) => {
     // Optionally exclude users already in a given group (any invite_status)
     const groupsId = req.query.groups_id ? parseInt(req.query.groups_id) : NaN;
     if (!isNaN(groupsId) && results.length > 0) {
-      const { data: existingMembers, error: membersError } = await req.supabase
+      const { data: existingMembers, error: membersError } = await supabaseAdmin
         .from('profiles_groups')
         .select('user_id')
         .eq('groups_id', groupsId)
@@ -238,7 +242,7 @@ router.get('/users/search', authRequire, async (req, res) => {
 
     return res.json({
       success: true,
-      users: results.map(u => ({ user_id: u.user_id, username: u.username, email: u.email })),
+      users: results.map(u => ({ user_id: u.user_id, username: u.username })),
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -290,7 +294,8 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
       }
     })
 
-    const {data: inviteUsers, error: inviteUsersError} = await req.supabase
+    // Writing other users' membership rows: admin client, after the admin check above
+    const {data: inviteUsers, error: inviteUsersError} = await supabaseAdmin
       .from('profiles_groups')
       .upsert(inviteUserDb) // Need upsert if there is a declined in there
       .select()
@@ -314,7 +319,7 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
 
     const emailIdList = inviteUsers.map(u => u.user_id)
 
-    const {data: userProfile, error: userProfileError} = await req.supabase
+    const {data: userProfile, error: userProfileError} = await supabaseAdmin
       .from('profiles')
       .select('email, user_id, username')
       .in('user_id', emailIdList)
@@ -351,7 +356,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
     ? req.body['shared-color']
     : null;
 
-  const {data: newGroup, error: newGroupError} = await req.supabase
+  const {data: newGroup, error: newGroupError} = await supabaseAdmin
   .from('groups')
   .insert({
       groups_title: req.body['group-title'],
@@ -365,7 +370,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
     return res.status(400).json({success: false, error: `Could not create Group: ${newGroupError.message}`})
   }
 
-  const {data: newProfilesGroup, error: newProfilesGroupError} = await req.supabase
+  const {data: newProfilesGroup, error: newProfilesGroupError} = await supabaseAdmin
   .from('profiles_groups')
   .insert([{
     groups_id: newGroup[0].groups_id,
@@ -376,7 +381,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
   .select()
 
   if (newProfilesGroupError) {
-    await req.supabase
+    await supabaseAdmin
     .from('groups')
     .delete()
     .eq('groups_id', newGroup[0].groups_id)
@@ -389,7 +394,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
   if (req.body.usersInvite) {
     // Need to use map to catch alle results and do async programming with it.
     promiseInviteResults = await Promise.all(req.body.usersInvite.map( async (user) => {
-      let {data: inviteUser, error: inviteUserError} = await req.supabase
+      let {data: inviteUser, error: inviteUserError} = await supabaseAdmin
       .from('profiles_groups')
       .upsert([{
         groups_id: newGroup[0].groups_id,
@@ -844,7 +849,7 @@ router.post('/joinGroup/:token', authRequire, async (req, res) => {
   }
 
   // Add the user as an accepted member
-  const { error: insertError } = await req.supabase
+  const { error: insertError } = await supabaseAdmin
     .from('profiles_groups')
     .upsert({
       groups_id: tokenRow.groups_id,
@@ -1065,7 +1070,7 @@ router.delete('/groups/:groupId/members/:userId', authRequire, async (req, res) 
     return res.status(400).json({ success: false, error: 'Cannot remove yourself. Use leave instead.' });
   }
 
-  const { error: deleteError } = await req.supabase
+  const { error: deleteError } = await supabaseAdmin
     .from('profiles_groups')
     .delete()
     .eq('groups_id', groupId)

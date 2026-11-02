@@ -103,7 +103,7 @@ router.get("/calendar/:token.ics", async (req, res) => {
 
 // GET /calendar/token → existing token + subscribe URL (or null)
 router.get("/calendar/token", authRequire, async (req, res) => {
-  const { data, error } = await req.supabase
+  const { data, error } = await supabaseAdmin
     .from("profiles")
     .select("ical_token")
     .eq("user_id", req.cookies.userId)
@@ -122,7 +122,7 @@ router.get("/calendar/token", authRequire, async (req, res) => {
 router.post("/calendar/token", authRequire, async (req, res) => {
   const token = crypto.randomUUID();
 
-  const { error } = await req.supabase
+  const { error } = await supabaseAdmin
     .from("profiles")
     .update({ ical_token: token })
     .eq("user_id", req.cookies.userId);
