@@ -4,7 +4,7 @@
 
 import express from 'express';
 import { Resend } from 'resend';
-import supabase from '../db/supabase.js';
+import { supabaseAdmin } from '../db/supabase.js';
 import authRequire from '../utils/utils.js';
 import { EVENT_TZ, todayIn } from '../utils/wallClock.js';
 import { addDaysStr } from '../utils/recurrence.js';
@@ -23,7 +23,7 @@ const FROM_EMAIL = process.env.FROM_EMAIL || 'digest@calendartracking.app';
  */
 export async function fetchDigestData(userId) {
   // -- Profile --
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('username, email')
     .eq('user_id', userId)
@@ -38,7 +38,7 @@ export async function fetchDigestData(userId) {
   const sevenDaysStr = addDaysStr(todayStr, 7);
 
   // -- Today's events --
-  const { data: todayEventsRaw, error: todayEventsError } = await supabase
+  const { data: todayEventsRaw, error: todayEventsError } = await supabaseAdmin
     .from('events')
     .select(`
       event_id, event_title, all_day, start_time,
@@ -54,7 +54,7 @@ export async function fetchDigestData(userId) {
   }
 
   // -- Next 7 days events (exclusive of today) --
-  const { data: upcomingEventsRaw, error: upcomingEventsError } = await supabase
+  const { data: upcomingEventsRaw, error: upcomingEventsError } = await supabaseAdmin
     .from('events')
     .select(`
       event_id, event_title, all_day, start_date, start_time,
@@ -72,7 +72,7 @@ export async function fetchDigestData(userId) {
   }
 
   // -- Groups the user belongs to (for task query) --
-  const { data: memberGroups, error: memberGroupsError } = await supabase
+  const { data: memberGroups, error: memberGroupsError } = await supabaseAdmin
     .from('profiles_groups')
     .select('groups_id')
     .eq('user_id', userId)
@@ -88,7 +88,7 @@ export async function fetchDigestData(userId) {
   let taskSummary = [];
 
   if (groupIds.length > 0) {
-    const { data: taskLists, error: taskListsError } = await supabase
+    const { data: taskLists, error: taskListsError } = await supabaseAdmin
       .from('task_list')
       .select('task_list_id, list_title')
       .in('groups_id', groupIds);
@@ -100,7 +100,7 @@ export async function fetchDigestData(userId) {
     if (taskLists && taskLists.length > 0) {
       const taskListIds = taskLists.map((tl) => tl.task_list_id);
 
-      const { data: incompleteTasks, error: incompleteTasksError } = await supabase
+      const { data: incompleteTasks, error: incompleteTasksError } = await supabaseAdmin
         .from('task')
         .select('task_list_id')
         .in('task_list_id', taskListIds)
@@ -323,7 +323,7 @@ export async function sendDigestForUser(userId) {
   // Check email digest preference gracefully — default to enabled
   let digestEnabled = true;
   try {
-    const { data: prefRow, error: prefError } = await supabase
+    const { data: prefRow, error: prefError } = await supabaseAdmin
       .from('profiles')
       .select('email_digest_enabled')
       .eq('user_id', userId)
@@ -382,7 +382,7 @@ router.get('/email-preferences', authRequire, async (req, res) => {
   const userId = req.cookies.userId;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('profiles')
       .select('email_digest_enabled')
       .eq('user_id', userId)
@@ -418,7 +418,7 @@ router.post('/email-preferences', authRequire, async (req, res) => {
     return res.status(400).json({ success: false, error: 'emailDigestEnabled must be a boolean.' });
   }
 
-  const { error } = await supabase
+  const { error } = await req.supabase
     .from('profiles')
     .update({ email_digest_enabled: emailDigestEnabled })
     .eq('user_id', userId);
