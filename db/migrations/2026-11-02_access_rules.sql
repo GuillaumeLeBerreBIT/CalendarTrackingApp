@@ -125,9 +125,9 @@ drop policy if exists event_overrides_select                 on public.event_ove
 
 -- ---------- profiles ----------
 -- Read: self; anyone sharing a group (any invite status); the creator of an event I can
--- access; a participant who has responded (rsvp_status <> 'pending') on an event I can
--- access. A pending invitee does not count: whoever manages an event can add anyone as a
--- participant, so "invited" alone must not reveal a stranger's profile (or email).
+-- access. Being a fellow participant does NOT count: whoever manages an event can add
+-- anyone to it with any RSVP status, so participation would let a stranger reveal
+-- anyone's profile (and email) by inviting them.
 -- Strangers are found only through the search routes (supabaseAdmin).
 create policy "profiles read self or shared" on public.profiles
   for select to authenticated
@@ -136,9 +136,6 @@ create policy "profiles read self or shared" on public.profiles
     or exists (select 1 from public.profiles_groups mine
                  join public.profiles_groups theirs on theirs.groups_id = mine.groups_id
                 where mine.user_id = auth.uid() and theirs.user_id = profiles.user_id)
-    or exists (select 1 from public.profiles_events pe
-                where pe.user_id = profiles.user_id and pe.rsvp_status <> 'pending'
-                  and public.can_access_event(pe.event_id))
     or exists (select 1 from public.events e
                 where e.created_by = profiles.user_id and public.can_access_event(e.event_id))
   );

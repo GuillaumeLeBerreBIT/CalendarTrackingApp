@@ -10,7 +10,9 @@
 -- except that A and S share no group or event, which is checked first):
 --   A  admin of G      M  member of G      P  pending invitee of G      S  stranger
 --
--- How to run, against today's database, without persisting anything:
+-- ALWAYS run it wrapped in begin … rollback. The block deletes the actors' existing
+-- memberships and RSVPs (see "isolate the actors") and relies on that wrapper, and on its
+-- own always-raised exception, to undo everything. How to run:
 --   begin;
 --   <FORWARD section of the migration, if testing the new rules>
 --   <this file>
@@ -36,7 +38,15 @@ declare
   v text;
   raised boolean;
 begin
-  -- ---------- preconditions (as owner) ----------
+  -- ---------- isolate the actors (as owner) ----------
+  -- Real profiles share real groups and events, which would make "stranger" checks
+  -- meaningless. Remove every existing membership and RSVP of the four actors for the
+  -- duration of the block. This is undone by the exception every run ends in
+  -- (ACCESS_RULES_OK or FAIL) and by the surrounding begin … rollback.
+  delete from profiles_groups where user_id in (a, m, p, s);
+  delete from profiles_events where user_id in (a, m, p, s);
+
+  -- ---------- preconditions (as owner; guards for the isolation above) ----------
   if (select count(*) from profiles where user_id in (a, m, p, s)) <> 4 then
     raise exception 'FAIL: precondition: actor profiles missing';
   end if;
@@ -86,13 +96,13 @@ begin
   if n <> 0 then raise exception 'FAIL: stranger cannot read RSVPs (S reads % rows of E_A)', n; end if;
   select count(*) into n from event_overrides where event_id = e_a;
   if n <> 0 then raise exception 'FAIL: stranger cannot read overrides (S reads % rows of E_A)', n; end if;
-  -- S invites A to S's own event: an invite alone does not reveal A.
+  -- S puts A on S's own event, even as 'going': that does not reveal A.
   insert into events (event_title, start_date, end_date, groups_id, created_by)
     values ('ZZ S bait', '2030-01-06', '2030-01-06', null, s) returning event_id into s_ev;
   insert into profiles_events (user_id, event_id, rsvp_status) values
-    (s, s_ev, 'going'), (a, s_ev, 'pending');
+    (s, s_ev, 'going'), (a, s_ev, 'going');
   select count(*) into n from profiles where user_id = a;
-  if n <> 0 then raise exception 'FAIL: stranger cannot read profiles (S invited A, then sees A: % rows)', n; end if;
+  if n <> 0 then raise exception 'FAIL: stranger cannot read profiles (S put A on own event, then sees A: % rows)', n; end if;
   reset role;
 
   perform set_config('request.jwt.claims', json_build_object('sub', m, 'role', 'authenticated')::text, true);
@@ -262,11 +272,11 @@ begin
   update profiles_events set rsvp_status = 'no' where user_id = m and event_id = pe;
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'FAIL: creator invites participants (S changed M''s RSVP)'; end if;
-  -- Having answered on PE, S sees PE's creator A, but not M, who is still pending on it.
+  -- On PE, S sees PE's creator A, but not M, who is only a fellow participant.
   select count(*) into n from profiles where user_id = a;
   if n <> 1 then raise exception 'FAIL: event co-participants (S on PE reading creator A: % rows)', n; end if;
   select count(*) into n from profiles where user_id = m;
-  if n <> 0 then raise exception 'FAIL: event co-participants (S on PE reads pending M: % rows)', n; end if;
+  if n <> 0 then raise exception 'FAIL: event co-participants (S on PE reads participant M: % rows)', n; end if;
   reset role;
 
   -- ---------- ics import as self ----------
