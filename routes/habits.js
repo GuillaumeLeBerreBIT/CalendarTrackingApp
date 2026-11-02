@@ -344,14 +344,14 @@ router.post('/habits/:id/log', authRequire, async (req, res) => {
     if (gIds.length > 0) {
       const { data: activePacts } = await supabaseAdmin
         .from('pacts')
-        .select('pact_id, completions_count')
+        .select('pact_id')
         .in('groups_id', gIds)
         .eq('status', 'active');
       for (const pact of activePacts || []) {
-        await supabaseAdmin
-          .from('pacts')
-          .update({ completions_count: Math.max(0, pact.completions_count - 1) })
-          .eq('pact_id', pact.pact_id);
+        // Atomic in the database (never below 0), so concurrent logs are not lost.
+        const { error: bumpError } = await supabaseAdmin
+          .rpc('bump_pact_completions', { p_pact_id: pact.pact_id, p_delta: -1 });
+        if (bumpError) console.warn('[pacts] un-bump failed:', bumpError.message);
       }
     }
 
@@ -432,22 +432,20 @@ router.post('/habits/:id/log', authRequire, async (req, res) => {
   if (gIds.length > 0) {
     const { data: activePacts } = await supabaseAdmin
       .from('pacts')
-      .select('pact_id, target_completions, completions_count, reward_event_id')
+      .select('pact_id')
       .in('groups_id', gIds)
       .eq('status', 'active');
     for (const pact of activePacts || []) {
-      const newCount = pact.completions_count + 1;
-      if (newCount >= pact.target_completions) {
-        // Conditional on 'active' so an already-resolved pact is never flipped back.
-        const { data: changed } = await supabaseAdmin
-          .from('pacts').update({ status: 'succeeded', completions_count: newCount })
-          .eq('pact_id', pact.pact_id).eq('status', 'active')
-          .select('pact_id');
-        if (changed?.length && pact.reward_event_id) {
-          await supabaseAdmin.from('events').update({ status: 'confirmed' }).eq('event_id', pact.reward_event_id);
-        }
-      } else {
-        await supabaseAdmin.from('pacts').update({ completions_count: newCount }).eq('pact_id', pact.pact_id);
+      // One atomic UPDATE in the database: two members logging at once both count.
+      // It only touches active pacts, so 'succeeded' back means THIS log completed it.
+      const { data: bumped, error: bumpError } = await supabaseAdmin
+        .rpc('bump_pact_completions', { p_pact_id: pact.pact_id, p_delta: 1 });
+      if (bumpError) { console.warn('[pacts] bump failed:', bumpError.message); continue; }
+      const row = bumped?.[0];
+      if (row?.status === 'succeeded' && row.reward_event_id) {
+        const { error: rewardError } = await supabaseAdmin
+          .from('events').update({ status: 'confirmed' }).eq('event_id', row.reward_event_id);
+        if (rewardError) console.warn('[pacts] reward unlock failed:', rewardError.message);
       }
     }
   }
