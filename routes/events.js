@@ -543,9 +543,11 @@ router.get('/renderEvents', authRequire, async (req, res) => {
   .from('groups')
   .select(`groups_id, tag_name, shared_color,
     profiles_groups!inner(
-    user_id
+    user_id, invite_status
     )`)
-  .eq('profiles_groups.user_id', req.cookies.userId);
+  .eq('profiles_groups.user_id', req.cookies.userId)
+  // A pending invite is not membership: those groups stay off the calendar until accepted.
+  .eq('profiles_groups.invite_status', 'accepted');
 
   if (groupsIdsError) {
     return res.status(500).json({success: false, error: groupsIdsError.message})
@@ -585,18 +587,15 @@ router.get('/renderEvents', authRequire, async (req, res) => {
     memberColorMap[m.groups_id][m.user_id] = m.color;
   });
 
-  let { data: userEvents, error: userEventsError} = await req.supabase.
-  from('events')
-  .select(`*,
-    profiles_events(
-      user_id,
-      rsvp_status,
-      profiles(
-      username
-      )
-    )`)
-  .eq('profiles_events.user_id', req.cookies.userId)
-  .is('groups_id', null);
+  // `mine` (inner join) decides WHICH personal events; `profiles_events` lists ALL
+  // their participants. Filtering the embed itself would hide everyone but me.
+  let { data: userEvents, error: userEventsError } = await req.supabase
+    .from('events')
+    .select(`*,
+      mine:profiles_events!inner(user_id),
+      profiles_events(user_id, rsvp_status, profiles(username))`)
+    .eq('mine.user_id', req.cookies.userId)
+    .is('groups_id', null);
 
   if (userEventsError) {
     console.warn('Could not retrieve any of the events specifically to the user.', userEventsError)
@@ -620,7 +619,8 @@ router.get('/renderEvents', authRequire, async (req, res) => {
     return res.status(400).json({success: false, error: errorEvents.message})
   }
 
-  const combinedEvents = [...events, ...(userEvents ?? [])];
+  // eslint-disable-next-line no-unused-vars -- `mine` only selects rows; keep it out of the response.
+  const combinedEvents = [...events, ...(userEvents ?? []).map(({ mine, ...e }) => e)];
 
   // Expand recurring masters into concrete occurrences within a bounded window.
   const recurringIds = combinedEvents.filter(e => e.recurrence_rule).map(e => e.event_id);
