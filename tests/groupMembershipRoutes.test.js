@@ -48,6 +48,8 @@ beforeAll(async () => {
     req.on("end", () => {
       log.push({ method: req.method, table, search: url.search, authorization: req.headers.authorization });
       let rows = tables[table] ?? [];
+      // invite tokens are unreadable to non-members (RLS): only the secret key sees them
+      if (table === "group_invite_tokens" && req.method === "GET" && req.headers.authorization !== "Bearer test-secret") rows = [];
       for (const [k, v] of url.searchParams) {
         if (v.startsWith("eq.")) rows = rows.filter((r) => String(r[k]) === v.slice(3));
       }
@@ -160,4 +162,41 @@ it("ical token is read and rotated with the secret key, scoped to me", async () 
     expect(l.authorization).toBe(SECRET);
     expect(l.search).toContain(`user_id=eq.${ME}`);
   }
+});
+
+const lastProfileOr = () => log.filter((l) => l.table === "profiles" && l.search.includes("or=")).pop();
+const orParam = (l) => new URL("http://x" + l.search).searchParams.get("or");
+
+it("checkUser by username does not return email", async () => {
+  const r = await call("POST", "/api/checkUser", ME, { isUser: "harry" });
+  const j = await r.json();
+  expect(j.match).toBe(true);
+  expect("email" in j.user).toBe(false);
+});
+
+it("checkUser by exact email returns it", async () => {
+  tables.profiles.reverse(); // stand-in ignores or=; put the matching row first
+  const r = await call("POST", "/api/checkUser", ME, { isUser: "Harry@x.test" });
+  const j = await r.json();
+  expect(j.user.email).toBe("harry@x.test");
+});
+
+it("checkUser escapes underscore and backslash in the ilike pattern", async () => {
+  await call("POST", "/api/checkUser", ME, { isUser: "ha_ry\\x" });
+  const or = orParam(lastProfileOr());
+  expect(or).toContain("username.ilike.ha\\_ry\\\\x");
+  expect(or).toContain("email.ilike.ha\\_ry\\\\x");
+});
+
+it("users/search matches email exactly, without wildcards around it", async () => {
+  await call("GET", "/api/users/search?q=ha_x", ME);
+  const or = orParam(lastProfileOr());
+  expect(or).toBe("(username.ilike.*ha\\_x*,email.ilike.ha\\_x)");
+});
+
+it("inviteUsers response contains no email", async () => {
+  const r = await call("POST", "/api/inviteUsers", ME, { groupId: 7, userList: [{ user_id: OTHER }] });
+  const j = await r.json();
+  expect(j.invitedUsers.length).toBe(1);
+  expect(j.invitedUsers.every((u) => !("email" in u))).toBe(true);
 });

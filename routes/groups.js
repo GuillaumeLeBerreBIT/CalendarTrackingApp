@@ -135,13 +135,15 @@ router.post('/checkUser', authRequire ,async (req, res) => {
     if (term.length < 2) {
       return res.json({ success: true, match: false });
     }
+    // Exact (case-insensitive) match: escape ilike wildcards so '_' and '\\' are literal
+    const likeTerm = term.replace(/[\\_]/g, '\\$&');
 
     // Exact-match lookup of any user: RLS only exposes own/shared-group profiles,
     // so read with the admin client. The searchable/shared-group gate below still applies.
     const {data: isUserFound, error: noUser} = await supabaseAdmin
     .from('profiles')
     .select('username, user_id, email, searchable')
-    .or(`username.ilike.${term},email.ilike.${term}`)
+    .or(`username.ilike.${likeTerm},email.ilike.${likeTerm}`)
     .limit(1)
 
     if (noUser) {
@@ -180,7 +182,8 @@ router.post('/checkUser', authRequire ,async (req, res) => {
     res.json({success: true, match: true, user: {
       username: found.username,
       user_id: found.user_id,
-      email: found.email
+      // Only confirm an email the caller already typed in full
+      ...(typeof found.email === 'string' && found.email.toLowerCase() === term.toLowerCase() && { email: found.email }),
     }})
 
   } catch (error) {
@@ -210,11 +213,13 @@ router.get('/users/search', authRequire, async (req, res) => {
 
     // Admin client: the search spans users RLS hides; filters below keep it to
     // searchable profiles and only username is returned to the caller.
+    // Username is a substring match; email only matches exactly (no existence oracle).
+    const likeQ = q.replace(/[\\_]/g, '\\$&');
     let query = supabaseAdmin
       .from('profiles')
       .select('user_id, username')
       .eq('searchable', true)
-      .or(`username.ilike.*${q}*,email.ilike.*${q}*`)
+      .or(`username.ilike.*${likeQ}*,email.ilike.${likeQ}`)
       .neq('user_id', req.cookies.userId)
       .limit(10);
 
@@ -321,7 +326,7 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
 
     const {data: userProfile, error: userProfileError} = await supabaseAdmin
       .from('profiles')
-      .select('email, user_id, username')
+      .select('user_id, username')
       .in('user_id', emailIdList)
     
     if (userProfileError) {
@@ -332,8 +337,7 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
       const profile = userProfile?.find(p => p.user_id === invite.user_id);
       return {
         ...invite,
-        username: profile.username,
-        email: profile.email
+        username: profile?.username,
       }
     })
 
@@ -809,8 +813,9 @@ router.post('/joinGroup/:token', authRequire, async (req, res) => {
   const { token } = req.params;
   const userId = req.cookies.userId;
 
-  // Validate token (use req.supabase so RLS is enforced with the user's JWT)
-  const { data: tokenRow, error: tokenError } = await req.supabase
+  // Validate token with the admin client: non-members cannot read invite tokens under RLS.
+  // The token itself is the credential; the lookup is filtered by it.
+  const { data: tokenRow, error: tokenError } = await supabaseAdmin
     .from('group_invite_tokens')
     .select('token, groups_id, expires_at, max_uses, use_count')
     .eq('token', token)
