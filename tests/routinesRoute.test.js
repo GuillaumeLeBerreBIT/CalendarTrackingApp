@@ -16,6 +16,7 @@ const tables = {
     { ...rec, event_id: 6, created_by: OTHER, event_title: "Not mine", start_date: "2026-01-05", end_date: "2026-01-05", recurrence_rule: "FREQ=WEEKLY" },
   ],
   event_overrides: [],
+  groups: [{ groups_id: 9, groups_title: "HOME" }],
 };
 
 let fake, server, base;
@@ -56,13 +57,20 @@ afterAll(() => { server?.close(); fake?.close(); });
 
 const get = (user) => fetch(`${base}/api/routines`, { headers: { cookie: `authCookie=${user}; refreshToken=r; expiresAt=9999999999` } });
 
-it("lists only my own personal repeating events, active before finished", async () => {
+it("lists my own repeating events, personal and group, active before finished", async () => {
   const body = await (await get(ME)).json();
   expect(body.success).toBe(true);
-  expect(body.routines.map((r) => r.title)).toEqual(["Swim", "Old class"]);
-  expect(body.routines[0].ended).toBe(false);
-  expect(body.routines[0].next).toMatchObject({ time: "19:00" });
-  expect(body.routines[1]).toMatchObject({ ended: true, next: null });
+  expect(body.routines.map((r) => r.title).sort()).toEqual(["Group practice", "Old class", "Swim"]);
+  const active = body.routines.filter((r) => !r.ended).map((r) => r.title);
+  expect(active.sort()).toEqual(["Group practice", "Swim"]);
+  expect(body.routines[body.routines.length - 1]).toMatchObject({ title: "Old class", ended: true, next: null });
+  expect(body.routines.find((r) => r.title === "Swim").next).toMatchObject({ time: "19:00" });
+});
+
+it("labels each routine with its group, or none when personal", async () => {
+  const body = await (await get(ME)).json();
+  expect(body.routines.find((r) => r.title === "Group practice")).toMatchObject({ groupId: 9, groupTitle: "HOME" });
+  expect(body.routines.find((r) => r.title === "Swim")).toMatchObject({ groupId: null, groupTitle: null });
 });
 
 it("someone else sees only their own", async () => {

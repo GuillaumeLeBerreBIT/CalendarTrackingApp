@@ -1,6 +1,7 @@
 import { buildRRule, parseRRule, isFullyEditable } from './recurrence'
 
-// A routine is a personal weekly-repeating event: "swim, Mon + Tue, 19:00".
+// A routine is a weekly-repeating event: "swim, Mon + Tue, 19:00", personal or
+// shared with a group (visible to its members, nobody is invited).
 // These helpers turn the quick-create form into the same payload the event
 // form sends, so routines are ordinary recurring events underneath.
 
@@ -29,6 +30,8 @@ export interface RoutineDraft {
   endTime: string
   end: EndPreset
   reminderMinutes: number | null
+  /** Group the routine is shared with; null/absent = just me. */
+  groupId?: string | null
 }
 
 const JS_DAY_TO_CODE = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
@@ -89,7 +92,7 @@ export interface PayloadOptions {
 export function routinePayload(draft: RoutineDraft, startDate: string, opts: PayloadOptions = {}): Record<string, unknown> {
   const allDay = !draft.startTime
   const endDate = 'endDate' in opts ? opts.endDate ?? null : endDateForPreset(opts.endFrom ?? startDate, draft.end)
-  return {
+  const payload: Record<string, unknown> = {
     'calendar-title': draft.title.trim(),
     'calendar-description': '',
     location: null,
@@ -103,6 +106,10 @@ export function routinePayload(draft: RoutineDraft, startDate: string, opts: Pay
     reminder_minutes: draft.reminderMinutes,
     status: 'confirmed',
   }
+  // Group routine: groups_id only. No event_type/participants, so the members
+  // see it on the group calendar without each getting an invite.
+  if (draft.groupId) payload.tagNames = draft.groupId
+  return payload
 }
 
 /** Can the quick sheet edit this rule without losing anything (plain weekly, every week)? */

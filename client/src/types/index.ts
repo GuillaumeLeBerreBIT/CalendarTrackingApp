@@ -195,4 +195,6 @@ export interface Routine {
   timezone: string
   next: { date: string; time: string | null } | null
   ended: boolean
+  groupId: number | null
+  groupTitle: string | null
 }

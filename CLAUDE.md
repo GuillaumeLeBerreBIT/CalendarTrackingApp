@@ -40,8 +40,9 @@ routes/
   todo.js                — /api/todo and task/task-list management
   habits.js              — /api/habits CRUD + /api/habits/:id/log (XP, pact increment)
   timers.js              — /api/timers CRUD (Pomodoro/countdown timers)
-  routines.js            — GET /api/routines: own personal weekly-repeating events + next session
-                           (create/edit/stop reuse /parseEvent; a routine is just a recurring event)
+  routines.js            — GET /api/routines: own weekly-repeating events (personal or in a group) + next session + group label
+                           (create/edit/stop reuse /parseEvent; a routine is just a recurring event;
+                           a group routine sets groups_id only, so members see it but nobody is invited)
   challenges.js          — /api/groups/:id/challenges (group shared goals)
   pacts.js               — /api/groups/:id/pacts (locked-event group bets)
   notifications.js       — /api/notifications, /api/notification-prefs
@@ -108,7 +109,7 @@ client/
       MobileMonthGrid.tsx — Compact mobile month grid (dot per covered day + day list)
       OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)
       CommentThread.tsx  — Self-contained event comment thread
-      RoutineSheet.tsx   — Quick create/edit sheet for a routine (day chips, time, end preset)
+      RoutineSheet.tsx   — Quick create/edit sheet for a routine ("Where": just me or a group, day chips, time, end preset)
       RecurringScopePrompt.tsx — "This / following / all" prompt for recurring edits
     lib/
       design.ts          — Group color map, design constants

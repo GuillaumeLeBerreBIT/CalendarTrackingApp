@@ -53,6 +53,14 @@ describe("routinePayload", () => {
     expect(days.every((d) => [1, 2].includes(new Date(d + "T00:00:00Z").getUTCDay()))).toBe(true);
   });
 
+  it("is personal without a group, and goes to the group without inviting anyone when one is chosen", () => {
+    expect(routinePayload(draft, "2026-11-02")).not.toHaveProperty("tagNames");
+    const p = routinePayload({ ...draft, groupId: "9" }, "2026-11-02");
+    expect(p.tagNames).toBe("9");
+    expect(p).not.toHaveProperty("event_type");
+    expect(p).not.toHaveProperty("participants");
+  });
+
   it("is all-day without a start time", () => {
     expect(routinePayload({ ...draft, startTime: "", endTime: "" }, "2026-11-02")).toMatchObject({ allDay: true, startTime: "", endTime: "" });
   });

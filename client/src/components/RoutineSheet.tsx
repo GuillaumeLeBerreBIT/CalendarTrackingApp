@@ -30,9 +30,13 @@ const labelStyle: React.CSSProperties = {
 
 type EndChoice = EndPreset | 'keep'
 
+export interface RoutineGroup { id: string; title: string }
+
 /** Quick create / edit for a routine. `routine` set = edit mode. */
-export default function RoutineSheet({ routine, onClose, onSaved }: {
+export default function RoutineSheet({ routine, groups, onClose, onSaved }: {
   routine?: Routine
+  /** Groups the routine can be shared with ("Just me" is always offered). */
+  groups: RoutineGroup[]
   onClose: () => void
   onSaved: () => void
 }) {
@@ -40,6 +44,7 @@ export default function RoutineSheet({ routine, onClose, onSaved }: {
   const existing = routine ? parseRRule(routine.rule) : null
 
   const [title, setTitle] = useState(routine?.title ?? '')
+  const [groupId, setGroupId] = useState(routine?.groupId != null ? String(routine.groupId) : '')
   const [weekdays, setWeekdays] = useState<string[]>(existing?.weekdays ?? [])
   const [startTime, setStartTime] = useState(routine?.startTime ?? '')
   const [endTime, setEndTime] = useState(routine?.endTime ?? '')
@@ -59,7 +64,7 @@ export default function RoutineSheet({ routine, onClose, onSaved }: {
 
     const draft: RoutineDraft = {
       title, weekdays, startTime, endTime: startTime ? endTime : '',
-      end: end === 'keep' ? '12m' : end, reminderMinutes: reminder,
+      end: end === 'keep' ? '12m' : end, reminderMinutes: reminder, groupId: groupId || null,
     }
     setSaving(true)
     setError('')
@@ -83,6 +88,11 @@ export default function RoutineSheet({ routine, onClose, onSaved }: {
       setSaving(false)
     }
   }
+
+  // A group the user has since left still shows, so opening the sheet never moves it silently.
+  const groupOptions = routine?.groupId != null && !groups.some((g) => g.id === String(routine.groupId))
+    ? [...groups, { id: String(routine.groupId), title: routine.groupTitle ?? 'Former group' }]
+    : groups
 
   const keepEndLabel = existing?.endMode === 'on' && existing.endDate
     ? `Keep (until ${formatDay(existing.endDate)})` : 'Keep (no end)'
@@ -123,6 +133,20 @@ export default function RoutineSheet({ routine, onClose, onSaved }: {
           <label style={labelStyle} htmlFor="routine-title">Name</label>
           <input id="routine-title" style={inputStyle} placeholder="e.g. Swim training" value={title}
             onChange={(e) => setTitle(e.target.value)} autoFocus maxLength={120} />
+        </div>
+
+        <div>
+          <label style={labelStyle} htmlFor="routine-group">Where</label>
+          <select id="routine-group" style={{ ...inputStyle, cursor: 'pointer' }}
+            value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+            <option value="">Just me</option>
+            {groupOptions.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+          </select>
+          {groupId && (
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '6px 0 0' }}>
+              Everyone in the group sees it on their calendar. Nobody is invited.
+            </p>
+          )}
         </div>
 
         <div>

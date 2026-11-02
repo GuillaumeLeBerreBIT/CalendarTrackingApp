@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
-import RoutineSheet from '@/components/RoutineSheet'
+import RoutineSheet, { type RoutineGroup } from '@/components/RoutineSheet'
 import { describeRoutine, formatDay, isSimpleRoutine, localToday } from '@/lib/routines'
 import type { Routine } from '@/types'
 
@@ -52,6 +52,10 @@ function RoutineCard({ routine, onEdit, onStop, onDelete }: {
       <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
         {describeRoutine(routine.rule)} · {timeRange(routine)}
       </p>
+      <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: routine.groupId != null ? 'var(--text-2)' : 'var(--text-3)', margin: 0 }}>
+        <Icon name={routine.groupId != null ? 'groups' : 'profile'} size={13} sw={2} />
+        {routine.groupId != null ? routine.groupTitle ?? 'Group' : 'Just me'}
+      </p>
       <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
         Started {formatDay(routine.startDate)}
         {routine.reminderMinutes != null && !routine.allDay ? ` · reminder ${routine.reminderMinutes >= 60 ? `${routine.reminderMinutes / 60} h` : `${routine.reminderMinutes} min`} before` : ''}
@@ -73,6 +77,18 @@ export default function RoutinesPage() {
   const [loadError, setLoadError] = useState(false)
   const [sheet, setSheet] = useState<{ routine?: Routine } | null>(null)
   const [actionError, setActionError] = useState('')
+  const [groups, setGroups] = useState<RoutineGroup[]>([])
+
+  useEffect(() => {
+    api.get('/groups')
+      .then(({ data }) => {
+        if (!data.success || !Array.isArray(data.userGroups)) return
+        setGroups(data.userGroups.map((g: { groupInfo: { groupId: string | number; title: string } }) => ({
+          id: String(g.groupInfo.groupId), title: g.groupInfo.title,
+        })))
+      })
+      .catch(() => { /* the sheet still offers "Just me" */ })
+  }, [])
 
   // Bumping `version` refetches; state is only set from the response callbacks.
   const [version, setVersion] = useState(0)
@@ -166,6 +182,7 @@ export default function RoutinesPage() {
       {sheet && (
         <RoutineSheet
           routine={sheet.routine}
+          groups={groups}
           onClose={() => setSheet(null)}
           onSaved={() => { setSheet(null); load() }}
         />
