@@ -18,6 +18,7 @@
 -- Then check nothing persisted:
 --   select count(*) from groups where groups_title like '%ZZ access-rules test%';  -- 0
 --   select to_regclass('public.zz_access_rules_probe');                             -- null
+--   select to_regprocedure('public.zz_access_rules_probe_fn()');                    -- null
 
 do $$
 declare
@@ -30,6 +31,7 @@ declare
   e_m int;
   pe int;
   ics int;
+  s_ev int;
   n int;
   v text;
   raised boolean;
@@ -45,6 +47,14 @@ begin
      or exists (select 1 from events e join profiles_events x using (event_id)
                  where (e.created_by = a and x.user_id = s) or (e.created_by = s and x.user_id = a)) then
     raise exception 'FAIL: precondition: S already shares a group or event with A';
+  end if;
+  if exists (select 1 from profiles_groups x join profiles_groups y using (groups_id)
+              where x.user_id = m and y.user_id = s)
+     or exists (select 1 from profiles_events x join profiles_events y using (event_id)
+                 where x.user_id = m and y.user_id = s)
+     or exists (select 1 from events e join profiles_events x using (event_id)
+                 where (e.created_by = m and x.user_id = s) or (e.created_by = s and x.user_id = m)) then
+    raise exception 'FAIL: precondition: S already shares a group or event with M';
   end if;
 
   -- ---------- seed (as owner) ----------
@@ -62,6 +72,8 @@ begin
     values ('ZZ PE', '2030-01-03', '2030-01-03', null, a) returning event_id into pe;
   insert into profiles_events (user_id, event_id, rsvp_status) values
     (a, e_a, 'going'), (m, e_m, 'going'), (a, pe, 'going'), (m, pe, 'pending');
+  insert into event_overrides (event_id, occurrence_date, is_cancelled)
+    values (e_a, '2030-01-08', true);
 
   -- ---------- stranger cannot read profiles ----------
   perform set_config('request.jwt.claims', json_build_object('sub', s, 'role', 'authenticated')::text, true);
@@ -70,6 +82,17 @@ begin
   if n <> 0 then raise exception 'FAIL: stranger cannot read profiles (S sees A: % rows)', n; end if;
   select count(*) into n from profiles_groups where groups_id = g;
   if n <> 0 then raise exception 'FAIL: stranger cannot read memberships (% rows)', n; end if;
+  select count(*) into n from profiles_events where event_id = e_a;
+  if n <> 0 then raise exception 'FAIL: stranger cannot read RSVPs (S reads % rows of E_A)', n; end if;
+  select count(*) into n from event_overrides where event_id = e_a;
+  if n <> 0 then raise exception 'FAIL: stranger cannot read overrides (S reads % rows of E_A)', n; end if;
+  -- S invites A to S's own event: an invite alone does not reveal A.
+  insert into events (event_title, start_date, end_date, groups_id, created_by)
+    values ('ZZ S bait', '2030-01-06', '2030-01-06', null, s) returning event_id into s_ev;
+  insert into profiles_events (user_id, event_id, rsvp_status) values
+    (s, s_ev, 'going'), (a, s_ev, 'pending');
+  select count(*) into n from profiles where user_id = a;
+  if n <> 0 then raise exception 'FAIL: stranger cannot read profiles (S invited A, then sees A: % rows)', n; end if;
   reset role;
 
   perform set_config('request.jwt.claims', json_build_object('sub', m, 'role', 'authenticated')::text, true);
@@ -93,6 +116,18 @@ begin
   exception when insufficient_privilege then raised := true;
   end;
   if not raised then raise exception 'FAIL: hidden columns (A wrote own total_xp)'; end if;
+  raised := false;
+  begin
+    update profiles set plan = 'plus' where user_id = a;
+  exception when insufficient_privilege then raised := true;
+  end;
+  if not raised then raise exception 'FAIL: hidden columns (A wrote own plan)'; end if;
+  raised := false;
+  begin
+    update profiles set ical_token = 'zz-forged' where user_id = a;
+  exception when insufficient_privilege then raised := true;
+  end;
+  if not raised then raise exception 'FAIL: hidden columns (A wrote own ical_token)'; end if;
   update profiles set city = city where user_id = a;
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: hidden columns (A cannot update own city: % rows)', n; end if;
@@ -179,6 +214,12 @@ begin
   update events set event_title = 'ZZ E_M (edited by A)' where event_id = e_m;
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: group admin manages member event (A updating E_M: % rows)', n; end if;
+  raised := false;
+  begin
+    update events set created_by = m where event_id = e_a;
+  exception when insufficient_privilege then raised := true;
+  end;
+  if not raised then raise exception 'FAIL: created_by is immutable (A gave E_A to M)'; end if;
   reset role;
   perform set_config('request.jwt.claims', json_build_object('sub', m, 'role', 'authenticated')::text, true);
   set local role authenticated;
@@ -221,6 +262,11 @@ begin
   update profiles_events set rsvp_status = 'no' where user_id = m and event_id = pe;
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'FAIL: creator invites participants (S changed M''s RSVP)'; end if;
+  -- Having answered on PE, S sees PE's creator A, but not M, who is still pending on it.
+  select count(*) into n from profiles where user_id = a;
+  if n <> 1 then raise exception 'FAIL: event co-participants (S on PE reading creator A: % rows)', n; end if;
+  select count(*) into n from profiles where user_id = m;
+  if n <> 0 then raise exception 'FAIL: event co-participants (S on PE reads pending M: % rows)', n; end if;
   reset role;
 
   -- ---------- ics import as self ----------
@@ -275,6 +321,10 @@ begin
                 and d.defaclrole = current_user::regrole
                 and x.grantee = 'anon'::regrole) then
     raise exception 'FAIL: anon has nothing (default privileges still grant anon)';
+  end if;
+  create function public.zz_access_rules_probe_fn() returns int language sql as 'select 1';
+  if has_function_privilege('anon', 'public.zz_access_rules_probe_fn()', 'execute') then
+    raise exception 'FAIL: anon has nothing (new function executable by anon)';
   end if;
   if has_table_privilege('anon', 'public.profiles', 'select') then
     raise exception 'FAIL: anon has nothing (anon selects profiles)';

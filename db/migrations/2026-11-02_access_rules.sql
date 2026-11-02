@@ -124,7 +124,10 @@ drop policy if exists event_overrides_modify                 on public.event_ove
 drop policy if exists event_overrides_select                 on public.event_overrides;
 
 -- ---------- profiles ----------
--- Read: self; anyone sharing a group (any invite status) or an event I can access.
+-- Read: self; anyone sharing a group (any invite status); the creator of an event I can
+-- access; a participant who has responded (rsvp_status <> 'pending') on an event I can
+-- access. A pending invitee does not count: whoever manages an event can add anyone as a
+-- participant, so "invited" alone must not reveal a stranger's profile (or email).
 -- Strangers are found only through the search routes (supabaseAdmin).
 create policy "profiles read self or shared" on public.profiles
   for select to authenticated
@@ -134,7 +137,8 @@ create policy "profiles read self or shared" on public.profiles
                  join public.profiles_groups theirs on theirs.groups_id = mine.groups_id
                 where mine.user_id = auth.uid() and theirs.user_id = profiles.user_id)
     or exists (select 1 from public.profiles_events pe
-                where pe.user_id = profiles.user_id and public.can_access_event(pe.event_id))
+                where pe.user_id = profiles.user_id and pe.rsvp_status <> 'pending'
+                  and public.can_access_event(pe.event_id))
     or exists (select 1 from public.events e
                 where e.created_by = profiles.user_id and public.can_access_event(e.event_id))
   );
@@ -180,7 +184,8 @@ create policy "groups delete admin" on public.groups
 -- Read: unchanged (group member / creator / participant; is_group_member is now
 -- accepted-only). Insert: as myself, personal or in a group I am a member of.
 -- Update and delete: creator or group admin (= canManageEvent); the updated row must
--- stay personal or in a group I am a member of.
+-- stay personal or in a group I am a member of. created_by cannot be changed by users
+-- (trigger below): a WITH CHECK cannot compare against the old row.
 create policy "events select" on public.events
   for select to authenticated
   using (
@@ -199,13 +204,28 @@ create policy "events insert own" on public.events
 create policy "events update manager" on public.events
   for update to authenticated
   using (public.can_manage_event(event_id))
-  with check (
-    (groups_id is null or public.is_group_member(groups_id::bigint))
-    and (created_by = auth.uid() or public.can_manage_event(event_id))
-  );
+  with check (groups_id is null or public.is_group_member(groups_id::bigint));
 create policy "events delete manager" on public.events
   for delete to authenticated
   using (public.can_manage_event(event_id));
+
+-- Users (role authenticated, i.e. PostgREST with a user token) may not rewrite
+-- created_by; supabaseAdmin (service_role) and the owner still can.
+create or replace function public.events_created_by_immutable()
+returns trigger language plpgsql security invoker set search_path = public as $$
+begin
+  if current_user = 'authenticated' and new.created_by is distinct from old.created_by then
+    raise exception 'events.created_by cannot be changed'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.events_created_by_immutable() from public, anon, authenticated;
+drop trigger if exists events_created_by_immutable on public.events;
+create trigger events_created_by_immutable
+  before update on public.events
+  for each row execute function public.events_created_by_immutable();
 
 -- ---------- profiles_events ----------
 -- Read: rows of events I can access. Insert: myself on an event I can access (RSVP,
@@ -279,6 +299,12 @@ revoke all on all tables in schema public from anon;
 alter default privileges in schema public revoke all on tables    from anon;
 alter default privileges in schema public revoke all on sequences from anon;
 alter default privileges in schema public revoke all on functions from anon;
+-- New functions are also no longer executable by PUBLIC (which includes anon). That grant
+-- is a built-in GLOBAL default, and a per-schema REVOKE cannot remove a globally granted
+-- privilege (PostgreSQL docs, ALTER DEFAULT PRIVILEGES), so this one is global, for the
+-- running role. authenticated and service_role keep EXECUTE on new functions in public
+-- through the schema-level defaults.
+alter default privileges revoke execute on functions from public;
 
 -- profiles: hidden columns (ical_token, paddle_customer_id, plan, tier, always_free) are
 -- neither readable nor writable by users; total_xp and email are readable, not writable.
@@ -301,7 +327,8 @@ grant update (invite_status, color) on public.profiles_groups to authenticated;
 -- verbatim from pg_policies; privileges from pg_class.relacl, which were
 -- arwdDxtm = ALL for anon and authenticated on all 28 public tables, with no column
 -- grants; postgres's default privileges in public granting ALL on tables, sequences and
--- functions to anon; is_group_member as defined before). Kept commented so pasting the whole file
+-- functions to anon and no global default-privilege entries; no trigger on events;
+-- is_group_member as defined before). Kept commented so pasting the whole file
 -- never undoes the forward section; uncomment (strip the leading `-- `) and paste it.
 --
 -- drop policy if exists "profiles read self or shared"  on public.profiles;
@@ -434,3 +461,7 @@ grant update (invite_status, color) on public.profiles_groups to authenticated;
 -- alter default privileges in schema public grant all on tables    to anon;
 -- alter default privileges in schema public grant all on sequences to anon;
 -- alter default privileges in schema public grant all on functions to anon;
+-- alter default privileges grant execute on functions to public;
+--
+-- drop trigger if exists events_created_by_immutable on public.events;
+-- drop function if exists public.events_created_by_immutable();
