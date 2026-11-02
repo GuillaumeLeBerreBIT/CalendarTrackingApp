@@ -46,9 +46,9 @@ the route's explicit check. That is the same pattern `delete_group()` already us
 
 | Table | Read | Write |
 |---|---|---|
-| `profiles` | self; anyone sharing a group (any status) or an event. Strangers are found only through the search routes. | update own row, **only** username/city/bio/avatar/onboarding/searchable/email-digest/notification-prefs columns. Columns `ical_token`, `paddle_customer_id`, `plan`, `tier`, `always_free`, `total_xp` are not readable or writable by users at all; routes read the own-row values through `supabaseAdmin`. |
-| `profiles_groups` | own rows; rows of groups where I have any row | insert: only the group creator's own first admin row (group has no rows yet). Update: own row, columns `invite_status` and `color` only, so no self-promotion. Delete: own row (leave). Invites, removals and invite-link joins go through `supabaseAdmin`. |
-| `groups` | `has_group_row` | insert: any user. Update and delete: admin. |
+| `profiles` | self; anyone sharing a group (any status) or an event. Strangers are found only through the search routes. | update own row, **only** username/city/bio/avatar/onboarding/searchable/email-digest/notification-prefs columns. Columns `ical_token`, `paddle_customer_id`, `plan`, `tier`, `always_free` are not readable or writable by users at all; routes read the own-row values through `supabaseAdmin`. `total_xp` stays readable (the profile page shows it) but is not writable. |
+| `profiles_groups` | own rows; rows of groups where I have any row | insert: none for users. Update: own row, columns `invite_status` and `color` only, so no self-promotion. Delete: own row (leave). Invites, removals and invite-link joins go through `supabaseAdmin`. |
+| `groups` | `has_group_row` | insert: none for users (`createGroup` writes the group and its creator's admin row through `supabaseAdmin`, since `insert … returning` cannot pass a membership check before the membership exists). Update and delete: admin. |
 | `events` | unchanged (group member / creator / participant) | insert: `created_by = me` and (personal, or I'm a member of the group). Update and delete: creator or group admin, matching `canManageEvent`. |
 | `profiles_events` | rows of events I can access | insert: myself on an event I can access (RSVP, .ics import), or any user if I created the event. Update: own row, or any row if I created the event. Delete: own row, or the event's creator. |
 | `event_comments`, `event_reactions` | `can_access_event` | own rows on events I can access |
