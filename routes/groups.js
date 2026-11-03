@@ -7,6 +7,26 @@ import { sanitizeOrTerm } from "../utils/postgrestFilter.js";
 import { isGroupMember } from "../utils/groupAccess.js";
 const router = express.Router();
 
+// RLS hides a not-yet-accepted member's profile from the rest of the group, so the
+// profiles(...) embed comes back null for them. Fill in their username (never their
+// email) with one admin-client query. Mutates and returns `memberships`.
+async function fillPendingUsernames(memberships, callerId) {
+  const pendingIds = memberships
+    .filter((pg) => pg.invite_status !== 'accepted' && pg.user_id !== callerId)
+    .map((pg) => pg.user_id);
+  if (pendingIds.length === 0) return memberships;
+  const { data: names, error } = await supabaseAdmin
+    .from('profiles')
+    .select('user_id, username')
+    .in('user_id', pendingIds);
+  if (error) throw new Error(`pending member lookup failed: ${error.message}`);
+  const byId = new Map((names || []).map((n) => [n.user_id, n.username]));
+  for (const pg of memberships) {
+    if (pendingIds.includes(pg.user_id)) pg.profiles = { username: byId.get(pg.user_id) ?? null };
+  }
+  return memberships;
+}
+
 
 router.get("/groups", authRequire, async (req, res) => {
 
@@ -51,6 +71,12 @@ router.get("/groups", authRequire, async (req, res) => {
 
   if (groupsError) {
     return res.status(400).json({success: false, error: groupsError.message});
+  }
+
+  try {
+    await fillPendingUsernames(groups.flatMap((g) => g.profiles_groups || []), req.cookies.userId);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
   }
 
   const userGroups =
@@ -231,8 +257,20 @@ router.get('/users/search', authRequire, async (req, res) => {
     let results = users || [];
 
     // Optionally exclude users already in a given group (any invite_status)
+    // Only for a group the caller has a row in: otherwise this would reveal who is
+    // in (or invited to) someone else's group.
     const groupsId = req.query.groups_id ? parseInt(req.query.groups_id) : NaN;
+    let callerInGroup = false;
     if (!isNaN(groupsId) && results.length > 0) {
+      const { data: ownRow } = await req.supabase
+        .from('profiles_groups')
+        .select('user_id')
+        .eq('groups_id', groupsId)
+        .eq('user_id', req.cookies.userId)
+        .limit(1);
+      callerInGroup = (ownRow || []).length > 0;
+    }
+    if (callerInGroup) {
       const { data: existingMembers, error: membersError } = await supabaseAdmin
         .from('profiles_groups')
         .select('user_id')
@@ -263,7 +301,8 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
       .select('role')
       .eq('groups_id', req.body.groupId)
       .eq('user_id', req.cookies.userId)
-      .single();
+      .eq('invite_status', 'accepted')
+      .maybeSingle();
 
     if (membershipError || membership?.role !== 'admin') {
       return res.status(403).json({ success: false, error: 'Only group admins can invite members.' });
@@ -277,7 +316,11 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
     .in('user_id', userIds)
     .eq('groups_id', req.body.groupId);
 
-    const existingUsers = users2Check.filter(u => u.invite_status === 'accepted'
+    if (users2CheckError) {
+      return res.status(500).json({ success: false, error: `Could not check existing members: ${users2CheckError.message}` });
+    }
+
+    const existingUsers = (users2Check || []).filter(u => u.invite_status === 'accepted'
       || u.invite_status === 'pending'
     ).map(u => u.user_id) || [];
 
@@ -395,9 +438,13 @@ router.post('/createGroup', authRequire, async (req, res) => {
 
   // Now need to ahndle sending invites to other users
   let promiseInviteResults
-  if (req.body.usersInvite) {
+  // Never invite the creator: the upsert would demote their admin row to a pending member.
+  const usersInvite = Array.isArray(req.body.usersInvite)
+    ? req.body.usersInvite.filter((u) => u?.user_id && u.user_id !== req.cookies.userId)
+    : [];
+  if (usersInvite.length > 0) {
     // Need to use map to catch alle results and do async programming with it.
-    promiseInviteResults = await Promise.all(req.body.usersInvite.map( async (user) => {
+    promiseInviteResults = await Promise.all(usersInvite.map( async (user) => {
       let {data: inviteUser, error: inviteUserError} = await supabaseAdmin
       .from('profiles_groups')
       .upsert([{
@@ -456,11 +503,17 @@ router.post('/acceptInviteGroup', authRequire, async (req, res) => {
     return res.status(400).json({success: false, error: groupsError.message});
   }
 
+  try {
+    await fillPendingUsernames(group[0]?.profiles_groups || [], req.cookies.userId);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+
   const members = group[0].profiles_groups?.map((pg) => {
     return {
       role: pg.role,
-      username: pg.profiles.username,
-      email: pg.profiles.email,
+      username: pg.profiles?.username ?? null,
+      email: pg.profiles?.email,
       invite_status: pg.invite_status,
       user_id: pg.user_id
     };
@@ -540,8 +593,8 @@ router.get('/getGroupMembers/:groupId', authRequire, async (req, res) => {
     sharedColor: group.shared_color || '#6B7280',
     members: members.map(m => ({
       user_id: m.user_id,
-      username: m.profiles.username,
-      email: m.profiles.email,
+      username: m.profiles?.username ?? null,
+      email: m.profiles?.email,
       role: m.role,
       color: m.color
     }))
@@ -891,6 +944,7 @@ router.patch('/groups/:groupId', authRequire, async (req, res) => {
     .eq('groups_id', groupId)
     .eq('user_id', callerId)
     .eq('role', 'admin')
+    .eq('invite_status', 'accepted')
     .maybeSingle();
 
   if (membershipError) {
@@ -928,6 +982,7 @@ async function isGroupAdmin(client, userId, groupId) {
     .eq('groups_id', groupId)
     .eq('user_id', userId)
     .eq('role', 'admin')
+    .eq('invite_status', 'accepted')
     .maybeSingle();
   if (error) throw new Error(`admin check failed: ${error.message}`);
   return !!data;
@@ -1062,6 +1117,7 @@ router.delete('/groups/:groupId/members/:userId', authRequire, async (req, res) 
     .eq('groups_id', groupId)
     .eq('user_id', callerId)
     .eq('role', 'admin')
+    .eq('invite_status', 'accepted')
     .maybeSingle();
 
   if (membershipError) {

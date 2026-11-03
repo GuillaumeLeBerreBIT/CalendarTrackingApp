@@ -7,6 +7,7 @@ import http from "http";
 const ME = "00000000-0000-4000-8000-0000000000aa";
 const OTHER = "00000000-0000-4000-8000-0000000000bb";
 const MEMBER = "00000000-0000-4000-8000-0000000000cc";
+const PENDING_ADMIN = "00000000-0000-4000-8000-0000000000dd";
 const future = new Date(Date.now() + 86400000).toISOString();
 
 let tables;
@@ -19,6 +20,7 @@ const resetTables = () => {
     profiles_groups: [
       { user_id: ME, groups_id: 7, role: "admin", invite_status: "accepted" },
       { user_id: MEMBER, groups_id: 8, role: "member", invite_status: "accepted" },
+      { user_id: PENDING_ADMIN, groups_id: 7, role: "admin", invite_status: "pending" },
     ],
     groups: [
       { groups_id: 7, groups_title: "Seven" },
@@ -29,7 +31,10 @@ const resetTables = () => {
     ],
     notifications: [],
   };
+  overrides = {};
 };
+// Per-test canned GET responses for embed queries the stand-in cannot evaluate.
+let overrides = {};
 
 let fake, server, base;
 let log = [];
@@ -46,12 +51,17 @@ beforeAll(async () => {
     let raw = "";
     req.on("data", (c) => (raw += c));
     req.on("end", () => {
-      log.push({ method: req.method, table, search: url.search, authorization: req.headers.authorization });
+      log.push({ method: req.method, table, search: url.search, authorization: req.headers.authorization, body: raw });
+      if (req.method === "GET" && overrides[table]) return res.end(JSON.stringify(overrides[table]));
       let rows = tables[table] ?? [];
       // invite tokens are unreadable to non-members (RLS): only the secret key sees them
       if (table === "group_invite_tokens" && req.method === "GET" && req.headers.authorization !== "Bearer test-secret") rows = [];
       for (const [k, v] of url.searchParams) {
         if (v.startsWith("eq.")) rows = rows.filter((r) => String(r[k]) === v.slice(3));
+        if (v.startsWith("in.(")) {
+          const vals = v.slice(4, -1).split(",").map((x) => x.replace(/^"|"$/g, ""));
+          rows = rows.filter((r) => vals.includes(String(r[k])));
+        }
       }
       if (req.method === "POST" || req.method === "PATCH") {
         // echo the written rows back (as return=representation would)
@@ -199,4 +209,62 @@ it("inviteUsers response contains no email", async () => {
   const j = await r.json();
   expect(j.invitedUsers.length).toBe(1);
   expect(j.invitedUsers.every((u) => !("email" in u))).toBe(true);
+});
+
+// ---- final fix wave ----
+
+it("GET /groups fills a pending member's username, never their email", async () => {
+  overrides.groups = [{
+    groups_id: 7, groups_title: "Seven", created_at: "2026-01-01T00:00:00Z",
+    profiles_groups: [
+      { user_id: ME, role: "admin", invite_status: "accepted", profiles: { username: "me", email: "me@x.test" } },
+      { user_id: OTHER, role: "member", invite_status: "pending", profiles: null },
+    ],
+  }];
+  const r = await call("GET", "/api/groups", ME);
+  expect(r.status).toBe(200);
+  const { userGroups } = await r.json();
+  const pending = userGroups[0].members.find((m) => m.user_id === OTHER);
+  expect(pending.profile.username).toBe("harry");
+  expect(pending.profile.email).toBeUndefined();
+  const lookup = log.filter((l) => l.table === "profiles");
+  expect(lookup).toHaveLength(1);
+  expect(lookup[0].authorization).toBe(SECRET);
+  expect(new URL("http://x" + lookup[0].search).searchParams.get("select")).toBe("user_id,username");
+});
+
+it("createGroup ignores the caller in usersInvite (creator stays admin)", async () => {
+  const r = await call("POST", "/api/createGroup", ME, {
+    "group-title": "New", "group-description": "d", "tag-name": "t",
+    usersInvite: [{ user_id: ME, username: "me" }, { user_id: OTHER, username: "harry" }],
+  });
+  expect(r.status).toBe(200);
+  const pg = writes("profiles_groups").map((w) => [].concat(JSON.parse(w.body)));
+  expect(pg).toHaveLength(2); // creator admin row + OTHER's invite
+  const mine = pg.flat().filter((row) => row.user_id === ME);
+  expect(mine).toEqual([expect.objectContaining({ role: "admin", invite_status: "accepted" })]);
+});
+
+it("a pending 'admin' cannot invite, remove members or edit the group", async () => {
+  const inv = await call("POST", "/api/inviteUsers", PENDING_ADMIN, { groupId: 7, userList: [{ user_id: OTHER }] });
+  expect(inv.status).toBe(403);
+  const rm = await call("DELETE", `/api/groups/7/members/${OTHER}`, PENDING_ADMIN);
+  expect(rm.status).toBe(403);
+  const ed = await call("PATCH", "/api/groups/7", PENDING_ADMIN, { groups_title: "Hijacked" });
+  expect(ed.status).toBe(403);
+  expect(writes("profiles_groups")).toHaveLength(0);
+  expect(writes("groups")).toHaveLength(0);
+});
+
+it("users/search skips the group exclusion for a group the caller is not in", async () => {
+  await call("GET", "/api/users/search?q=ha&groups_id=55", ME);
+  const adminMembershipReads = log.filter((l) => l.table === "profiles_groups" && l.authorization === SECRET);
+  expect(adminMembershipReads).toHaveLength(0);
+});
+
+it("users/search runs the group exclusion for the caller's own group", async () => {
+  await call("GET", "/api/users/search?q=ha&groups_id=7", ME);
+  const adminMembershipReads = log.filter((l) => l.table === "profiles_groups" && l.authorization === SECRET);
+  expect(adminMembershipReads).toHaveLength(1);
+  expect(adminMembershipReads[0].search).toContain("groups_id=eq.7");
 });
