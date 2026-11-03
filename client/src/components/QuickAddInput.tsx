@@ -6,7 +6,11 @@ export function errorText(err: unknown): string {
   return e?.response?.data?.error || e?.message || 'Something went wrong'
 }
 
-/** One-line add box: Enter adds one title; pasting several lines (or commas for shopping) adds many. */
+/**
+ * One-line add box: Enter adds one title; pasting several lines (or commas for shopping) adds many.
+ * The box clears at once; submits are queued and sent one after another, in order. A failed submit
+ * puts its text back (in the box if empty, else in front of what was typed since).
+ */
 export default function QuickAddInput({ kind, placeholder, onAdd }: {
   kind: ListKind
   placeholder: string
@@ -14,29 +18,41 @@ export default function QuickAddInput({ kind, placeholder, onAdd }: {
 }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLInputElement>(null)
+  const queue = useRef<Promise<void>>(Promise.resolve())
+  const latest = useRef('')
 
-  async function submit(titles: string[], clear: boolean) {
-    if (titles.length === 0 || busy) return
-    setBusy(true)
+  function update(v: string) {
+    latest.current = v
+    setValue(v)
+  }
+
+  function restore(titles: string[]) {
+    const text = titles.join(', ')
+    update(latest.current ? `${text} ${latest.current}` : text)
+  }
+
+  function enqueue(titles: string[]) {
+    if (titles.length === 0) return
     setError('')
-    try {
-      await onAdd(titles)
-      if (clear) setValue('')
-    } catch (err) {
-      setError(errorText(err))
-    } finally {
-      setBusy(false)
-      ref.current?.focus()
-    }
+    queue.current = queue.current.then(async () => {
+      try {
+        await onAdd(titles)
+      } catch (err) {
+        setError(errorText(err))
+        restore(titles)
+      }
+    })
+    ref.current?.focus()
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== 'Enter') return
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
     e.preventDefault()
-    const t = value.trim()
-    if (t) void submit([t], true)
+    const t = latest.current.trim()
+    if (!t) return
+    update('')
+    enqueue([t])
   }
 
   function onPaste(e: ClipboardEvent<HTMLInputElement>) {
@@ -44,7 +60,7 @@ export default function QuickAddInput({ kind, placeholder, onAdd }: {
     const multi = text.includes('\n') || (kind === 'shopping' && text.includes(','))
     if (!multi) return
     e.preventDefault()
-    void submit(splitPasted(text, kind), false)
+    enqueue(splitPasted(text, kind))
   }
 
   return (
@@ -54,7 +70,7 @@ export default function QuickAddInput({ kind, placeholder, onAdd }: {
         value={value}
         placeholder={placeholder}
         aria-label={placeholder}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => update(e.target.value)}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
         maxLength={200}

@@ -327,6 +327,7 @@ router.post('/account/delete', authRequire, async (req, res) => {
     await supabaseAdmin.from('subscriptions').delete().eq('user_id', userId);
     await supabaseAdmin.from('events').delete().eq('created_by', userId);
 
+    // Lists and claims (lists, list_items, list_item_claims) cascade via FK from profiles; nothing to clear here.
     // 3. Delete the profile — cascades habits, completions, push subs, memberships,
     //    profiles_events/task, timers, xp, comments, reactions.
     const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('user_id', userId);

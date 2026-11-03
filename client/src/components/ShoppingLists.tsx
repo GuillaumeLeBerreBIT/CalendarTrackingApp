@@ -4,6 +4,12 @@ import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import { Empty } from '@/components/ui/Primitives'
 import QuickAddInput, { errorText } from '@/components/QuickAddInput'
+
+/** RLS hides writes a member may not make, which surfaces as 404; say why. */
+function manageErrorText(err: unknown): string {
+  const status = (err as { response?: { status?: number } })?.response?.status
+  return status === 404 ? 'Only the creator or a group admin can change this list' : errorText(err)
+}
 import { splitDone } from '@/lib/lists'
 import type { ShoppingList, ListItem } from '@/types'
 
@@ -198,7 +204,7 @@ function ListCard({ list, patchItems, track, onRenamed, onRemoved }: {
       await track(api.patch(`/lists/${list.listId}`, { title: next }))
       onRenamed(next)
     } catch (err) {
-      setError(errorText(err))
+      setError(manageErrorText(err))
     }
   }
 
@@ -209,7 +215,7 @@ function ListCard({ list, patchItems, track, onRenamed, onRemoved }: {
       await track(api.delete(`/lists/${list.listId}`))
       onRemoved(list.listId)
     } catch (err) {
-      setError(errorText(err))
+      setError(manageErrorText(err))
     }
   }
 

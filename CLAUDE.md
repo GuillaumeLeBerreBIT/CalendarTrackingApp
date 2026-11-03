@@ -40,7 +40,9 @@ routes/
   todo.js                — /api/todo and task/task-list management
   habits.js              — /api/habits CRUD + /api/habits/:id/log (XP, pact increment)
   timers.js              — /api/timers CRUD (Pomodoro/countdown timers)
-  lists.js               — /api/lists shopping lists (personal or per group) + items; RLS decides access, names via admin lookup
+  lists.js               — /api/lists shopping lists (personal or per group) + items; /api/events/:id/wishlist (GET/POST, one per event)
+                           and /api/lists/items/:id/claim (POST/DELETE; claims hidden from the wishlist owner);
+                           RLS decides access, names via admin lookup
   routines.js            — GET /api/routines: own weekly-repeating events (personal or in a group) + next session + group label
                            (create/edit/stop reuse /parseEvent; a routine is just a recurring event;
                            a group routine sets groups_id only, so members see it but nobody is invited)
@@ -54,6 +56,7 @@ utils/
   utils.js               — authRequire middleware, validatePassword, createEventObj,
                            retrieveTodoLists, retrieveEvents, retrieveAllTasks
   notifications.js       — notifyUsers() helper (in-app + web push)
+  lists.js               — shopping list helpers (cleanTitles(), isHttpLink())
   scheduler.js           — node-cron jobs: digest 07:00, reminders every 5min,
                            countdown 08:00, pact resolution 00:05, habit reminder 20:00,
                            daily summary sweep every 15min
@@ -117,6 +120,7 @@ client/
       RecurringScopePrompt.tsx — "This / following / all" prompt for recurring edits
     lib/
       design.ts          — Group color map, design constants
+      lists.ts           — splitPasted() (paste → items), isSafeLink(), splitDone()
       allDayDates.ts     — Inclusive ↔ FullCalendar-exclusive all-day end conversion
       calendarEvents.ts  — Calendar event normalisation, FullCalendar conversion,
                            day coverage, agenda bucketing, fetch window
@@ -169,6 +173,7 @@ client/
 | Countdowns | ✅ Done | Milestone countdowns; Pomodoro/interval timer removed 2026-06 |
 | Group Pacts | ✅ Done | Locked events, completion target, confetti |
 | Group Challenges | ✅ Done | Shared group goals with progress |
+| Shopping lists + event wishlists | ✅ Done | Per group or personal; one wishlist per event (per series for recurring), claims hidden from the owner |
 | Push notifications | ✅ Done | VAPID web push, prefs UI, bell badge |
 | PWA install | ✅ Done | Manifest, service worker, install banner |
 | Habit reminders (20:00 cron) | ✅ Done | Sends push for unlogged daily habits |

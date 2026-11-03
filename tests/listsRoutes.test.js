@@ -161,6 +161,9 @@ it("POST /lists/:id/items rejects more than 100 titles", async () => {
 it("PATCH /lists/items/:id validates and writes snake_case; routes to items, not :listId", async () => {
   expect((await call("PATCH", "/api/lists/items/10", { isDone: "yes" })).status).toBe(400);
   expect((await call("PATCH", "/api/lists/items/10", { link: "javascript:x" })).status).toBe(400);
+  const long = await call("PATCH", "/api/lists/items/10", { link: "https://x.co/" + "a".repeat(2000) });
+  expect(long.status).toBe(400);
+  expect((await long.json()).error).toBe("Link is too long (max 2000 characters)");
   log = [];
   const r = await call("PATCH", "/api/lists/items/10", { isDone: true });
   expect(r.status).toBe(200);

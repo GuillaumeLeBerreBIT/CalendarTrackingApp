@@ -279,7 +279,9 @@ router.patch('/lists/items/:itemId', authRequire, async (req, res) => {
   }
   if ('link' in b) {
     if (b.link === null || b.link === '') patch.link = null;
-    else if (!isHttpLink(b.link) || b.link.length > MAX_LINK) {
+    else if (typeof b.link === 'string' && b.link.length > MAX_LINK) {
+      return res.status(400).json({ success: false, error: 'Link is too long (max 2000 characters)' });
+    } else if (!isHttpLink(b.link)) {
       return res.status(400).json({ success: false, error: 'Link must start with http:// or https://' });
     } else patch.link = b.link;
   }

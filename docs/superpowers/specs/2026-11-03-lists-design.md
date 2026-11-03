@@ -189,3 +189,4 @@ links that are not `http://` or `https://`.
 
 Multiple wishlists per event (one per person), quantities, recently-used suggestions,
 realtime sync, "X added milk" notifications, aisle sorting.
+Per-occurrence wishlists for recurring events (today one wishlist per series, so a yearly event keeps last year's claims)

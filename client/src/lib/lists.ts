@@ -1,6 +1,7 @@
 export type ListKind = 'shopping' | 'wishlist'
 
 const MARKER = /^([-*•·]|\d+[.)])\s+/
+const BARE_MARKER = /^([-*•·]|\d+[.)])$/
 
 /** Split pasted text into item titles: lines (plus commas for shopping), markers stripped. */
 export function splitPasted(text: string, kind: ListKind): string[] {
@@ -8,7 +9,7 @@ export function splitPasted(text: string, kind: ListKind): string[] {
   return text
     .split(sep)
     .map((s) => s.trim().replace(MARKER, '').trim())
-    .filter(Boolean)
+    .filter((s) => s && !BARE_MARKER.test(s))
 }
 
 export function isSafeLink(url: string): boolean {

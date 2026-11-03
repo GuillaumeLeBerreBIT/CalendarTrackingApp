@@ -6,6 +6,12 @@ describe("splitPasted", () => {
     expect(splitPasted("milk\n\n- eggs\n• bread\n1. jam\n* rice, pasta", "shopping"))
       .toEqual(["milk", "eggs", "bread", "jam", "rice", "pasta"]);
   });
+  it("drops pieces that are only a bullet or number marker", () => {
+    expect(splitPasted("milk\n•\n- \n3.\neggs", "shopping")).toEqual(["milk", "eggs"]);
+  });
+  it("handles CRLF line endings", () => {
+    expect(splitPasted("a\r\nb", "shopping")).toEqual(["a", "b"]);
+  });
   it("keeps commas for wishlists", () => {
     expect(splitPasted("Lego, the big one\nBook", "wishlist")).toEqual(["Lego, the big one", "Book"]);
   });
