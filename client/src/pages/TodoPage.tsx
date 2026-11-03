@@ -6,6 +6,9 @@ import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
 import { Empty, Segmented } from '@/components/ui/Primitives'
+import WishlistDraft, { type GiftDraft } from '@/components/WishlistDraft'
+import WishlistSection from '@/components/WishlistSection'
+import { errorText } from '@/components/QuickAddInput'
 import ShoppingLists from '@/components/ShoppingLists'
 import { groupColorById } from './GroupsPage'
 import EventFormModal from '@/components/EventFormModal'
@@ -50,7 +53,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         border: '1px solid var(--border-2)',
         boxShadow: 'var(--shadow-lg)',
         width: '100%',
-        maxWidth: 400,
+        maxWidth: 440,
+        maxHeight: 'calc(100dvh - 32px)',
+        overflowY: 'auto',
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -231,6 +236,7 @@ function TaskItem({ task, color, taskListId, onToggle, onAssign, onSchedule }: {
   onSchedule: () => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [wishlistOpen, setWishlistOpen] = useState(false)
   const assignees = task.assignees ?? []
   const assigneeIds = assignees.map((a) => a.userId)
   const assigneeNames: Record<string, string> = {}
@@ -294,6 +300,14 @@ function TaskItem({ task, color, taskListId, onToggle, onAssign, onSchedule }: {
             </span>
           )}
         </div>
+        <button type="button" onClick={() => setWishlistOpen(true)} style={{ background: 'none', border: 'none', padding: '8px 0', color: 'var(--accent)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650 }}>
+          Wishlist
+        </button>
+        {wishlistOpen && (
+          <Modal title={`${task.task_title} · Wishlist`} onClose={() => setWishlistOpen(false)}>
+            <WishlistSection taskId={task.task_id} />
+          </Modal>
+        )}
         {editing && (
           <AssigneeEditor
             taskListId={taskListId}
@@ -508,6 +522,9 @@ function TasksTab() {
   const [createTaskOpen, setCreateTaskOpen] = useState<string | null>(null)
   const [scheduleTask, setScheduleTask] = useState<{ task: Task; groupsId: string } | null>(null)
   const [listForm, setListForm] = useState({ title: '', description: '', groups_id: '' })
+  const [wishlistEnabled, setWishlistEnabled] = useState(false)
+  const [giftDrafts, setGiftDrafts] = useState<GiftDraft[]>([])
+  const [taskError, setTaskError] = useState('')
   const [taskForm, setTaskForm] = useState({ task_title: '', task_description: '', priority: 'medium', due_date: '' })
   const [saving, setSaving] = useState(false)
 
@@ -560,12 +577,22 @@ function TasksTab() {
 
   async function handleCreateTask(e: FormEvent, taskListId: string) {
     e.preventDefault()
+    if (saving) return
     setSaving(true)
+    setTaskError('')
     try {
-      await api.post('/createTask', { ...taskForm, task_list_id: taskListId })
+      const { data } = await api.post('/createTask', {
+        ...taskForm, task_list_id: taskListId,
+        ...(wishlistEnabled ? { wishlist: giftDrafts } : {}),
+      })
+      if (!data.success) throw new Error(data.error || data.message || 'Could not create task')
       setCreateTaskOpen(null)
       setTaskForm({ task_title: '', task_description: '', priority: 'medium', due_date: '' })
+      setWishlistEnabled(false)
+      setGiftDrafts([])
       load()
+    } catch (err) {
+      setTaskError(errorText(err))
     } finally {
       setSaving(false)
     }
@@ -604,7 +631,7 @@ function TasksTab() {
                 tl={tl}
                 isExpanded={!!expanded[idTl]}
                 onToggleExpand={() => toggleExpand(idTl)}
-                onAddTask={() => setCreateTaskOpen(idTl)}
+                onAddTask={() => { setTaskError(''); setCreateTaskOpen(idTl) }}
                 onToggleTask={toggleTask}
                 onAssign={assignTask}
                 onScheduleTask={(task, groupsId) => setScheduleTask({ task, groupsId })}
@@ -656,7 +683,7 @@ function TasksTab() {
 
       {/* Create task modal */}
       {createTaskOpen && (
-        <Modal title="New task" onClose={() => setCreateTaskOpen(null)}>
+        <Modal title="New task" onClose={() => { if (!saving) setCreateTaskOpen(null) }}>
           <form onSubmit={(e) => handleCreateTask(e, createTaskOpen)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
               <label style={labelStyle}>Task title</label>
@@ -700,11 +727,13 @@ function TasksTab() {
                 />
               </div>
             </div>
+            <WishlistDraft enabled={wishlistEnabled} onEnabled={setWishlistEnabled} items={giftDrafts} onChange={setGiftDrafts} disabled={saving} />
+            {taskError && <p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--danger, #ef4444)' }}>{taskError}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
               <Button type="submit" variant="primary" full disabled={saving}>
                 {saving ? 'Creating…' : 'Create task'}
               </Button>
-              <Button type="button" variant="secondary" full onClick={() => setCreateTaskOpen(null)}>
+              <Button type="button" variant="secondary" full disabled={saving} onClick={() => setCreateTaskOpen(null)}>
                 Cancel
               </Button>
             </div>

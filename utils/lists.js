@@ -19,3 +19,22 @@ export function cleanTitles(titles) {
 export function isHttpLink(url) {
   return typeof url === 'string' && /^https?:\/\//i.test(url);
 }
+
+export function cleanWishlistItems(items) {
+  if (!Array.isArray(items) || items.length > 100) return { ok: false, error: 'Use up to 100 wishlist items' };
+  const cleaned = [];
+  for (const item of items) {
+    if (!item || typeof item.title !== 'string' || !item.title.trim() || item.title.trim().length > 200) {
+      return { ok: false, error: 'Each gift needs a name (1–200 characters)' };
+    }
+    if ((item.link != null && typeof item.link !== 'string') || (item.note != null && typeof item.note !== 'string')) {
+      return { ok: false, error: 'Gift links and notes must be text' };
+    }
+    const link = item.link?.trim() || null;
+    const note = item.note?.trim() || null;
+    if (link && (!isHttpLink(link) || link.length > 2000)) return { ok: false, error: 'Use an http:// or https:// link (up to 2000 characters)' };
+    if (note && note.length > 1000) return { ok: false, error: 'Gift notes can be at most 1000 characters' };
+    cleaned.push({ title: item.title.trim(), link, note });
+  }
+  return { ok: true, items: cleaned };
+}
