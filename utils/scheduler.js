@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import supabase, { supabaseAdmin } from '../db/supabase.js';
+import { supabaseAdmin } from '../db/supabase.js';
 import { sendDigestForUser } from '../routes/email.js';
 import { expandRecurringEvent, addDaysStr } from './recurrence.js';
 import { notifyUsers } from './notifications.js';
@@ -219,7 +219,7 @@ export function startScheduler() {
   cron.schedule('0 7 * * *', async () => {
     console.log('[scheduler] Starting daily digest run...');
 
-    const { data: profiles, error } = await supabase
+    const { data: profiles, error } = await supabaseAdmin
       .from('profiles')
       .select('user_id, email');
 

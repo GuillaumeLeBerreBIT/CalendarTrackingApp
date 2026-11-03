@@ -1998,12 +1998,6 @@ export default function GroupDetailPage() {
                             }}>
                               {u.username}
                             </p>
-                            <p style={{
-                              fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0',
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}>
-                              {u.email}
-                            </p>
                           </div>
                           {invited ? (
                             <span style={{

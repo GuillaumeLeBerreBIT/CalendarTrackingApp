@@ -37,7 +37,7 @@ export async function notifyUsers(client, recipients, type, buildPayload) {
 
   try {
     // Read prefs for all recipients at once
-    const { data: profiles } = await client
+    const { data: profiles } = await supabaseAdmin
       .from("profiles")
       .select("user_id, notification_prefs")
       .in("user_id", ids);

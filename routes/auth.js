@@ -81,7 +81,7 @@ router.get("/logout", async (req, res) => {
 router.get('/profile', authRequire, async (req, res) => {
   const userId = req.cookies.userId;
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await req.supabase
     .from('profiles')
     .select('username, email, created_at, email_digest_enabled, city, has_completed_onboarding, searchable, total_xp')
     .eq('user_id', userId)
@@ -125,7 +125,7 @@ router.patch('/profile', authRequire, async (req, res) => {
     return res.status(400).json({ success: false, error: 'No valid fields provided to update.' });
   }
 
-  const { error } = await supabase
+  const { error } = await req.supabase
     .from('profiles')
     .update(updates)
     .eq('user_id', req.cookies.userId);
@@ -151,7 +151,7 @@ router.patch('/profile/city', authRequire, async (req, res) => {
 
   const sanitized = city.trim().slice(0, 100);
 
-  const { error } = await supabase
+  const { error } = await req.supabase
     .from('profiles')
     .update({ city: sanitized || null })
     .eq('user_id', req.cookies.userId);
@@ -177,7 +177,7 @@ router.patch('/profile/username', authRequire, async (req, res) => {
 
   const sanitized = username.trim();
 
-  const { error } = await supabase
+  const { error } = await req.supabase
     .from('profiles')
     .update({ username: sanitized })
     .eq('user_id', req.cookies.userId);

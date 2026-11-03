@@ -7,6 +7,26 @@ import { sanitizeOrTerm } from "../utils/postgrestFilter.js";
 import { isGroupMember } from "../utils/groupAccess.js";
 const router = express.Router();
 
+// RLS hides a not-yet-accepted member's profile from the rest of the group, so the
+// profiles(...) embed comes back null for them. Fill in their username (never their
+// email) with one admin-client query. Mutates and returns `memberships`.
+async function fillPendingUsernames(memberships, callerId) {
+  const pendingIds = memberships
+    .filter((pg) => pg.invite_status !== 'accepted' && pg.user_id !== callerId)
+    .map((pg) => pg.user_id);
+  if (pendingIds.length === 0) return memberships;
+  const { data: names, error } = await supabaseAdmin
+    .from('profiles')
+    .select('user_id, username')
+    .in('user_id', pendingIds);
+  if (error) throw new Error(`pending member lookup failed: ${error.message}`);
+  const byId = new Map((names || []).map((n) => [n.user_id, n.username]));
+  for (const pg of memberships) {
+    if (pendingIds.includes(pg.user_id)) pg.profiles = { username: byId.get(pg.user_id) ?? null };
+  }
+  return memberships;
+}
+
 
 router.get("/groups", authRequire, async (req, res) => {
 
@@ -51,6 +71,12 @@ router.get("/groups", authRequire, async (req, res) => {
 
   if (groupsError) {
     return res.status(400).json({success: false, error: groupsError.message});
+  }
+
+  try {
+    await fillPendingUsernames(groups.flatMap((g) => g.profiles_groups || []), req.cookies.userId);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
   }
 
   const userGroups =
@@ -135,11 +161,15 @@ router.post('/checkUser', authRequire ,async (req, res) => {
     if (term.length < 2) {
       return res.json({ success: true, match: false });
     }
+    // Exact (case-insensitive) match: escape ilike wildcards so '_' and '\\' are literal
+    const likeTerm = term.replace(/[\\_]/g, '\\$&');
 
-    const {data: isUserFound, error: noUser} = await req.supabase
+    // Exact-match lookup of any user: RLS only exposes own/shared-group profiles,
+    // so read with the admin client. The searchable/shared-group gate below still applies.
+    const {data: isUserFound, error: noUser} = await supabaseAdmin
     .from('profiles')
     .select('username, user_id, email, searchable')
-    .or(`username.ilike.${term},email.ilike.${term}`)
+    .or(`username.ilike.${likeTerm},email.ilike.${likeTerm}`)
     .limit(1)
 
     if (noUser) {
@@ -178,7 +208,8 @@ router.post('/checkUser', authRequire ,async (req, res) => {
     res.json({success: true, match: true, user: {
       username: found.username,
       user_id: found.user_id,
-      email: found.email
+      // Only confirm an email the caller already typed in full
+      ...(typeof found.email === 'string' && found.email.toLowerCase() === term.toLowerCase() && { email: found.email }),
     }})
 
   } catch (error) {
@@ -206,11 +237,15 @@ router.get('/users/search', authRequire, async (req, res) => {
       return res.json({ success: true, users: [] });
     }
 
-    let query = req.supabase
+    // Admin client: the search spans users RLS hides; filters below keep it to
+    // searchable profiles and only username is returned to the caller.
+    // Username is a substring match; email only matches exactly (no existence oracle).
+    const likeQ = q.replace(/[\\_]/g, '\\$&');
+    let query = supabaseAdmin
       .from('profiles')
-      .select('user_id, username, email')
+      .select('user_id, username')
       .eq('searchable', true)
-      .or(`username.ilike.*${q}*,email.ilike.*${q}*`)
+      .or(`username.ilike.*${likeQ}*,email.ilike.${likeQ}`)
       .neq('user_id', req.cookies.userId)
       .limit(10);
 
@@ -222,9 +257,21 @@ router.get('/users/search', authRequire, async (req, res) => {
     let results = users || [];
 
     // Optionally exclude users already in a given group (any invite_status)
+    // Only for a group the caller has a row in: otherwise this would reveal who is
+    // in (or invited to) someone else's group.
     const groupsId = req.query.groups_id ? parseInt(req.query.groups_id) : NaN;
+    let callerInGroup = false;
     if (!isNaN(groupsId) && results.length > 0) {
-      const { data: existingMembers, error: membersError } = await req.supabase
+      const { data: ownRow } = await req.supabase
+        .from('profiles_groups')
+        .select('user_id')
+        .eq('groups_id', groupsId)
+        .eq('user_id', req.cookies.userId)
+        .limit(1);
+      callerInGroup = (ownRow || []).length > 0;
+    }
+    if (callerInGroup) {
+      const { data: existingMembers, error: membersError } = await supabaseAdmin
         .from('profiles_groups')
         .select('user_id')
         .eq('groups_id', groupsId)
@@ -238,7 +285,7 @@ router.get('/users/search', authRequire, async (req, res) => {
 
     return res.json({
       success: true,
-      users: results.map(u => ({ user_id: u.user_id, username: u.username, email: u.email })),
+      users: results.map(u => ({ user_id: u.user_id, username: u.username })),
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -254,7 +301,8 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
       .select('role')
       .eq('groups_id', req.body.groupId)
       .eq('user_id', req.cookies.userId)
-      .single();
+      .eq('invite_status', 'accepted')
+      .maybeSingle();
 
     if (membershipError || membership?.role !== 'admin') {
       return res.status(403).json({ success: false, error: 'Only group admins can invite members.' });
@@ -268,7 +316,11 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
     .in('user_id', userIds)
     .eq('groups_id', req.body.groupId);
 
-    const existingUsers = users2Check.filter(u => u.invite_status === 'accepted'
+    if (users2CheckError) {
+      return res.status(500).json({ success: false, error: `Could not check existing members: ${users2CheckError.message}` });
+    }
+
+    const existingUsers = (users2Check || []).filter(u => u.invite_status === 'accepted'
       || u.invite_status === 'pending'
     ).map(u => u.user_id) || [];
 
@@ -290,7 +342,8 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
       }
     })
 
-    const {data: inviteUsers, error: inviteUsersError} = await req.supabase
+    // Writing other users' membership rows: admin client, after the admin check above
+    const {data: inviteUsers, error: inviteUsersError} = await supabaseAdmin
       .from('profiles_groups')
       .upsert(inviteUserDb) // Need upsert if there is a declined in there
       .select()
@@ -314,9 +367,9 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
 
     const emailIdList = inviteUsers.map(u => u.user_id)
 
-    const {data: userProfile, error: userProfileError} = await req.supabase
+    const {data: userProfile, error: userProfileError} = await supabaseAdmin
       .from('profiles')
-      .select('email, user_id, username')
+      .select('user_id, username')
       .in('user_id', emailIdList)
     
     if (userProfileError) {
@@ -327,8 +380,7 @@ router.post('/inviteUsers', authRequire, async (req, res) => {
       const profile = userProfile?.find(p => p.user_id === invite.user_id);
       return {
         ...invite,
-        username: profile.username,
-        email: profile.email
+        username: profile?.username,
       }
     })
 
@@ -351,7 +403,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
     ? req.body['shared-color']
     : null;
 
-  const {data: newGroup, error: newGroupError} = await req.supabase
+  const {data: newGroup, error: newGroupError} = await supabaseAdmin
   .from('groups')
   .insert({
       groups_title: req.body['group-title'],
@@ -365,7 +417,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
     return res.status(400).json({success: false, error: `Could not create Group: ${newGroupError.message}`})
   }
 
-  const {data: newProfilesGroup, error: newProfilesGroupError} = await req.supabase
+  const {data: newProfilesGroup, error: newProfilesGroupError} = await supabaseAdmin
   .from('profiles_groups')
   .insert([{
     groups_id: newGroup[0].groups_id,
@@ -376,7 +428,7 @@ router.post('/createGroup', authRequire, async (req, res) => {
   .select()
 
   if (newProfilesGroupError) {
-    await req.supabase
+    await supabaseAdmin
     .from('groups')
     .delete()
     .eq('groups_id', newGroup[0].groups_id)
@@ -386,10 +438,14 @@ router.post('/createGroup', authRequire, async (req, res) => {
 
   // Now need to ahndle sending invites to other users
   let promiseInviteResults
-  if (req.body.usersInvite) {
+  // Never invite the creator: the upsert would demote their admin row to a pending member.
+  const usersInvite = Array.isArray(req.body.usersInvite)
+    ? req.body.usersInvite.filter((u) => u?.user_id && u.user_id !== req.cookies.userId)
+    : [];
+  if (usersInvite.length > 0) {
     // Need to use map to catch alle results and do async programming with it.
-    promiseInviteResults = await Promise.all(req.body.usersInvite.map( async (user) => {
-      let {data: inviteUser, error: inviteUserError} = await req.supabase
+    promiseInviteResults = await Promise.all(usersInvite.map( async (user) => {
+      let {data: inviteUser, error: inviteUserError} = await supabaseAdmin
       .from('profiles_groups')
       .upsert([{
         groups_id: newGroup[0].groups_id,
@@ -447,11 +503,17 @@ router.post('/acceptInviteGroup', authRequire, async (req, res) => {
     return res.status(400).json({success: false, error: groupsError.message});
   }
 
+  try {
+    await fillPendingUsernames(group[0]?.profiles_groups || [], req.cookies.userId);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+
   const members = group[0].profiles_groups?.map((pg) => {
     return {
       role: pg.role,
-      username: pg.profiles.username,
-      email: pg.profiles.email,
+      username: pg.profiles?.username ?? null,
+      email: pg.profiles?.email,
       invite_status: pg.invite_status,
       user_id: pg.user_id
     };
@@ -531,8 +593,8 @@ router.get('/getGroupMembers/:groupId', authRequire, async (req, res) => {
     sharedColor: group.shared_color || '#6B7280',
     members: members.map(m => ({
       user_id: m.user_id,
-      username: m.profiles.username,
-      email: m.profiles.email,
+      username: m.profiles?.username ?? null,
+      email: m.profiles?.email,
       role: m.role,
       color: m.color
     }))
@@ -804,8 +866,9 @@ router.post('/joinGroup/:token', authRequire, async (req, res) => {
   const { token } = req.params;
   const userId = req.cookies.userId;
 
-  // Validate token (use req.supabase so RLS is enforced with the user's JWT)
-  const { data: tokenRow, error: tokenError } = await req.supabase
+  // Validate token with the admin client: non-members cannot read invite tokens under RLS.
+  // The token itself is the credential; the lookup is filtered by it.
+  const { data: tokenRow, error: tokenError } = await supabaseAdmin
     .from('group_invite_tokens')
     .select('token, groups_id, expires_at, max_uses, use_count')
     .eq('token', token)
@@ -844,7 +907,7 @@ router.post('/joinGroup/:token', authRequire, async (req, res) => {
   }
 
   // Add the user as an accepted member
-  const { error: insertError } = await req.supabase
+  const { error: insertError } = await supabaseAdmin
     .from('profiles_groups')
     .upsert({
       groups_id: tokenRow.groups_id,
@@ -881,6 +944,7 @@ router.patch('/groups/:groupId', authRequire, async (req, res) => {
     .eq('groups_id', groupId)
     .eq('user_id', callerId)
     .eq('role', 'admin')
+    .eq('invite_status', 'accepted')
     .maybeSingle();
 
   if (membershipError) {
@@ -918,6 +982,7 @@ async function isGroupAdmin(client, userId, groupId) {
     .eq('groups_id', groupId)
     .eq('user_id', userId)
     .eq('role', 'admin')
+    .eq('invite_status', 'accepted')
     .maybeSingle();
   if (error) throw new Error(`admin check failed: ${error.message}`);
   return !!data;
@@ -1052,6 +1117,7 @@ router.delete('/groups/:groupId/members/:userId', authRequire, async (req, res) 
     .eq('groups_id', groupId)
     .eq('user_id', callerId)
     .eq('role', 'admin')
+    .eq('invite_status', 'accepted')
     .maybeSingle();
 
   if (membershipError) {
@@ -1065,7 +1131,7 @@ router.delete('/groups/:groupId/members/:userId', authRequire, async (req, res) 
     return res.status(400).json({ success: false, error: 'Cannot remove yourself. Use leave instead.' });
   }
 
-  const { error: deleteError } = await req.supabase
+  const { error: deleteError } = await supabaseAdmin
     .from('profiles_groups')
     .delete()
     .eq('groups_id', groupId)
