@@ -9,6 +9,14 @@ const MAX_TITLE = 200;
 const MAX_NOTE = 1000;
 const MAX_LINK = 2000;
 
+// Every numeric route param is validated once, here.
+for (const name of ['listId', 'itemId', 'eventId']) {
+  router.param(name, (req, res, next, value) => {
+    if (!/^\d+$/.test(value)) return res.status(400).json({ success: false, error: 'Invalid id' });
+    next();
+  });
+}
+
 // Supabase error -> HTTP response. RLS denials (42501 / 403) are 403, the rest 500.
 export function sendDbError(res, error) {
   if (error.code === '42501' || error.status === 403) {
@@ -60,6 +68,124 @@ function cleanTitle(v) {
   const t = v.trim();
   return t && t.length <= MAX_TITLE ? t : null;
 }
+
+// The event's wishlist as seen by `me`. The owner never sees claims (no request is
+// made for them); guests only get taken / claimedByMe, never who claimed.
+async function readWishlist(req, eventId) {
+  const me = req.cookies.userId;
+  const { data: lists, error } = await req.supabase
+    .from('lists')
+    .select('*')
+    .eq('kind', 'wishlist')
+    .eq('event_id', eventId)
+    .limit(1);
+  if (error) return { error };
+  const row = (lists || [])[0];
+  if (!row) return { wishlist: null };
+
+  const { data: items, error: itemsError } = await req.supabase
+    .from('list_items')
+    .select('*')
+    .eq('list_id', row.list_id)
+    .order('created_at', { ascending: true });
+  if (itemsError) return { error: itemsError };
+
+  const isOwner = row.created_by === me;
+  let views = (items || []).map(itemView);
+  if (!isOwner && views.length > 0) {
+    const { data: claims, error: cError } = await req.supabase
+      .from('list_item_claims')
+      .select('item_id,claimed_by')
+      .in('item_id', (items || []).map((i) => i.item_id));
+    if (cError) return { error: cError };
+    const claimedBy = new Map((claims || []).map((c) => [String(c.item_id), c.claimed_by]));
+    views = views.map((v) => ({
+      ...v,
+      taken: claimedBy.has(v.itemId),
+      claimedByMe: claimedBy.get(v.itemId) === me,
+    }));
+  } else if (!isOwner) {
+    views = [];
+  }
+
+  const names = await fillUsernames([row.created_by]);
+  return {
+    wishlist: {
+      listId: String(row.list_id),
+      title: row.title,
+      ownerId: row.created_by,
+      ownerName: names.get(row.created_by) ?? null,
+      isOwner,
+      items: views,
+    },
+  };
+}
+
+router.get('/events/:eventId/wishlist', authRequire, async (req, res) => {
+  try {
+    const { wishlist, error } = await readWishlist(req, req.params.eventId);
+    if (error) return sendDbError(res, error);
+    res.json({ success: true, wishlist });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/events/:eventId/wishlist', authRequire, async (req, res) => {
+  try {
+    const { data, error } = await req.supabase
+      .from('lists')
+      .insert({ kind: 'wishlist', title: 'Wishlist', event_id: Number(req.params.eventId), created_by: req.cookies.userId })
+      .select()
+      .single();
+    if (!error) {
+      if (!data) return res.status(403).json({ success: false, error: 'Not allowed' });
+      const names = await fillUsernames([data.created_by]);
+      return res.status(201).json({
+        success: true,
+        wishlist: {
+          listId: String(data.list_id),
+          title: data.title,
+          ownerId: data.created_by,
+          ownerName: names.get(data.created_by) ?? null,
+          isOwner: true,
+          items: [],
+        },
+      });
+    }
+    if (error.code !== '23505') return sendDbError(res, error);
+    // One wishlist per event: return the existing one.
+    const { wishlist, error: readError } = await readWishlist(req, req.params.eventId);
+    if (readError) return sendDbError(res, readError);
+    if (!wishlist) return res.status(403).json({ success: false, error: 'Not allowed' });
+    res.status(200).json({ success: true, wishlist });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/lists/items/:itemId/claim', authRequire, async (req, res) => {
+  const { error } = await req.supabase
+    .from('list_item_claims')
+    .insert({ item_id: Number(req.params.itemId), claimed_by: req.cookies.userId });
+  if (error) {
+    if (error.code === '23505') return res.status(409).json({ success: false, error: 'taken' });
+    return sendDbError(res, error);
+  }
+  res.status(201).json({ success: true });
+});
+
+router.delete('/lists/items/:itemId/claim', authRequire, async (req, res) => {
+  const { data, error } = await req.supabase
+    .from('list_item_claims')
+    .delete()
+    .eq('item_id', req.params.itemId)
+    .eq('claimed_by', req.cookies.userId)
+    .select();
+  if (error) return sendDbError(res, error);
+  if (!data || data.length === 0) return res.status(404).json({ success: false, error: 'Claim not found' });
+  res.json({ success: true });
+});
 
 router.get('/lists', authRequire, async (req, res) => {
   try {
@@ -200,7 +326,6 @@ router.delete('/lists/:listId/items/done', authRequire, async (req, res) => {
 router.post('/lists/:listId/items', authRequire, async (req, res) => {
   const cleaned = cleanTitles(req.body?.titles);
   if (!cleaned.ok) return res.status(400).json({ success: false, error: cleaned.error });
-  if (!/^\d+$/.test(req.params.listId)) return res.status(400).json({ success: false, error: 'Invalid list id' });
 
   const userId = req.cookies.userId;
   const rows = cleaned.titles.map((title) => ({ list_id: Number(req.params.listId), title, created_by: userId }));
