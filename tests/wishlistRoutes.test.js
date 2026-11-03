@@ -1,5 +1,7 @@
-import { it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import http from "http";
+vi.mock('../utils/notifications.js', () => ({ notifyUsers: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../utils/google.js', () => ({ syncEventToGoogle: vi.fn() }));
 
 // Real lists router against a local Supabase stand-in (no network).
 const ME = "00000000-0000-4000-8000-0000000000aa";
@@ -11,8 +13,11 @@ let injectError; // "METHOD table" -> { status, code }
 let denyWrites; // when true, any non-GET returns 403 / 42501
 const resetTables = () => {
   tables = {
-    task_list: [{ task_list_id: 10, groups_id: 7 }],
-    profiles_groups: [{ user_id: ME, groups_id: 7, invite_status: 'accepted' }],
+    profiles_groups: [
+      { user_id: ME, groups_id: 7, invite_status: 'accepted' },
+      { user_id: OTHER, groups_id: 7, invite_status: 'accepted' },
+      { user_id: THIRD, groups_id: 7, invite_status: 'pending' },
+    ],
     profiles: [
       { user_id: ME, username: "me" },
       { user_id: OTHER, username: "harry" },
@@ -68,12 +73,12 @@ beforeAll(async () => {
           rows = rows.filter((r) => vals.includes(String(r[k])));
         }
       }
-      if (table === 'rpc/create_task_with_wishlist') {
-        return res.end(JSON.stringify({ task_id: 42, task_title: 'Christmas', task_list_id: 10 }));
+      if (table === 'rpc/create_event_with_wishlist') {
+        return res.end(JSON.stringify({ event_id: 42, ...JSON.parse(raw).p_event }));
       }
       if (req.method === "POST") {
         const body = [].concat(raw ? JSON.parse(raw) : []).map((r, i) => ({
-          list_id: 50, item_id: 60 + i, created_at: "2026-11-03T10:00:00Z", is_done: false, link: null, note: null, ...r,
+          event_id: 42, list_id: 50, item_id: 60 + i, created_at: "2026-11-03T10:00:00Z", is_done: false, link: null, note: null, ...r,
         }));
         return res.end(JSON.stringify(String(req.headers.accept).includes("vnd.pgrst.object") ? body[0] : body));
       }
@@ -97,7 +102,7 @@ beforeAll(async () => {
   app.use(cookieParser());
   app.use(express.json());
   app.use("/api", (await import("../routes/lists.js")).default);
-  app.use("/api", (await import("../routes/todo.js")).default);
+  app.use("/api", (await import("../routes/events.js")).default);
   server = app.listen(0, "127.0.0.1");
   await new Promise((r) => server.on("listening", r));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -207,74 +212,81 @@ it("malformed ids return 400, not 500", async () => {
 });
 
 
-it('task wishlist reads its task parent, with the same owner privacy', async () => {
-  tables.lists[0].task_id = 10;
-  tables.lists[0].event_id = null;
-  asOwner();
-  const r = await call('GET', '/api/tasks/10/wishlist');
+const newEvent = {
+  'calendar-title': 'Christmas', 'calendar-description': 'Family party',
+  startDate: '2030-12-24', endDate: '2030-12-24', allDay: true,
+  tagNames: 7, event_type: 'social', timezone: 'Europe/Brussels',
+  recurrence_rule: 'FREQ=YEARLY', reminder_minutes: 15,
+  wishlist: [{ title: ' Book ', link: ' https://example.com/book ', note: ' Hardcover ' }],
+};
+
+it('event with wishlist uses atomic creation with normalized gifts and accepted invitees', async () => {
+  const r = await call('POST', '/api/parseEvent', newEvent);
   expect(r.status).toBe(200);
-  const { wishlist } = await r.json();
-  expect(wishlist.items).toHaveLength(3);
-  expect(wishlist.items.every(i => !('taken' in i) && !('claimedByMe' in i))).toBe(true);
-  expect(log.some(l => l.table === 'list_item_claims')).toBe(false);
-  expect(log.find(l => l.table === 'lists').search).toContain('task_id=eq.10');
-});
-
-it('task wishlist guests see reservations without identities', async () => {
-  tables.lists[0].task_id = 10;
-  const r = await call('GET', '/api/tasks/10/wishlist');
-  const text = await r.text();
-  expect(JSON.parse(text).wishlist.items[0]).toMatchObject({ taken: true, claimedByMe: true });
-  expect(text).not.toContain(THIRD);
-});
-
-it('task wishlist creation sets only task_id and uses the requesting user', async () => {
-  const r = await call('POST', '/api/tasks/10/wishlist', { created_by: OTHER, event_id: 5 });
-  expect(r.status).toBe(201);
-  expect(JSON.parse(writes('lists')[0].body)).toEqual({ kind: 'wishlist', title: 'Wishlist', task_id: 10, created_by: ME });
-  expect((await call('GET', '/api/tasks/abc/wishlist')).status).toBe(400);
-});
-
-const newTask = { task_title: 'Christmas', task_list_id: 10, priority: 'medium', due_date: '2030-12-24', wishlist: [{ title: ' Book ', link: ' https://example.com ', note: ' Hardcover ' }] };
-
-it('createTask with gifts calls the atomic RPC using the user JWT', async () => {
-  const r = await call('POST', '/api/createTask', newTask);
-  expect(r.status).toBe(200);
-  expect((await r.json()).insertTask.task_id).toBe(42);
-  const rpc = writes('rpc/create_task_with_wishlist');
+  const { eventData, participants } = await r.json();
+  expect(eventData[0].event_id).toBe(42);
+  expect(participants).toContainEqual({ userId: ME, username: 'me', rsvpStatus: 'going' });
+  const rpc = writes('rpc/create_event_with_wishlist');
   expect(rpc).toHaveLength(1);
   expect(rpc[0].authorization).toBe(`Bearer ${ME}`);
-  expect(JSON.parse(rpc[0].body)).toMatchObject({ p_task_list_id: 10, p_title: 'Christmas', p_items: [{ title: 'Book', link: 'https://example.com', note: 'Hardcover' }] });
-  expect(writes('task')).toHaveLength(0);
+  expect(JSON.parse(rpc[0].body)).toMatchObject({
+    p_event: { event_title: 'Christmas', created_by: ME, groups_id: 7, recurrence_rule: 'FREQ=YEARLY', timezone: 'Europe/Brussels', reminder_minutes: 15 },
+    p_participants: [ME, OTHER], p_options: [],
+    p_items: [{ title: 'Book', link: 'https://example.com/book', note: 'Hardcover' }],
+  });
+  expect(writes('events')).toHaveLength(0);
+  expect(writes('profiles_events')).toHaveLength(0);
 });
 
-it('invalid gifts cause no task creation', async () => {
+it('tentative wishlist creation passes dates to the transaction without separate writes', async () => {
+  const dateOptions = [{ startDate: '2030-12-24' }, { startDate: '2030-12-25' }];
+  const r = await call('POST', '/api/parseEvent', { ...newEvent, status: 'tentative', dateOptions });
+  expect(r.status).toBe(200);
+  expect(JSON.parse(writes('rpc/create_event_with_wishlist')[0].body).p_options).toEqual(dateOptions);
+  expect(writes('event_date_options')).toHaveLength(0);
+});
+
+it('personal event with an empty wishlist still creates the wishlist', async () => {
+  const r = await call('POST', '/api/parseEvent', { ...newEvent, tagNames: null, event_type: 'appointment', wishlist: [] });
+  expect(r.status).toBe(200);
+  const body = JSON.parse(writes('rpc/create_event_with_wishlist')[0].body);
+  expect(body.p_event.groups_id).toBe(null);
+  expect(body.p_participants).toEqual([ME]);
+  expect(body.p_items).toEqual([]);
+});
+
+it('invalid gifts are rejected before creating any event', async () => {
   for (const wishlist of [[{ title: '' }], [{ title: 'x', link: 'javascript:alert(1)' }], [{ title: 'x', note: 7 }], Array(101).fill({ title: 'x' })]) {
-    const r = await call('POST', '/api/createTask', { ...newTask, wishlist });
-    expect(r.status).toBe(400);
+    expect((await call('POST', '/api/parseEvent', { ...newEvent, wishlist })).status).toBe(400);
   }
-  expect(writes('rpc/create_task_with_wishlist')).toHaveLength(0);
-  expect(writes('task')).toHaveLength(0);
+  expect(writes('rpc/create_event_with_wishlist')).toHaveLength(0);
+  expect(writes('events')).toHaveLength(0);
 });
 
-it('nonmembers cannot create tasks with wishlists', async () => {
+it('nonmembers cannot create a group event with a wishlist', async () => {
   tables.profiles_groups = [];
-  expect((await call('POST', '/api/createTask', newTask)).status).toBe(403);
-  expect(writes('rpc/create_task_with_wishlist')).toHaveLength(0);
+  expect((await call('POST', '/api/parseEvent', newEvent)).status).toBe(403);
+  expect(writes('rpc/create_event_with_wishlist')).toHaveLength(0);
 });
 
-it('RPC failure is returned without retrying task creation', async () => {
-  injectError['POST rpc/create_task_with_wishlist'] = { status: 403, code: '42501' };
-  const r = await call('POST', '/api/createTask', newTask);
+it('failed atomic event creation returns an error and does not retry inserts', async () => {
+  injectError['POST rpc/create_event_with_wishlist'] = { status: 403, code: '42501' };
+  const r = await call('POST', '/api/parseEvent', newEvent);
   expect(r.status).toBe(403);
   expect((await r.json()).success).toBe(false);
-  expect(writes('task')).toHaveLength(0);
+  expect(writes('events')).toHaveLength(0);
 });
 
-it('ordinary task creation still uses the existing path', async () => {
-  const { wishlist, ...task } = newTask;
-  const r = await call('POST', '/api/createTask', task);
-  expect((await r.json()).success).toBe(true);
-  expect(writes('task')).toHaveLength(1);
-  expect(writes('rpc/create_task_with_wishlist')).toHaveLength(0);
+it('events without a wishlist keep the existing creation path', async () => {
+  const { wishlist, ...event } = newEvent;
+  const r = await call('POST', '/api/parseEvent', event);
+  expect(r.status).toBe(200);
+  expect(writes('events')).toHaveLength(1);
+  expect(writes('profiles_events')).toHaveLength(1);
+  expect(writes('rpc/create_event_with_wishlist')).toHaveLength(0);
+});
+
+it('task wishlist endpoints have been removed', async () => {
+  expect((await call('GET', '/api/tasks/10/wishlist')).status).toBe(404);
+  expect((await call('POST', '/api/tasks/10/wishlist')).status).toBe(404);
 });

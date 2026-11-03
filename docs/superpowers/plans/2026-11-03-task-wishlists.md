@@ -1,4 +1,8 @@
-# Task wishlists
+# Task wishlists (superseded)
+
+The requested parent was clarified to be a calendar event. See
+`2026-11-04-event-creation-wishlists.md`; task-specific app code is removed and
+the applied task migration is reversed by a guarded forward migration.
 
 Add a collapsed, optional Wishlist section to New task, below the due date. Use
 the existing modal typography, surface colors and controls. Gift rows contain a

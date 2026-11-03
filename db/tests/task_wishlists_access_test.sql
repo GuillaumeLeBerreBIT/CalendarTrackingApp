@@ -1,3 +1,4 @@
+-- Historical test: only valid before 2026-11-04_remove_task_wishlists.sql.
 -- Run migration + this file inside BEGIN ... ROLLBACK.
 -- TASK_WISHLISTS_ACCESS_OK is the intentional final exception; all rows roll back.
 do $$

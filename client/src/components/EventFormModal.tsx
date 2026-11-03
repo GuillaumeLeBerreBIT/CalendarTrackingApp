@@ -1,6 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '@/components/ui/Icon'
+import WishlistDraft, { type GiftDraft } from '@/components/WishlistDraft'
+import { errorText } from '@/components/QuickAddInput'
 import type { DateSelectArg } from '@fullcalendar/core'
 import api from '@/api/client'
 import type { CalEvent, Group, Member } from '@/types'
@@ -96,6 +98,8 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
     event?.extendedProps?.participants?.map((p) => p.userId) ?? []
   )
+  const [wishlistEnabled, setWishlistEnabled] = useState(false)
+  const [giftDrafts, setGiftDrafts] = useState<GiftDraft[]>([])
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
@@ -252,26 +256,29 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
       payload.tagNames = form.groupsId
       payload.participants = []
     }
+    if (!isEdit && wishlistEnabled) payload.wishlist = giftDrafts
     return payload
   }
 
   // mode: 'create' (new event) | 'all' (whole series / single) | 'this' (one occurrence)
   //       | 'following' (this occurrence + all later — splits the series)
   async function doSave(mode: 'create' | 'all' | 'this' | 'following') {
+    if (saving) return
     setSaving(true)
     setError('')
     try {
       const payload = buildPayload()
       if (mode === 'create') {
-        await api.post('/parseEvent', payload)
+        const { data } = await api.post('/parseEvent', payload)
+        if (!data.success) throw new Error(data.error || 'Could not save event')
       } else {
         payload.recurrenceScope = mode
         if (mode === 'this' || mode === 'following') payload.occurrenceDate = occurrenceDate
         await api.put(`/parseEvent/${masterId}`, payload)
       }
       onSaved()
-    } catch {
-      setError('Could not save event. Please try again.')
+    } catch (err) {
+      setError(errorText(err))
     } finally {
       setSaving(false)
       setScopePrompt(null)
@@ -1038,6 +1045,10 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                 <p style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Loading members…</p>
               )}
             </>
+          )}
+
+          {!isEdit && (
+            <WishlistDraft enabled={wishlistEnabled} onEnabled={setWishlistEnabled} items={giftDrafts} onChange={setGiftDrafts} disabled={saving} />
           )}
 
           {/* ── Error ── */}
