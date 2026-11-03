@@ -124,8 +124,9 @@ drop policy if exists event_overrides_modify                 on public.event_ove
 drop policy if exists event_overrides_select                 on public.event_overrides;
 
 -- ---------- profiles ----------
--- Read: self; anyone sharing a group (any invite status); the creator of an event I can
--- access. Being a fellow participant does NOT count: whoever manages an event can add
+-- Read: self; an accepted member of a group I have any row in (so a pending invitee sees
+-- the group's members, but members do not see a pending invitee); the creator of an
+-- event I can access. Being a fellow participant does NOT count: whoever manages an event can add
 -- anyone to it with any RSVP status, so participation would let a stranger reveal
 -- anyone's profile (and email) by inviting them.
 -- Strangers are found only through the search routes (supabaseAdmin).
@@ -135,7 +136,8 @@ create policy "profiles read self or shared" on public.profiles
     user_id = auth.uid()
     or exists (select 1 from public.profiles_groups mine
                  join public.profiles_groups theirs on theirs.groups_id = mine.groups_id
-                where mine.user_id = auth.uid() and theirs.user_id = profiles.user_id)
+                where mine.user_id = auth.uid() and theirs.user_id = profiles.user_id
+                  and theirs.invite_status = 'accepted')
     or exists (select 1 from public.events e
                 where e.created_by = profiles.user_id and public.can_access_event(e.event_id))
   );

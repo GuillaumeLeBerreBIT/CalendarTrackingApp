@@ -171,6 +171,21 @@ begin
   if n <> 0 then raise exception 'FAIL: no self-promotion (M changed A''s color: % rows)', n; end if;
   reset role;
 
+  -- ---------- profiles of pending invitees (P still pending here) ----------
+  perform set_config('request.jwt.claims', json_build_object('sub', m, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  select count(*) into n from profiles where user_id = p;
+  if n <> 0 then raise exception 'FAIL: pending invitee profile hidden (M reads pending P: % rows)', n; end if;
+  select count(*) into n from profiles_groups pg join profiles pr on pr.user_id = pg.user_id
+   where pg.groups_id = g and pr.username is not null;
+  if n <> 2 then raise exception 'FAIL: member reads co-member profiles (while P pending: % rows)', n; end if;
+  reset role;
+  perform set_config('request.jwt.claims', json_build_object('sub', p, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  select count(*) into n from profiles where user_id = a;
+  if n <> 1 then raise exception 'FAIL: pending invitee sees members (P reads A: % rows)', n; end if;
+  reset role;
+
   -- ---------- pending invitee sees group name only ----------
   perform set_config('request.jwt.claims', json_build_object('sub', p, 'role', 'authenticated')::text, true);
   set local role authenticated;
@@ -311,12 +326,14 @@ begin
   if n <> 1 then raise exception 'FAIL: comments need access (M reads % comments)', n; end if;
   reset role;
 
-  -- ---------- member reads co-member profiles ----------
+  -- ---------- member reads co-member profiles (P accepted earlier) ----------
   perform set_config('request.jwt.claims', json_build_object('sub', m, 'role', 'authenticated')::text, true);
   set local role authenticated;
   select count(*) into n from profiles_groups pg join profiles pr on pr.user_id = pg.user_id
    where pg.groups_id = g and pr.username is not null;
-  if n <> 3 then raise exception 'FAIL: member reads co-member profiles (% rows)', n; end if;
+  if n <> 3 then raise exception 'FAIL: member reads co-member profiles (after P accepted: % rows)', n; end if;
+  select count(*) into n from profiles where user_id = p;
+  if n <> 1 then raise exception 'FAIL: member reads co-member profiles (M reads accepted P: % rows)', n; end if;
   reset role;
 
   -- ---------- anon has nothing ----------
