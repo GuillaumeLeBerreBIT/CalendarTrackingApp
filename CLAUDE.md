@@ -40,6 +40,7 @@ routes/
   todo.js                — /api/todo and task/task-list management
   habits.js              — /api/habits CRUD + /api/habits/:id/log (XP, pact increment)
   timers.js              — /api/timers CRUD (Pomodoro/countdown timers)
+  lists.js               — /api/lists shopping lists (personal or per group) + items; RLS decides access, names via admin lookup
   routines.js            — GET /api/routines: own weekly-repeating events (personal or in a group) + next session + group label
                            (create/edit/stop reuse /parseEvent; a routine is just a recurring event;
                            a group routine sets groups_id only, so members see it but nobody is invited)

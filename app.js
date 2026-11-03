@@ -29,6 +29,7 @@ import timerRouter from "./routes/timers.js"
 import challengeRouter from "./routes/challenges.js"
 import pactRouter from "./routes/pacts.js"
 import routinesRouter from "./routes/routines.js"
+import listsRouter from "./routes/lists.js"
 import { startScheduler } from "./utils/scheduler.js"
 
 const app = express();
@@ -111,6 +112,7 @@ app.use('/api', timerRouter);
 app.use('/api', challengeRouter);
 app.use('/api', pactRouter);
 app.use('/api', routinesRouter);
+app.use('/api', listsRouter);
 
 app.post('/api/refresh-session', authRequire, (req, res) => {
   return res.json({ success: true });
