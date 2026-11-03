@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
@@ -30,7 +30,9 @@ function NewListSheet({ groups, onClose, onCreated }: {
   onCreated: (list: ShoppingList) => void
 }) {
   const [title, setTitle] = useState('')
-  const [groupId, setGroupId] = useState(groups[0]?.id ?? '')
+  const [chosen, setChosen] = useState<string | null>(null)
+  const groupId = chosen ?? groups[0]?.id ?? ''
+  const setGroupId = setChosen
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
@@ -122,53 +124,67 @@ function ItemRow({ item, onTick, onRemove }: {
   )
 }
 
-function ListCard({ list, onChange, onRemoved }: {
+function ListCard({ list, patchItems, track, onRenamed, onRemoved }: {
   list: ShoppingList
-  onChange: (next: ShoppingList) => void
+  /** Functional update of this list's items against the latest state. */
+  patchItems: (fn: (items: ListItem[]) => ListItem[]) => void
+  /** Wraps a mutation so the parent knows one is pending. */
+  track: <T>(p: Promise<T>) => Promise<T>
+  onRenamed: (title: string) => void
   onRemoved: (listId: string) => void
 }) {
+  const pendingItems = useRef(new Set<string>())
   const [showDone, setShowDone] = useState(false)
   const [menu, setMenu] = useState(false)
   const [error, setError] = useState('')
   const { open, done } = splitDone(list.items)
 
-  function setItems(items: ListItem[]) { onChange({ ...list, items }) }
+  const setDone = (id: string, isDone: boolean) =>
+    patchItems((items) => items.map((i) => (i.itemId === id ? { ...i, isDone } : i)))
 
   async function tick(item: ListItem) {
-    const target = !item.isDone
-    const before = list.items
+    if (pendingItems.current.has(item.itemId)) return
+    pendingItems.current.add(item.itemId)
+    const prev = item.isDone
+    const target = !prev
     setError('')
-    setItems(before.map((i) => (i.itemId === item.itemId ? { ...i, isDone: target } : i)))
+    setDone(item.itemId, target)
     try {
-      await api.patch(`/lists/items/${item.itemId}`, { isDone: target })
+      await track(api.patch(`/lists/items/${item.itemId}`, { isDone: target }))
     } catch (err) {
-      setItems(before)
+      setDone(item.itemId, prev)
       setError(errorText(err))
+    } finally {
+      pendingItems.current.delete(item.itemId)
     }
   }
 
   async function remove(item: ListItem) {
-    const before = list.items
+    if (pendingItems.current.has(item.itemId)) return
+    pendingItems.current.add(item.itemId)
     setError('')
-    setItems(before.filter((i) => i.itemId !== item.itemId))
+    patchItems((items) => items.filter((i) => i.itemId !== item.itemId))
     try {
-      await api.delete(`/lists/items/${item.itemId}`)
+      await track(api.delete(`/lists/items/${item.itemId}`))
     } catch (err) {
-      setItems(before)
+      patchItems((items) => (items.some((i) => i.itemId === item.itemId) ? items : [...items, item]))
       setError(errorText(err))
+    } finally {
+      pendingItems.current.delete(item.itemId)
     }
   }
 
   async function add(titles: string[]) {
-    const { data } = await api.post(`/lists/${list.listId}/items`, { titles })
-    onChange({ ...list, items: [...list.items, ...data.items] })
+    const { data } = await track(api.post(`/lists/${list.listId}/items`, { titles }))
+    const added: ListItem[] = data.items
+    patchItems((items) => [...items, ...added.filter((a) => !items.some((i) => i.itemId === a.itemId))])
   }
 
   async function clearDone() {
     setError('')
     try {
-      await api.delete(`/lists/${list.listId}/items/done`)
-      onChange({ ...list, items: list.items.filter((i) => !i.isDone) })
+      await track(api.delete(`/lists/${list.listId}/items/done`))
+      patchItems((items) => items.filter((i) => !i.isDone))
     } catch (err) {
       setError(errorText(err))
     }
@@ -179,8 +195,8 @@ function ListCard({ list, onChange, onRemoved }: {
     const next = window.prompt('Rename list', list.title)?.trim()
     if (!next || next === list.title) return
     try {
-      await api.patch(`/lists/${list.listId}`, { title: next })
-      onChange({ ...list, title: next })
+      await track(api.patch(`/lists/${list.listId}`, { title: next }))
+      onRenamed(next)
     } catch (err) {
       setError(errorText(err))
     }
@@ -190,7 +206,7 @@ function ListCard({ list, onChange, onRemoved }: {
     setMenu(false)
     if (!window.confirm(`Delete "${list.title}" and all its items?`)) return
     try {
-      await api.delete(`/lists/${list.listId}`)
+      await track(api.delete(`/lists/${list.listId}`))
       onRemoved(list.listId)
     } catch (err) {
       setError(errorText(err))
@@ -258,21 +274,37 @@ export default function ShoppingLists() {
   const [groups, setGroups] = useState<GroupOpt[]>([])
   const [sheet, setSheet] = useState(false)
 
+  const seq = useRef(0)
+  const pending = useRef(0)
+
   const load = useCallback(() => {
+    if (pending.current > 0) return // a refetch would clobber optimistic state
+    const mine = ++seq.current
     api.get('/lists')
-      .then(({ data }) => { setLists(data.lists ?? []); setLoadError('') })
-      .catch((err) => setLoadError(errorText(err)))
+      .then(({ data }) => {
+        if (mine !== seq.current || pending.current > 0) return
+        setLists(data.lists ?? []); setLoadError('')
+      })
+      .catch((err) => {
+        if (mine !== seq.current) return
+        setLists((cur) => { if (cur === null) setLoadError(errorText(err)); return cur })
+      })
   }, [])
+
+  const track = useCallback(async <T,>(p: Promise<T>): Promise<T> => {
+    pending.current++
+    seq.current++ // invalidate any refetch already in flight
+    try { return await p } finally { pending.current-- }
+  }, [])
+
+  const patchList = (id: string, fn: (l: ShoppingList) => ShoppingList) =>
+    setLists((cur) => (cur ?? []).map((x) => (x.listId === id ? fn(x) : x)))
 
   useEffect(() => {
     load()
     const onVisible = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', load)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', load)
-    }
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [load])
 
   useEffect(() => {
@@ -305,8 +337,9 @@ export default function ShoppingLists() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {lists.map((l) => (
-            <ListCard key={l.listId} list={l}
-              onChange={(next) => setLists((cur) => (cur ?? []).map((x) => (x.listId === next.listId ? next : x)))}
+            <ListCard key={l.listId} list={l} track={track}
+              patchItems={(fn) => patchList(l.listId, (x) => ({ ...x, items: fn(x.items) }))}
+              onRenamed={(title) => patchList(l.listId, (x) => ({ ...x, title }))}
               onRemoved={(id) => setLists((cur) => (cur ?? []).filter((x) => x.listId !== id))} />
           ))}
         </div>
