@@ -34,6 +34,8 @@ declare
   e int;
   pe int;
   sl bigint;
+  slm bigint;
+  sli bigint;
   pl bigint;
   w bigint;
   w1 bigint;
@@ -85,7 +87,9 @@ begin
     (a, e, 'going'), (a, pe, 'going'), (m, pe, 'going');
   insert into lists (kind, title, created_by, groups_id)
     values ('shopping', 'ZZ SL', a, g) returning list_id into sl;
-  insert into list_items (list_id, title, created_by) values (sl, 'ZZ milk', a);
+  insert into list_items (list_id, title, created_by) values (sl, 'ZZ milk', a) returning item_id into sli;
+  insert into lists (kind, title, created_by, groups_id)
+    values ('shopping', 'ZZ SLM', m, g) returning list_id into slm;
   insert into lists (kind, title, created_by)
     values ('shopping', 'ZZ PL', a) returning list_id into pl;
   insert into list_items (list_id, title, created_by) values (pl, 'ZZ secret', a);
@@ -277,12 +281,6 @@ begin
   set local role authenticated;
   raised := false;
   begin
-    update lists set created_by = a where list_id = w;
-  exception when insufficient_privilege then raised := true;
-  end;
-  if not raised then raise exception 'FAIL: lists.created_by is immutable (M gave W to A)'; end if;
-  raised := false;
-  begin
     update lists set kind = 'shopping' where list_id = w;
   exception when insufficient_privilege then raised := true;
   end;
@@ -296,6 +294,14 @@ begin
   update lists set title = 'ZZ W (renamed)' where list_id = w;
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: owner renames wishlist (M renaming W: % rows)', n; end if;
+  -- M owns W and can edit SL's items, so RLS allows moving SL's item into W: only the
+  -- trigger stops it.
+  raised := false;
+  begin
+    update list_items set list_id = w where item_id = sli;
+  exception when insufficient_privilege then raised := true;
+  end;
+  if not raised then raise exception 'FAIL: list_items.list_id is immutable (M moved SL''s item into W)'; end if;
   reset role;
 
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
@@ -306,6 +312,14 @@ begin
   exception when insufficient_privilege then raised := true;
   end;
   if not raised then raise exception 'FAIL: lists.groups_id is immutable (A made SL personal)'; end if;
+  -- A is admin of G, so RLS allows A to update M's group list SLM (and the new row
+  -- passes the policy): only the trigger stops the change of creator.
+  raised := false;
+  begin
+    update lists set created_by = a where list_id = slm;
+  exception when insufficient_privilege then raised := true;
+  end;
+  if not raised then raise exception 'FAIL: lists.created_by is immutable (admin A took M''s SLM)'; end if;
 
   -- ---------- one wishlist per event ----------
   raised := false;

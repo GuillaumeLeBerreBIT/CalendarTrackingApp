@@ -27,7 +27,8 @@ create table public.lists (
   list_id    bigint generated always as identity primary key,
   kind       text not null check (kind in ('shopping', 'wishlist')),
   title      text not null check (char_length(btrim(title)) between 1 and 200),
-  created_by uuid not null default auth.uid() references public.profiles (user_id),
+  -- Cascade: deleting an account (POST /account/delete) deletes the lists it created.
+  created_by uuid not null default auth.uid() references public.profiles (user_id) on delete cascade,
   groups_id  bigint null references public.groups (groups_id) on delete cascade,
   event_id   bigint null references public.events (event_id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -43,10 +44,11 @@ create table public.list_items (
   item_id    bigint generated always as identity primary key,
   list_id    bigint not null references public.lists (list_id) on delete cascade,
   title      text not null check (char_length(btrim(title)) between 1 and 200),
-  link       text null check (link ~* '^https?://'),
-  note       text null,
+  link       text null check (link ~* '^https?://' and char_length(link) <= 2000),
+  note       text null check (char_length(note) <= 1000),
   is_done    boolean not null default false,
-  created_by uuid not null default auth.uid(),
+  -- Nullable: items a departed user added to a shared list stay, unattributed.
+  created_by uuid default auth.uid() references public.profiles (user_id) on delete set null,
   created_at timestamptz not null default now()
 );
 create index list_items_list_id_idx on public.list_items (list_id);
@@ -54,7 +56,7 @@ create index list_items_list_id_idx on public.list_items (list_id);
 -- Primary key on item_id = one claim per item. Deleting an item takes its claim with it.
 create table public.list_item_claims (
   item_id    bigint primary key references public.list_items (item_id) on delete cascade,
-  claimed_by uuid not null default auth.uid(),
+  claimed_by uuid not null default auth.uid() references public.profiles (user_id) on delete cascade,
   created_at timestamptz not null default now()
 );
 
@@ -224,14 +226,17 @@ create trigger list_items_immutable
 
 -- ---------- privileges ----------
 -- anon (no login) gets nothing; authenticated gets table grants and RLS decides.
+-- Revoke authenticated first: Supabase's default privileges give it ALL (TRUNCATE,
+-- UPDATE on claims, …); only the grants below should remain.
 revoke all on public.lists, public.list_items, public.list_item_claims from anon;
+revoke all on public.lists, public.list_items, public.list_item_claims from authenticated;
 grant select, insert, update, delete on public.lists, public.list_items to authenticated;
 grant select, insert, delete on public.list_item_claims to authenticated;
 
 -- =========================== ROLLBACK ==========================
 -- Kept commented so pasting the whole file never undoes the forward section; uncomment
 -- (strip the leading `-- `) and paste it. Dropping the tables drops their policies,
--- indexes and triggers; ALL list data is lost.
+-- indexes, triggers and foreign keys (incl. those to profiles); ALL list data is lost.
 --
 -- drop trigger if exists list_items_immutable on public.list_items;
 -- drop trigger if exists lists_immutable on public.lists;
