@@ -3,6 +3,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import supabase, { supabaseAdmin } from "../db/supabase.js";
 import authRequire, { createEventObj } from "../utils/utils.js";
+import { cleanWishlistItems } from '../utils/lists.js';
 import { creatorTimeZone } from "../utils/eventTimeZone.js";
 import { notifyUsers } from "../utils/notifications.js";
 import { syncEventToGoogle } from "../utils/google.js";
@@ -46,35 +47,72 @@ router.post("/parseEvent", authRequire, async (req, res) => {
   }
   const eventStatus = req.body.status === 'tentative' ? 'tentative' : 'confirmed';
   const dateOptions = Array.isArray(req.body.dateOptions) ? req.body.dateOptions : [];
+  const hasWishlist = req.body.wishlist !== undefined;
+  const gifts = hasWishlist ? cleanWishlistItems(req.body.wishlist) : null;
+  if (gifts && !gifts.ok) return res.status(400).json({ success: false, error: gifts.error });
+  // Build the set of rows to upsert into profiles_events.
+  // Use a map keyed by user_id so each user appears exactly once (no PK conflicts).
+  const rsvpByUser = new Map();
+
+  // 1. Social events: auto-invite ALL accepted group members as 'pending'
+  if (req.body.event_type === 'social' && insertEventObj.tagNames) {
+    const groupId = parseInt(insertEventObj.tagNames);
+    if (!isNaN(groupId)) {
+      const { data: groupMembers } = await req.supabase
+        .from('profiles_groups')
+        .select('user_id')
+        .eq('groups_id', groupId)
+        .eq('invite_status', 'accepted');
+
+      (groupMembers || []).forEach(m => rsvpByUser.set(m.user_id, 'pending'));
+    }
+  }
+
+  // 2. Appointment events: explicitly selected participants as 'pending'
+  if (Array.isArray(insertEventObj.participants)) {
+    insertEventObj.participants.forEach(p => {
+      if (p?.userId) rsvpByUser.set(p.userId, 'pending');
+    });
+  }
+
+  // 3. Creator is always 'going' (overrides any pending status set above)
+  rsvpByUser.set(req.cookies.userId, 'going');
+
   const timezone = await creatorTimeZone(req.supabase, req.cookies.userId, req.body.timezone);
 
-  const { data: eventData, error: eventDataError } = await req.supabase
-    .from("events")
-    .insert([
-      {
-        event_title: insertEventObj["calendar-title"],
-        event_description: insertEventObj["calendar-description"],
-        all_day: insertEventObj.allDay,
-        start_date: insertEventObj.startDate,
-        end_date: insertEventObj.endDate,
-        start_time: insertEventObj.startTime,
-        end_time: insertEventObj.endTime,
-        groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : null,
-        created_by: req.cookies.userId,
-        location: insertEventObj.location || null,
-        image_url: insertEventObj.image_url || null,
-        event_type: insertEventObj.event_type || 'appointment',
-        recurrence_rule: insertEventObj.recurrence_rule || null,
-        reminder_minutes: insertEventObj.reminder_minutes != null ? parseInt(insertEventObj.reminder_minutes) : null,
-        status: eventStatus,
-        timezone,
-      },
-    ])
-    .select();
+  const eventRow = {
+    event_title: insertEventObj["calendar-title"],
+    event_description: insertEventObj["calendar-description"],
+    all_day: insertEventObj.allDay,
+    start_date: insertEventObj.startDate,
+    end_date: insertEventObj.endDate,
+    start_time: insertEventObj.startTime,
+    end_time: insertEventObj.endTime,
+    groups_id: insertEventObj?.tagNames ? parseInt(insertEventObj?.tagNames) : null,
+    created_by: req.cookies.userId,
+    location: insertEventObj.location || null,
+    image_url: insertEventObj.image_url || null,
+    event_type: insertEventObj.event_type || 'appointment',
+    recurrence_rule: insertEventObj.recurrence_rule || null,
+    reminder_minutes: insertEventObj.reminder_minutes != null ? parseInt(insertEventObj.reminder_minutes) : null,
+    status: eventStatus,
+    timezone,
+  };
+  const creation = hasWishlist
+    ? await req.supabase.rpc('create_event_with_wishlist', {
+        p_event: eventRow, p_participants: Array.from(rsvpByUser.keys()),
+        p_options: eventStatus === 'tentative' ? dateOptions.slice(0, MAX_DATE_OPTIONS) : [],
+        p_items: gifts.items,
+      })
+    : await req.supabase.from('events').insert([eventRow]).select();
+  const eventDataError = creation.error;
+  const eventData = hasWishlist ? (creation.data ? [creation.data] : []) : creation.data;
 
   if (eventDataError) {
-    return res.status(500).json({ success: false, error: eventDataError.message });
+    return res.status(eventDataError.code === '42501' ? 403 : /^(22|23)/.test(eventDataError.code) ? 400 : 500).json({ success: false, error: eventDataError.message });
   }
+
+  if (!eventData?.length) return res.status(500).json({ success: false, error: 'Could not create event' });
 
   if (eventData[0]['start_time']) eventData[0]['start_time'] = eventData[0]['start_time'].slice(0, -3);
   if (eventData[0]['end_time']) eventData[0]['end_time'] = eventData[0]['end_time'].slice(0, -3);
@@ -83,7 +121,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
   const creatorId = req.cookies.userId;
 
   // Insert candidate date options for tentative events
-  if (eventStatus === 'tentative' && dateOptions.length > 0) {
+  if (!hasWishlist && eventStatus === 'tentative' && dateOptions.length > 0) {
     const optionRows = dateOptions.slice(0, MAX_DATE_OPTIONS).map((opt, i) => ({
       event_id: eventId,
       start_date: opt.startDate,
@@ -126,34 +164,6 @@ router.post("/parseEvent", authRequire, async (req, res) => {
     }
   }
 
-  // Build the set of rows to upsert into profiles_events.
-  // Use a map keyed by user_id so each user appears exactly once (no PK conflicts).
-  const rsvpByUser = new Map();
-
-  // 1. Social events: auto-invite ALL accepted group members as 'pending'
-  if (req.body.event_type === 'social' && insertEventObj.tagNames) {
-    const groupId = parseInt(insertEventObj.tagNames);
-    if (!isNaN(groupId)) {
-      const { data: groupMembers } = await req.supabase
-        .from('profiles_groups')
-        .select('user_id')
-        .eq('groups_id', groupId)
-        .eq('invite_status', 'accepted');
-
-      (groupMembers || []).forEach(m => rsvpByUser.set(m.user_id, 'pending'));
-    }
-  }
-
-  // 2. Appointment events: explicitly selected participants as 'pending'
-  if (Array.isArray(insertEventObj.participants)) {
-    insertEventObj.participants.forEach(p => {
-      if (p?.userId) rsvpByUser.set(p.userId, 'pending');
-    });
-  }
-
-  // 3. Creator is always 'going' (overrides any pending status set above)
-  rsvpByUser.set(creatorId, 'going');
-
   // Upsert all rows at once — onConflict avoids duplicate-key errors
   const upsertRows = Array.from(rsvpByUser.entries()).map(([user_id, rsvp_status]) => ({
     user_id,
@@ -161,7 +171,7 @@ router.post("/parseEvent", authRequire, async (req, res) => {
     rsvp_status,
   }));
 
-  const { error: rsvpError } = await req.supabase
+  const { error: rsvpError } = hasWishlist ? { error: null } : await req.supabase
     .from('profiles_events')
     .upsert(upsertRows, { onConflict: 'user_id,event_id' });
 
@@ -171,11 +181,15 @@ router.post("/parseEvent", authRequire, async (req, res) => {
 
   // Notify everyone invited (except the creator) that they're on a new event
   const inviteeIds = Array.from(rsvpByUser.keys()).filter((id) => id !== creatorId);
-  await notifyUsers(req.supabase, inviteeIds, 'event_invite', {
+  try {
+    await notifyUsers(req.supabase, inviteeIds, 'event_invite', {
     title: 'New event invite',
     body: `You're invited to "${eventData[0].event_title}".`,
     link: '/calendar',
-  });
+    });
+  } catch (err) {
+    console.warn('Event invitation notification failed:', err.message);
+  }
 
   // Build participant display list (username + userId) for the response
   const userIds = Array.from(rsvpByUser.keys());

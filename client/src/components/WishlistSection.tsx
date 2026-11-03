@@ -77,8 +77,7 @@ function OwnerRow({ item, onSave, onRemove }: {
   )
 }
 
-export default function WishlistSection({ eventId, taskId }: { eventId?: string | number; taskId?: string | number }) {
-  const endpoint = taskId != null ? `/tasks/${taskId}/wishlist` : `/events/${eventId}/wishlist`
+export default function WishlistSection({ eventId }: { eventId: string | number }) {
   const [wl, setWl] = useState<Wishlist | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
@@ -91,12 +90,12 @@ export default function WishlistSection({ eventId, taskId }: { eventId?: string 
   useEffect(() => {
     let live = true
     setLoaded(false); setWl(null); setError(''); setLoadError(''); setItemError('')
-    api.get(endpoint)
+    api.get(`/events/${eventId}/wishlist`)
       .then(({ data }) => { if (live) setWl(data.wishlist ?? null) })
       .catch((err) => { if (live) setLoadError(errorText(err)) })
       .finally(() => { if (live) setLoaded(true) })
     return () => { live = false }
-  }, [endpoint, reload])
+  }, [eventId, reload])
 
   const patchItem = (listId: string | undefined, id: string, fn: (i: WishItem) => WishItem) =>
     setWl((cur) => cur && cur.listId === listId ? { ...cur, items: cur.items.map((i) => (i.itemId === id ? fn(i) : i)) } : cur)
@@ -104,7 +103,7 @@ export default function WishlistSection({ eventId, taskId }: { eventId?: string 
   async function create() {
     setCreating(true); setError('')
     try {
-      const { data } = await api.post(endpoint)
+      const { data } = await api.post(`/events/${eventId}/wishlist`)
       setWl(data.wishlist)
     } catch (err) {
       setError(errorText(err))
@@ -185,7 +184,7 @@ export default function WishlistSection({ eventId, taskId }: { eventId?: string 
     }
   }
 
-  if (!loaded) return <p role="status" style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading wishlist…</p>
+  if (!loaded) return null
   if (loadError) {
     return (
       <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

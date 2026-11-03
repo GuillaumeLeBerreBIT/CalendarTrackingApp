@@ -18,14 +18,14 @@ export default function WishlistDraft({ enabled, onEnabled, items, onChange, dis
   return (
     <fieldset disabled={disabled} style={{ border: '1px solid var(--border-2)', borderRadius: 'var(--r-md)', padding: 12, margin: 0, minWidth: 0 }}>
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, fontWeight: 650, color: 'var(--text-1)', cursor: 'pointer', minHeight: 32 }}>
-        <input type="checkbox" checked={enabled} onChange={e => onEnabled(e.target.checked)} aria-controls="task-wishlist-draft" />
+        <input type="checkbox" checked={enabled} onChange={e => onEnabled(e.target.checked)} aria-controls="event-wishlist-draft" />
         Add a wishlist
         <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>Optional</span>
       </label>
       {enabled && (
-        <div id="task-wishlist-draft" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+        <div id="event-wishlist-draft" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-3)' }}>
-            Share gift ideas with this task’s group. They can reserve gifts; you won’t see what they’ve chosen.
+            Share gift ideas with people who can see this event. They can reserve gifts; you won’t see what they’ve chosen.
           </p>
           {items.map((item, i) => (
             <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 12 }}>

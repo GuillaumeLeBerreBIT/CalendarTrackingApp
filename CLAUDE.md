@@ -40,7 +40,7 @@ routes/
   todo.js                — /api/todo and task/task-list management
   habits.js              — /api/habits CRUD + /api/habits/:id/log (XP, pact increment)
   timers.js              — /api/timers CRUD (Pomodoro/countdown timers)
-  lists.js               — /api/lists shopping lists (personal or per group) + items; /api/events/:id/wishlist and /api/tasks/:id/wishlist (GET/POST, one per parent)
+  lists.js               — /api/lists shopping lists (personal or per group) + items; /api/events/:id/wishlist (GET/POST, one per event)
                            and /api/lists/items/:id/claim (POST/DELETE; claims hidden from the wishlist owner);
                            RLS decides access, names via admin lookup
   routines.js            — GET /api/routines: own weekly-repeating events (personal or in a group) + next session + group label
@@ -387,4 +387,4 @@ RESEND_API_KEY=
 - **Event times are naive wall clocks, read in `EVENT_TZ`** (`utils/wallClock.js`). Server code that needs a real instant (reminders, countdowns, cron times, "today") must use `wallClockToInstant()` / `todayIn()` — never `new Date(y, m, d, hh, mm)`, `getHours()` or `toISOString().slice(0,10)`, which read the host's zone (UTC in production) and made reminders fire ~2h late.
 - **Supabase query builders have no `.catch()`**: they are lazy thenables. Always `const { error } = await …`; a bare `.catch()` throws a TypeError and never sends the query.
 - **Date voting**: tentative events store candidate slots in `event_date_options`; members mark availability per slot in `event_date_votes` (one row per `(event_id, option_id, user_id)`, `availability` ∈ yes/maybe/no). `renderEvents` returns per-option `yesCount/maybeCount/noCount` + a `myVotes` map; the creator confirms a slot via `/confirmEventDate`. (Discovery/Ticketmaster removed 2026-06-15.)
-- Task wishlist creation uses `create_task_with_wishlist` to save the task and gifts atomically; apply `2026-11-03_task_wishlists.sql` before deploying that UI. Wishlist claims live in `list_item_claims`, invisible to the list owner by RLS — never return claim data to the owner.
+- Event creation with gifts uses `create_event_with_wishlist` to save the event, invitations, date options and wishlist atomically; apply both 2026-11-04 migrations before deploying that UI. Wishlist claims live in `list_item_claims`, invisible to the list owner by RLS — never return claim data to the owner.
