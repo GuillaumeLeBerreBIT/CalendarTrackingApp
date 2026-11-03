@@ -10,7 +10,7 @@ const MAX_NOTE = 1000;
 const MAX_LINK = 2000;
 
 // Every numeric route param is validated once, here.
-for (const name of ['listId', 'itemId', 'eventId']) {
+for (const name of ['listId', 'itemId', 'eventId', 'taskId']) {
   router.param(name, (req, res, next, value) => {
     if (!/^\d+$/.test(value)) return res.status(400).json({ success: false, error: 'Invalid id' });
     next();
@@ -69,15 +69,15 @@ function cleanTitle(v) {
   return t && t.length <= MAX_TITLE ? t : null;
 }
 
-// The event's wishlist as seen by `me`. The owner never sees claims (no request is
+// The event or task wishlist as seen by `me`. The owner never sees claims (no request is
 // made for them); guests only get taken / claimedByMe, never who claimed.
-async function readWishlist(req, eventId) {
+async function readWishlist(req, parentId, parentColumn = 'event_id') {
   const me = req.cookies.userId;
   const { data: lists, error } = await req.supabase
     .from('lists')
     .select('*')
     .eq('kind', 'wishlist')
-    .eq('event_id', eventId)
+    .eq(parentColumn, parentId)
     .limit(1);
   if (error) return { error };
   const row = (lists || [])[0];
@@ -121,9 +121,9 @@ async function readWishlist(req, eventId) {
   };
 }
 
-router.get('/events/:eventId/wishlist', authRequire, async (req, res) => {
+router.get(['/events/:eventId/wishlist', '/tasks/:taskId/wishlist'], authRequire, async (req, res) => {
   try {
-    const { wishlist, error } = await readWishlist(req, req.params.eventId);
+    const { wishlist, error } = await readWishlist(req, req.params.taskId ?? req.params.eventId, req.params.taskId ? 'task_id' : 'event_id');
     if (error) return sendDbError(res, error);
     res.json({ success: true, wishlist });
   } catch (err) {
@@ -131,11 +131,11 @@ router.get('/events/:eventId/wishlist', authRequire, async (req, res) => {
   }
 });
 
-router.post('/events/:eventId/wishlist', authRequire, async (req, res) => {
+router.post(['/events/:eventId/wishlist', '/tasks/:taskId/wishlist'], authRequire, async (req, res) => {
   try {
     const { data, error } = await req.supabase
       .from('lists')
-      .insert({ kind: 'wishlist', title: 'Wishlist', event_id: Number(req.params.eventId), created_by: req.cookies.userId })
+      .insert({ kind: 'wishlist', title: 'Wishlist', [req.params.taskId ? 'task_id' : 'event_id']: Number(req.params.taskId ?? req.params.eventId), created_by: req.cookies.userId })
       .select()
       .single();
     if (!error) {
@@ -154,8 +154,8 @@ router.post('/events/:eventId/wishlist', authRequire, async (req, res) => {
       });
     }
     if (error.code !== '23505') return sendDbError(res, error);
-    // One wishlist per event: return the existing one.
-    const { wishlist, error: readError } = await readWishlist(req, req.params.eventId);
+    // One wishlist per parent: return the existing one.
+    const { wishlist, error: readError } = await readWishlist(req, req.params.taskId ?? req.params.eventId, req.params.taskId ? 'task_id' : 'event_id');
     if (readError) return sendDbError(res, readError);
     if (!wishlist) return res.status(403).json({ success: false, error: 'Not allowed' });
     res.status(200).json({ success: true, wishlist });

@@ -1,6 +1,7 @@
 import express from "express";
 import supabase from "../db/supabase.js";
 import authRequire from "../utils/utils.js";
+import { cleanWishlistItems } from '../utils/lists.js';
 import { isGroupMember } from "../utils/groupAccess.js";
 
 const router = express.Router();
@@ -163,6 +164,24 @@ router.post("/createTask", authRequire, async (req, res) => {
     .from("task_list").select("groups_id").eq("task_list_id", req.body.task_list_id).maybeSingle();
   if (!list || !(await isGroupMember(req.supabase, req.cookies.userId, list.groups_id))) {
     return res.status(403).json({ success: false, error: 'Not a group member.' });
+  }
+  if (req.body.wishlist !== undefined) {
+    const cleaned = cleanWishlistItems(req.body.wishlist);
+    if (!cleaned.ok) return res.status(400).json({ success: false, error: cleaned.error });
+    if (typeof req.body.task_title !== 'string' || !req.body.task_title.trim() || req.body.task_title.trim().length > 200
+        || !['low', 'medium', 'high'].includes(req.body.priority)) {
+      return res.status(400).json({ success: false, error: 'A task title and valid priority are required' });
+    }
+    // The modal has no assignee selection; reject rather than silently dropping API input.
+    if (req.body.members?.length) return res.status(400).json({ success: false, error: 'Assign members after creating this task' });
+    const { data, error } = await req.supabase.rpc('create_task_with_wishlist', {
+      p_task_list_id: Number(req.body.task_list_id), p_title: req.body.task_title.trim(),
+      p_description: req.body.task_description || null, p_priority: req.body.priority,
+      p_due_date: req.body.due_date || null, p_items: cleaned.items,
+    });
+    if (error) return res.status(error.code === '42501' ? 403 : /^22|^23/.test(error.code) ? 400 : 500)
+      .json({ success: false, error: error.code === '42501' ? 'Not allowed' : error.message });
+    return res.json({ success: true, insertTask: data });
   }
   const { data: insertTask, error: insertTaskError } = await req.supabase
     .from("task")
