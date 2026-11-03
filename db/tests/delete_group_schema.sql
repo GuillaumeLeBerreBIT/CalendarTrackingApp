@@ -27,3 +27,7 @@ create table event_reminders_sent (event_id bigint references events, occurrence
 create table google_event_links (user_id uuid, event_id bigint references events);
 create table group_challenges (challenge_id bigint primary key, groups_id bigint references groups);
 create table habits (habit_id bigint primary key, user_id uuid, groups_id bigint references groups, challenge_id bigint references group_challenges);
+-- Lists (2026-11-03_lists.sql): unlike the tables above these DO cascade, so
+-- delete_group() takes a group's lists (and an event's wishlist) without knowing them.
+create table lists (list_id bigint primary key, kind text, groups_id bigint references groups on delete cascade, event_id bigint references events on delete cascade);
+create table list_items (item_id bigint primary key, list_id bigint references lists on delete cascade);

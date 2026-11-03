@@ -302,6 +302,9 @@ if (error) return res.status(500).json({ success: false, error: error.message })
 | `notifications`        | `notification_id`, `user_id`, `type`, `title`, `body`, `link`, `is_read`, `created_at`      |
 | `push_subscriptions`   | `user_id`, `endpoint`, `p256dh`, `auth`                                                      |
 | `event_reminders_sent` | `event_id`, `occurrence_date`, `reminder_type`, `fired_at`                                   |
+| `lists`                | `list_id`, `kind` (shopping/wishlist), `title`, `created_by`, `groups_id` (shopping, null = personal), `event_id` (wishlist; one per event) |
+| `list_items`           | `item_id`, `list_id`, `title`, `link`, `note`, `is_done`, `created_by`                      |
+| `list_item_claims`     | `item_id` (pk — one claim per item), `claimed_by`, `created_at`                             |
 
 Also present (not detailed here; `subscriptions` and `profiles.plan`/`always_free` are unused leftovers of the removed Free/Plus tier): `event_overrides`, `event_reactions`, `event_comments`, `group_invite_tokens`, `google_calendar_tokens`, `google_synced_calendars`, `google_event_links`, `subscriptions`, `xp_transactions`, `profiles_task`, `timers`.
 
@@ -375,3 +378,4 @@ RESEND_API_KEY=
 - **Event times are naive wall clocks, read in `EVENT_TZ`** (`utils/wallClock.js`). Server code that needs a real instant (reminders, countdowns, cron times, "today") must use `wallClockToInstant()` / `todayIn()` — never `new Date(y, m, d, hh, mm)`, `getHours()` or `toISOString().slice(0,10)`, which read the host's zone (UTC in production) and made reminders fire ~2h late.
 - **Supabase query builders have no `.catch()`**: they are lazy thenables. Always `const { error } = await …`; a bare `.catch()` throws a TypeError and never sends the query.
 - **Date voting**: tentative events store candidate slots in `event_date_options`; members mark availability per slot in `event_date_votes` (one row per `(event_id, option_id, user_id)`, `availability` ∈ yes/maybe/no). `renderEvents` returns per-option `yesCount/maybeCount/noCount` + a `myVotes` map; the creator confirms a slot via `/confirmEventDate`. (Discovery/Ticketmaster removed 2026-06-15.)
+- Wishlist claims live in `list_item_claims`, invisible to the list owner by RLS — never return claim data to the owner.
