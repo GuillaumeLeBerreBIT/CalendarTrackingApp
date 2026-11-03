@@ -153,5 +153,7 @@ Sentry.setupExpressErrorHandler(app);
 
 app.listen(app.get("port"), () => {
   console.log(`Listening on port: ${app.get("port")}`);
-  startScheduler();
+  if (process.env.DISABLE_SCHEDULER !== 'true') {
+    startScheduler();
+  }
 });
