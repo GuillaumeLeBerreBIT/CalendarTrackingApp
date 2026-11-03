@@ -111,6 +111,8 @@ client/
       OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)
       CommentThread.tsx  — Self-contained event comment thread
       RoutineSheet.tsx   — Quick create/edit sheet for a routine ("Where": just me or a group, day chips, time, end preset)
+      QuickAddInput.tsx  — One-line add box (Enter adds one, paste splits lines/commas); reused by shopping + wishlists
+      ShoppingLists.tsx  — Shopping tab of TodoPage (?tab=shopping): lists, tap-to-strike, Done section
       RecurringScopePrompt.tsx — "This / following / all" prompt for recurring edits
     lib/
       design.ts          — Group color map, design constants

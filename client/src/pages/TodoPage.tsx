@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '@/api/client'
 import type { TaskList, Task, Group } from '@/types'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
-import { Empty } from '@/components/ui/Primitives'
+import { Empty, Segmented } from '@/components/ui/Primitives'
+import ShoppingLists from '@/components/ShoppingLists'
 import { groupColorById } from './GroupsPage'
 import EventFormModal from '@/components/EventFormModal'
 
@@ -497,7 +499,7 @@ function TaskListCard({ tl, isExpanded, onToggleExpand, onAddTask, onToggleTask,
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function TodoPage() {
+function TasksTab() {
   const [taskLists, setTaskLists] = useState<TaskList[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
@@ -725,5 +727,26 @@ export default function TodoPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function TodoPage() {
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'shopping' ? 'shopping' : 'tasks'
+  return (
+    <>
+      <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px) 0', maxWidth: 760, margin: '0 auto' }}>
+        <Segmented
+          options={[{ value: 'tasks', label: 'Tasks' }, { value: 'shopping', label: 'Shopping' }]}
+          value={tab}
+          onChange={(v) => setParams(v === 'shopping' ? { tab: 'shopping' } : {}, { replace: true })}
+        />
+      </div>
+      {tab === 'shopping' ? (
+        <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 760, margin: '0 auto' }}>
+          <ShoppingLists />
+        </div>
+      ) : <TasksTab />}
+    </>
   )
 }
