@@ -637,6 +637,25 @@ router.get('/renderEvents', authRequire, async (req, res) => {
 
   const { windowStart, windowEnd } = expansionWindow(req.query);
 
+  // RLS hides profiles of participants the viewer shares no accepted group with (and of
+  // pending group invitees), so their embedded `profiles` comes back null. These events are
+  // already visible to the viewer, so fill just the usernames (never emails) server-side.
+  const missingNameIds = [...new Set(combinedEvents.flatMap((e) =>
+    (e.profiles_events || []).filter((p) => !p.profiles?.username).map((p) => p.user_id)))];
+  if (missingNameIds.length > 0) {
+    const { data: names, error: namesError } = await supabaseAdmin
+      .from('profiles')
+      .select('user_id, username')
+      .in('user_id', missingNameIds);
+    if (namesError) console.warn('[renderEvents] participant names lookup failed:', namesError.message);
+    const nameById = new Map((names || []).map((n) => [n.user_id, n.username]));
+    for (const e of combinedEvents) {
+      for (const p of e.profiles_events || []) {
+        if (!p.profiles?.username) p.profiles = { username: nameById.get(p.user_id) ?? null };
+      }
+    }
+  }
+
   const expandedEvents = [];
   for (const e of combinedEvents) {
     if (e.recurrence_rule) {
@@ -738,7 +757,7 @@ router.get('/renderEvents', authRequire, async (req, res) => {
         }
 
         const participants = e.profiles_events.map((p) => {
-          return {username: p.profiles.username, userId: p.user_id, rsvpStatus: p.rsvp_status};
+          return {username: p.profiles?.username ?? null, userId: p.user_id, rsvpStatus: p.rsvp_status};
         });
 
         let eventColor;
