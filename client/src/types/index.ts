@@ -198,3 +198,36 @@ export interface Routine {
   groupId: number | null
   groupTitle: string | null
 }
+
+export interface ListItem {
+  itemId: string
+  title: string
+  link: string | null
+  note: string | null
+  isDone: boolean
+  createdAt: string
+}
+
+export interface ShoppingList {
+  listId: string
+  title: string
+  groupId: string | null
+  groupTitle: string | null
+  createdBy: string
+  createdByName: string | null
+  items: ListItem[]
+}
+
+export interface WishItem extends ListItem {
+  taken?: boolean
+  claimedByMe?: boolean
+}
+
+export interface Wishlist {
+  listId: string
+  title: string
+  ownerId: string
+  ownerName: string | null
+  isOwner: boolean
+  items: WishItem[]
+}

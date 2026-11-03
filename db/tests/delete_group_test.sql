@@ -21,6 +21,8 @@ insert into event_reminders_sent values (2000, '2026-10-17', 'reminder');
 insert into google_event_links values (:me, 2000);
 insert into group_challenges values (7, 2);
 insert into habits values (1, :me, 2, 7), (2, :me, 1, null);
+insert into lists values (30, 'shopping', 1, null), (40, 'shopping', 2, null), (50, 'wishlist', null, 2000);
+insert into list_items values (300, 30), (400, 40), (500, 50);
 
 -- 1. A failure part-way must change nothing (one transaction).
 create table blocker (task_id bigint references task);   -- an FK the function does not know about
@@ -31,7 +33,8 @@ do $$ begin
 exception when foreign_key_violation then null; end $$;
 select 'atomic: task Tent kept' as check, count(*) = 1 as ok from task where task_id = 200
 union all select 'atomic: group kept', count(*) = 1 from groups where groups_id = 2
-union all select 'atomic: events kept', count(*) = 2 from events;
+union all select 'atomic: events kept', count(*) = 2 from events
+union all select 'atomic: lists kept', count(*) = 3 from lists;
 drop table blocker;
 
 -- 2. Deleting Weekend Crew removes all of it and nothing of Home.
@@ -46,7 +49,12 @@ union all select 'kept: Tandarts task', count(*) = 1 from task where task_title 
 union all select 'kept: Tandarts event', count(*) = 1 from events where event_id = 1000
 union all select 'kept: Home membership', count(*) = 1 from profiles_groups where groups_id = 1
 union all select 'kept: personal habit, unlinked', count(*) = 1 from habits where habit_id = 1 and groups_id is null and challenge_id is null
-union all select 'kept: Home habit', count(*) = 1 from habits where habit_id = 2 and groups_id = 1;
+union all select 'kept: Home habit', count(*) = 1 from habits where habit_id = 2 and groups_id = 1
+union all select 'gone: its shopping list', count(*) = 0 from lists where list_id = 40
+union all select 'gone: its event wishlist', count(*) = 0 from lists where list_id = 50
+union all select 'gone: their items', count(*) = 0 from list_items where list_id in (40, 50)
+union all select 'kept: Home shopping list', count(*) = 1 from lists where list_id = 30
+union all select 'kept: Home list item', count(*) = 1 from list_items where item_id = 300;
 
 -- 3. Unknown group: null, nothing changes.
 select 'unknown group returns null' as check, public.delete_group(999) is null as ok;

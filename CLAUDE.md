@@ -40,6 +40,9 @@ routes/
   todo.js                — /api/todo and task/task-list management
   habits.js              — /api/habits CRUD + /api/habits/:id/log (XP, pact increment)
   timers.js              — /api/timers CRUD (Pomodoro/countdown timers)
+  lists.js               — /api/lists shopping lists (personal or per group) + items; /api/events/:id/wishlist (GET/POST, one per event)
+                           and /api/lists/items/:id/claim (POST/DELETE; claims hidden from the wishlist owner);
+                           RLS decides access, names via admin lookup
   routines.js            — GET /api/routines: own weekly-repeating events (personal or in a group) + next session + group label
                            (create/edit/stop reuse /parseEvent; a routine is just a recurring event;
                            a group routine sets groups_id only, so members see it but nobody is invited)
@@ -53,6 +56,7 @@ utils/
   utils.js               — authRequire middleware, validatePassword, createEventObj,
                            retrieveTodoLists, retrieveEvents, retrieveAllTasks
   notifications.js       — notifyUsers() helper (in-app + web push)
+  lists.js               — shopping list helpers (cleanTitles(), isHttpLink())
   scheduler.js           — node-cron jobs: digest 07:00, reminders every 5min,
                            countdown 08:00, pact resolution 00:05, habit reminder 20:00,
                            daily summary sweep every 15min
@@ -110,9 +114,13 @@ client/
       OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)
       CommentThread.tsx  — Self-contained event comment thread
       RoutineSheet.tsx   — Quick create/edit sheet for a routine ("Where": just me or a group, day chips, time, end preset)
+      QuickAddInput.tsx  — One-line add box (Enter adds one, paste splits lines/commas); reused by shopping + wishlists
+      ShoppingLists.tsx  — Shopping tab of TodoPage (?tab=shopping): lists, tap-to-strike, Done section
+      WishlistSection.tsx — Event wishlist in EventModal: owner edits items; guests claim ("I'll get this"), owner never sees claim state
       RecurringScopePrompt.tsx — "This / following / all" prompt for recurring edits
     lib/
       design.ts          — Group color map, design constants
+      lists.ts           — splitPasted() (paste → items), isSafeLink(), splitDone()
       allDayDates.ts     — Inclusive ↔ FullCalendar-exclusive all-day end conversion
       calendarEvents.ts  — Calendar event normalisation, FullCalendar conversion,
                            day coverage, agenda bucketing, fetch window
@@ -165,6 +173,7 @@ client/
 | Countdowns | ✅ Done | Milestone countdowns; Pomodoro/interval timer removed 2026-06 |
 | Group Pacts | ✅ Done | Locked events, completion target, confetti |
 | Group Challenges | ✅ Done | Shared group goals with progress |
+| Shopping lists + event wishlists | ✅ Done | Per group or personal; one wishlist per event (per series for recurring), claims hidden from the owner |
 | Push notifications | ✅ Done | VAPID web push, prefs UI, bell badge |
 | PWA install | ✅ Done | Manifest, service worker, install banner |
 | Habit reminders (20:00 cron) | ✅ Done | Sends push for unlogged daily habits |
@@ -302,6 +311,9 @@ if (error) return res.status(500).json({ success: false, error: error.message })
 | `notifications`        | `notification_id`, `user_id`, `type`, `title`, `body`, `link`, `is_read`, `created_at`      |
 | `push_subscriptions`   | `user_id`, `endpoint`, `p256dh`, `auth`                                                      |
 | `event_reminders_sent` | `event_id`, `occurrence_date`, `reminder_type`, `fired_at`                                   |
+| `lists`                | `list_id`, `kind` (shopping/wishlist), `title`, `created_by`, `groups_id` (shopping, null = personal), `event_id` (wishlist; one per event) |
+| `list_items`           | `item_id`, `list_id`, `title`, `link`, `note`, `is_done`, `created_by`                      |
+| `list_item_claims`     | `item_id` (pk — one claim per item), `claimed_by`, `created_at`                             |
 
 Also present (not detailed here; `subscriptions` and `profiles.plan`/`always_free` are unused leftovers of the removed Free/Plus tier): `event_overrides`, `event_reactions`, `event_comments`, `group_invite_tokens`, `google_calendar_tokens`, `google_synced_calendars`, `google_event_links`, `subscriptions`, `xp_transactions`, `profiles_task`, `timers`.
 
@@ -375,3 +387,4 @@ RESEND_API_KEY=
 - **Event times are naive wall clocks, read in `EVENT_TZ`** (`utils/wallClock.js`). Server code that needs a real instant (reminders, countdowns, cron times, "today") must use `wallClockToInstant()` / `todayIn()` — never `new Date(y, m, d, hh, mm)`, `getHours()` or `toISOString().slice(0,10)`, which read the host's zone (UTC in production) and made reminders fire ~2h late.
 - **Supabase query builders have no `.catch()`**: they are lazy thenables. Always `const { error } = await …`; a bare `.catch()` throws a TypeError and never sends the query.
 - **Date voting**: tentative events store candidate slots in `event_date_options`; members mark availability per slot in `event_date_votes` (one row per `(event_id, option_id, user_id)`, `availability` ∈ yes/maybe/no). `renderEvents` returns per-option `yesCount/maybeCount/noCount` + a `myVotes` map; the creator confirms a slot via `/confirmEventDate`. (Discovery/Ticketmaster removed 2026-06-15.)
+- Wishlist claims live in `list_item_claims`, invisible to the list owner by RLS — never return claim data to the owner.

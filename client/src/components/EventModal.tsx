@@ -7,6 +7,7 @@ import { IconButton } from '@/components/ui/Button'
 import type { CalEvent } from '@/types'
 import api from '@/api/client'
 import RecurringScopePrompt from '@/components/RecurringScopePrompt'
+import WishlistSection from '@/components/WishlistSection'
 import CommentThread from '@/components/CommentThread'
 
 const HEX_GROUP_COLORS: Record<string, string> = {
@@ -654,6 +655,8 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
           {eventId && reactionsLoaded && (
             <ReactionBar reactions={reactions} onToggle={handleReactionToggle} />
           )}
+
+          {eventId && <WishlistSection eventId={calEvent?.extendedProps?.recurringEventId ?? eventId} />}
 
           {/* ── Comment Thread ────────────────────────────────── */}
           {eventId && (
