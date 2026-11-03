@@ -83,20 +83,22 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
   const [error, setError] = useState('')
   const [itemError, setItemError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [reload, setReload] = useState(0)
   const pendingItems = useRef(new Set<string>())
 
   useEffect(() => {
     let live = true
-    setLoaded(false); setWl(null); setError('')
+    setLoaded(false); setWl(null); setError(''); setLoadError(''); setItemError('')
     api.get(`/events/${eventId}/wishlist`)
       .then(({ data }) => { if (live) setWl(data.wishlist ?? null) })
-      .catch((err) => { if (live) setError(errorText(err)) })
+      .catch((err) => { if (live) setLoadError(errorText(err)) })
       .finally(() => { if (live) setLoaded(true) })
     return () => { live = false }
-  }, [eventId])
+  }, [eventId, reload])
 
-  const patchItem = (id: string, fn: (i: WishItem) => WishItem) =>
-    setWl((cur) => cur && { ...cur, items: cur.items.map((i) => (i.itemId === id ? fn(i) : i)) })
+  const patchItem = (listId: string | undefined, id: string, fn: (i: WishItem) => WishItem) =>
+    setWl((cur) => cur && cur.listId === listId ? { ...cur, items: cur.items.map((i) => (i.itemId === id ? fn(i) : i)) } : cur)
 
   async function create() {
     setCreating(true); setError('')
@@ -122,17 +124,19 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
 
   async function add(titles: string[]) {
     if (!wl) return
-    const { data } = await api.post(`/lists/${wl.listId}/items`, { titles })
+    const listId = wl.listId
+    const { data } = await api.post(`/lists/${listId}/items`, { titles })
     const added: WishItem[] = data.items
-    setWl((cur) => cur && { ...cur, items: [...cur.items, ...added.filter((a) => !cur.items.some((i) => i.itemId === a.itemId))] })
+    setWl((cur) => cur && cur.listId === listId ? { ...cur, items: [...cur.items, ...added.filter((a) => !cur.items.some((i) => i.itemId === a.itemId))] } : cur)
   }
 
   async function save(item: WishItem, patch: { title: string; link: string | null; note: string | null }): Promise<string | null> {
     if (pendingItems.current.has(item.itemId)) return 'Saving…'
     pendingItems.current.add(item.itemId)
+    const listId = wl?.listId
     try {
       const { data } = await api.patch(`/lists/items/${item.itemId}`, patch)
-      patchItem(item.itemId, (i) => ({ ...i, ...data.item }))
+      patchItem(listId, item.itemId, (i) => ({ ...i, ...data.item }))
       return null
     } catch (err) {
       return errorText(err)
@@ -145,11 +149,12 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
     if (pendingItems.current.has(item.itemId)) return
     pendingItems.current.add(item.itemId)
     setItemError('')
+    const listId = wl?.listId
     setWl((cur) => cur && { ...cur, items: cur.items.filter((i) => i.itemId !== item.itemId) })
     try {
       await api.delete(`/lists/items/${item.itemId}`)
     } catch (err) {
-      setWl((cur) => cur && (cur.items.some((i) => i.itemId === item.itemId) ? cur : { ...cur, items: [...cur.items, item] }))
+      setWl((cur) => cur && cur.listId === listId && !cur.items.some((i) => i.itemId === item.itemId) ? { ...cur, items: [...cur.items, item] } : cur)
       setItemError(errorText(err))
     } finally {
       pendingItems.current.delete(item.itemId)
@@ -160,17 +165,18 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
     if (pendingItems.current.has(item.itemId) || item.taken && !item.claimedByMe) return
     pendingItems.current.add(item.itemId)
     setItemError('')
+    const listId = wl?.listId
     const prev = { taken: item.taken, claimedByMe: item.claimedByMe }
     const claiming = !item.claimedByMe
-    patchItem(item.itemId, (i) => ({ ...i, taken: claiming, claimedByMe: claiming }))
+    patchItem(listId, item.itemId, (i) => ({ ...i, taken: claiming, claimedByMe: claiming }))
     try {
       if (claiming) await api.post(`/lists/items/${item.itemId}/claim`)
       else await api.delete(`/lists/items/${item.itemId}/claim`)
     } catch (err) {
       if (claiming && (err as { response?: { status?: number } })?.response?.status === 409) {
-        patchItem(item.itemId, (i) => ({ ...i, taken: true, claimedByMe: false }))
+        patchItem(listId, item.itemId, (i) => ({ ...i, taken: true, claimedByMe: false }))
       } else {
-        patchItem(item.itemId, (i) => ({ ...i, ...prev }))
+        patchItem(listId, item.itemId, (i) => ({ ...i, ...prev }))
         setItemError(errorText(err))
       }
     } finally {
@@ -179,6 +185,14 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
   }
 
   if (!loaded) return null
+  if (loadError) {
+    return (
+      <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <p role="alert" style={errStyle}>Couldn't load the wishlist: {loadError}</p>
+        <Button variant="ghost" size="sm" onClick={() => setReload((n) => n + 1)}>Retry</Button>
+      </div>
+    )
+  }
   if (!wl) {
     return (
       <div style={{ marginTop: 16 }}>
@@ -218,11 +232,11 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
             <ItemDetails item={item} />
           </div>
           {item.claimedByMe ? (
-            <Button variant="outline" size="sm" onClick={() => toggleClaim(item)}>You're getting this — undo</Button>
+            <Button variant="outline" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>You're getting this — undo</Button>
           ) : item.taken ? (
-            <Button variant="ghost" size="sm" disabled>Taken</Button>
+            <Button variant="ghost" size="sm" style={{ flexShrink: 0 }} disabled>Taken</Button>
           ) : (
-            <Button variant="soft" size="sm" onClick={() => toggleClaim(item)}>I'll get this</Button>
+            <Button variant="soft" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>I'll get this</Button>
           )}
         </div>
       ))}

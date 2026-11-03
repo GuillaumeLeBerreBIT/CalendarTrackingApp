@@ -656,7 +656,7 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
             <ReactionBar reactions={reactions} onToggle={handleReactionToggle} />
           )}
 
-          {eventId && <WishlistSection eventId={eventId} />}
+          {eventId && <WishlistSection eventId={calEvent?.extendedProps?.recurringEventId ?? eventId} />}
 
           {/* ── Comment Thread ────────────────────────────────── */}
           {eventId && (
