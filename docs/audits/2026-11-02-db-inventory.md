@@ -55,3 +55,13 @@ function signature.
   shifted except event 514 "Verlof", extended to Sun 8 Nov at the owner's request.
 - Deleted 7 orphaned Nov 2025 test events (ids 1, 12, 13, 14, 15, 24, 25; creator account gone).
 - Separately: routines 580–583 moved to group 35 (HOME) at the owner's request.
+
+## Resolution (2026-11-03)
+
+R1–R8 fixed by `db/migrations/2026-11-02_access_rules.sql`, applied to production on
+2026-11-03 at 08:56 UTC (migration version 20261103085611), after the route changes in PR #2
+were deployed. `db/tests/access_rules_test.sql` passed against the live rules
+(ACCESS_RULES_OK); the migration's ROLLBACK section was proven to restore the previous state
+(ROLLBACK_OK). One incident followed: `/renderEvents` returned 500 because a participant's
+profile embed was now null; fixed by PR #3 (usernames filled via supabaseAdmin), live 09:11 UTC.
+Known leftover: legacy membership row with `invite_status` NULL (group 14 "Testing").
