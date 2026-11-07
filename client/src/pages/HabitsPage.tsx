@@ -90,10 +90,9 @@ function HabitCard({
 
   return (
     <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--r-lg)',
-      padding: '16px 18px',
+      background: 'var(--fill)',
+      borderRadius: 12,
+      padding: '14px 16px',
       marginBottom: 12,
     }}>
       {/* Header row */}
@@ -254,7 +253,7 @@ function CreateHabitModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="New Habit" onClose={onClose}>
+    <Modal title="New habit" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div>
           <label style={labelStyle}>Title</label>
@@ -449,9 +448,8 @@ export default function HabitsPage() {
           <h1 className="page-title">
             Habits
           </h1>
-          <Button variant="primary" size="md" onClick={() => setShowCreateModal(true)}>
-            <Icon name="plus" size={16} />
-            New Habit
+          <Button variant="primary" size="sm" icon="plus" onClick={() => setShowCreateModal(true)}>
+            New habit
           </Button>
         </header>
 

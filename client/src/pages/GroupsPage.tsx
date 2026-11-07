@@ -7,7 +7,7 @@ import type { Group, Invite } from '@/types'
 import Icon from '@/components/ui/Icon'
 import { AvatarStack } from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
-import { Progress, Stat, Empty } from '@/components/ui/Primitives'
+import { Empty } from '@/components/ui/Primitives'
 import GroupDeletePreview from '@/components/GroupDeletePreview'
 
 export const GROUP_COLOR_PALETTE = ['#f59e0b', '#ec4899', '#22d3aa', '#38bdf8', '#c084fc', '#818cf8']
@@ -35,161 +35,51 @@ interface GroupCardProps {
   onClick: () => void
 }
 
-function GroupCard({ group, onClick }: GroupCardProps) {
-  const [hovered, setHovered] = useState(false)
+function GroupCard({ group, onClick, selectMode, selected }: GroupCardProps & { selectMode?: boolean; selected?: boolean }) {
   const color = groupColorFor(group)
-  const letter = group.groups_title?.[0]?.toUpperCase() ?? 'G'
-
   const memberCount = group.members?.length ?? 0
   const upcomingEvents = group.totalEvents ?? 0
   const openTasks = Math.max(0, (group.totalTasks?.all ?? 0) - (group.totalTasks?.completed ?? 0))
-
-  // Real member avatars from the group's member list (with username initials)
   const members = group.members ?? []
   const memberIds = members.map((m) => m.user_id)
   const memberNames: Record<string, string> = {}
   members.forEach((m) => { if (m.username) memberNames[m.user_id] = m.username })
+  const meta = [
+    `${memberCount} member${memberCount === 1 ? '' : 's'}`,
+    upcomingEvents ? `${upcomingEvents} upcoming` : null,
+    openTasks ? `${openTasks} open task${openTasks === 1 ? '' : 's'}` : null,
+  ].filter(Boolean).join(' · ')
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       onClick={onClick}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      aria-pressed={selectMode ? selected : undefined}
+      className="row-hover"
       style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-lg)',
-        border: `1px solid ${hovered ? 'var(--border-hi)' : 'var(--border)'}`,
-        boxShadow: 'none',
-        transition: 'var(--transition)',
-        cursor: 'pointer',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
+        display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 64, padding: '10px 16px',
+        border: 0, borderTop: '1px solid var(--divider)', background: 'transparent', textAlign: 'left',
+        color: 'var(--text-1)', cursor: 'pointer',
       }}
     >
-      {/* Body */}
-      <div style={{ padding: '16px 16px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Icon row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Group icon square */}
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: 'var(--r-md)',
-            background: color,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontSize: 20,
-            fontWeight: 700,
-            flexShrink: 0,
-          }}>
-            {letter}
-          </div>
-          <AvatarStack ids={memberIds} names={memberNames} size={24} max={4} ringColor="var(--surface)" />
-        </div>
-
-        {/* Title + member count */}
-        <div>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
-            {group.groups_title}
-          </h3>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '3px 0 0', lineHeight: 1 }}>
-            {memberCount} members
-          </p>
-        </div>
-
-        {/* Next event row */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '7px 10px',
-          borderRadius: 'var(--r-sm)',
-          background: 'var(--surface-2)',
-          border: '1px solid var(--border)',
-          minWidth: 0,
-        }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
-          <span style={{ fontSize: 12.5, color: 'var(--text-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {upcomingEvents > 0 ? `${upcomingEvents} upcoming event${upcomingEvents > 1 ? 's' : ''}` : 'No upcoming events'}
-          </span>
-        </div>
-
-        {/* Task progress */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>Tasks</span>
-            <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-              {openTasks} open
-            </span>
-          </div>
-          <Progress value={group.totalTasks?.completed ?? 0} total={group.totalTasks?.all ?? 0} color={color} height={4} />
-        </div>
-
-        {/* Stats row */}
-        <div style={{
-          display: 'flex',
-          gap: 0,
-          paddingTop: 8,
-          borderTop: '1px solid var(--border)',
-          justifyContent: 'space-between',
-        }}>
-          <Stat n={upcomingEvents} label="upcoming" />
-          <Stat n={memberCount} label="members" />
-          <Stat n={openTasks} label="open tasks" />
-        </div>
-      </div>
-    </div>
+      {selectMode && (
+        <span style={{
+          width: 22, height: 22, borderRadius: 11, flex: '0 0 22px', boxSizing: 'border-box',
+          border: selected ? 'none' : '1.5px solid var(--border-hi)', background: selected ? 'var(--accent)' : 'transparent',
+          color: 'var(--accent-text)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>{selected && <Icon name="check" size={12} sw={3.2} />}</span>
+      )}
+      <span style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: color, flex: '0 0 3px' }} />
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.groups_title}</span>
+        <span style={{ fontSize: 13, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</span>
+      </span>
+      <AvatarStack ids={memberIds} names={memberNames} size={26} max={3} ringColor="var(--fill)" />
+      {!selectMode && <Icon name="chevR" size={14} sw={2} style={{ color: 'var(--text-3)', flexShrink: 0 }} />}
+    </button>
   )
 }
 
-// ── Create placeholder card ───────────────────────────────────────────────────
-function CreateCard({ onClick }: { onClick: () => void }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        minHeight: 260,
-        border: '1.5px dashed var(--border-hi)',
-        borderRadius: 'var(--r-lg)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        color: hovered ? 'var(--text-2)' : 'var(--text-3)',
-        background: hovered ? 'var(--surface-2)' : 'transparent',
-        transition: 'var(--transition)',
-        cursor: 'pointer',
-      }}
-    >
-      <div style={{
-        width: 42,
-        height: 42,
-        borderRadius: 'var(--r-md)',
-        border: '1.5px dashed var(--border-hi)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--text-3)',
-      }}>
-        <Icon name="plus" size={20} sw={2} />
-      </div>
-      <span style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: '-0.01em' }}>Create a group</span>
-    </div>
-  )
-}
 
 // ── Invite card ───────────────────────────────────────────────────────────────
 function InviteCard({ inv, onAccept, onDecline }: { inv: Invite; onAccept: () => void; onDecline: () => void }) {
@@ -370,12 +260,12 @@ export default function GroupsPage() {
   }
 
   return (
-    <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 900, margin: '0 auto' }}>
+    <div className="page-body">
       {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 20 }}>
         <div>
           <h1 className="page-title">Groups</h1>
-          <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '4px 0 0' }}>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '2px 0 0' }}>
             {selectMode
               ? `${selectedIds.size} selected`
               : `${groups.length} group${groups.length !== 1 ? 's' : ''}`}
@@ -384,10 +274,10 @@ export default function GroupsPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           {selectMode ? (
             <>
-              <Button variant="ghost" size="md" onClick={exitSelectMode}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={exitSelectMode}>Cancel</Button>
               <Button
                 variant="danger"
-                size="md"
+                size="sm"
                 icon="trash"
                 onClick={() => { setBulkDeleteError(null); setShowDeleteConfirm(true) }}
                 disabled={selectedIds.size === 0}
@@ -397,8 +287,8 @@ export default function GroupsPage() {
             </>
           ) : (
             <>
-              <Button variant="ghost" size="md" onClick={() => setSelectMode(true)}>Select</Button>
-              <Button variant="primary" icon="plus" size="md" onClick={() => setCreateOpen(true)}>
+              <Button variant="ghost" size="sm" onClick={() => setSelectMode(true)}>Select</Button>
+              <Button variant="primary" icon="plus" size="sm" onClick={() => setCreateOpen(true)}>
                 New group
               </Button>
             </>
@@ -446,9 +336,9 @@ export default function GroupsPage() {
 
       {/* Groups grid */}
       {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3].map(i => (
-            <div key={i} className="skeleton" style={{ height: 260, borderRadius: 'var(--r-lg)' }} />
+            <div key={i} className="skeleton" style={{ height: 64, borderRadius: 12 }} />
           ))}
         </div>
       ) : groups.length === 0 && invites.length === 0 ? (
@@ -461,57 +351,18 @@ export default function GroupsPage() {
           </div>
         </div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))',
-          gap: 16,
-        }}>
-          {groups.map((g) => {
-            const isSelected = selectedIds.has(g.groups_id)
-            return (
-              <div key={g.groups_id} style={{ position: 'relative' }}>
-                <GroupCard
-                  group={g}
-                  onClick={() => selectMode ? toggleSelect(g.groups_id) : navigate(`/groups/${g.groups_id}`)}
-                />
-                {selectMode && (
-                  <div
-                    onClick={() => toggleSelect(g.groups_id)}
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      borderRadius: 'var(--r-lg)',
-                      border: isSelected ? '2px solid var(--danger)' : '2px solid transparent',
-                      background: isSelected ? 'color-mix(in srgb, var(--danger) 10%, transparent)' : 'transparent',
-                      transition: 'var(--transition)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      justifyContent: 'flex-end',
-                      padding: 10,
-                    }}
-                  >
-                    <div style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      border: isSelected ? '2px solid var(--danger)' : '2px solid rgba(255,255,255,0.5)',
-                      background: isSelected ? 'var(--danger)' : 'rgba(0,0,0,0.4)',
-                      backdropFilter: 'blur(4px)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      transition: 'var(--transition)',
-                    }}>
-                      {isSelected && <Icon name="check" size={12} sw={2.5} style={{ color: '#fff' }} />}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-          {!selectMode && <CreateCard onClick={() => setCreateOpen(true)} />}
+        <div style={{ background: 'var(--fill)', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ marginTop: -1 }}>
+            {groups.map((g) => (
+              <GroupCard
+                key={g.groups_id}
+                group={g}
+                selectMode={selectMode}
+                selected={selectedIds.has(g.groups_id)}
+                onClick={() => selectMode ? toggleSelect(g.groups_id) : navigate(`/groups/${g.groups_id}`)}
+              />
+            ))}
+          </div>
         </div>
       )}
 
