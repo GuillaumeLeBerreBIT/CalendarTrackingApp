@@ -43,6 +43,7 @@ const IconPaths: Record<string, string> = {
   repeat:     'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
   hourglass:  'M6 2h12M6 22h12M7 2v4.5a5 5 0 0 0 10 0V2M7 22v-4.5a5 5 0 0 1 10 0V22',
   'chevron-down': 'M6 9l6 6 6-6',
+  gift:      'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z',
   trophy:     'M6 9H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2M6 9a6 6 0 0 0 12 0M12 15v4M8 21h8',
 }
 

@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
 import CountdownPill from '@/components/CountdownPill'
 import { IconButton } from '@/components/ui/Button'
+import Sheet from '@/components/ui/Sheet'
+import { Tag } from '@/components/ui/Primitives'
+import { InsetGroup, InsetRow } from '@/components/ui/Controls'
+import { Avatar } from '@/components/ui/Avatar'
 import type { CalEvent } from '@/types'
 import api from '@/api/client'
 import RecurringScopePrompt from '@/components/RecurringScopePrompt'
@@ -55,7 +58,6 @@ interface EventModalProps {
 
 export default function EventModal({ data, onClose, onEdit, onDeleted, currentUserId, onRsvp }: EventModalProps) {
   const navigate = useNavigate()
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
   const isCalEvent = true
   const eventId = data.id
 
@@ -156,15 +158,6 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
     }
   }
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose()
-  }, [onClose])
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
-
   // Fetch reactions when the modal opens for a real calendar event.
   // (Comments are fetched independently by <CommentThread>.)
   useEffect(() => {
@@ -217,14 +210,9 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
   }
 
   // Display shape for a calendar event
-  const cat    = 'calendar'
   const title  = data.title
   const blurb  = data.extendedProps?.description ?? ''
-  const date   = data.start
-    ? `${data.start.split('T')[0]}${data.start.includes('T') ? ' · ' + data.start.split('T')[1].slice(0, 5) : ''}`
-    : ''
-  const venue  = data.extendedProps?.groupName ?? 'Calendar event'
-  const area   = ''
+  const dateText = formatWhen(data)
 
   // Edit/Delete actions are gated on management rights (creator OR group admin),
   // independent of whether the user is an invited participant.
@@ -244,427 +232,175 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
     pending: { label: 'Invited',   color: 'var(--text-3)' },
   }
 
-  // Portal to <body>: a position:fixed overlay nested inside .app-viewport
-  // (overflow:hidden) is clipped behind the mobile bottom nav on iOS Safari.
-  return createPortal(
-    <div
-      // Close on pointerdown, not click: the tap that opens the modal (fired from
-      // FullCalendar on touchend) is followed by a compatibility click hit-tested
-      // against the freshly mounted backdrop, which would instantly close it.
-      // pointerdown only fires for a *new* touch, so the ghost click can't reach it.
-      onPointerDown={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 200,
-        background: 'var(--scrim)',
-        backdropFilter: 'blur(6px)',
-        display: 'flex',
-        alignItems: isMobile ? 'flex-end' : 'center',
-        justifyContent: isMobile ? 'stretch' : 'center',
-        padding: isMobile ? '0' : '16px',
-        animation: 'fadeIn 0.2s ease',
-      }}
-    >
-      <div
-        onPointerDown={(e) => e.stopPropagation()}
-        style={isMobile ? {
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          maxHeight: '92dvh',
-          overflowY: 'auto',
-          background: 'var(--surface)',
-          borderRadius: '20px 20px 0 0',
-          border: '1px solid var(--border-2)',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'scaleIn 0.24s cubic-bezier(0.2,0.7,0.2,1) both',
-          display: 'flex',
-          flexDirection: 'column',
-        } : {
-          width: 'min(720px, 100%)',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          background: 'var(--surface)',
-          borderRadius: 'var(--r-xl)',
-          border: '1px solid var(--border-2)',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'scaleIn 0.24s cubic-bezier(0.2,0.7,0.2,1) both',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+  const groupsId = calEvent?.extendedProps?.groupsId
+  const isTentativeEv = calEvent?.extendedProps?.status === 'tentative'
+  const isGoogle = calEvent?.extendedProps?.externalSource === 'google'
+  const reminderMins = calEvent?.extendedProps?.reminderMinutes
+  const reminderText = typeof reminderMins === 'number'
+    ? (reminderMins >= 1440 ? `${Math.round(reminderMins / 1440)} day before`
+      : reminderMins >= 60 ? `${Math.round(reminderMins / 60)} hour before`
+      : `${reminderMins} min before`)
+    : null
+
+  return (
+    <>
+      <Sheet
+        title={isMultiPerson ? 'Group event' : isGroupEvent ? 'Appointment' : 'Event'}
+        onClose={onClose}
+        width={480}
+        actions={
+          <>
+            {calEvent?.extendedProps?.publicToken && (
+              shareCopied
+                ? <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', padding: '0 6px' }}>Copied!</span>
+                : <IconButton name="share" size={36} isz={16} title="Share link" onClick={handleShare} />
+            )}
+            {canManage && <IconButton name="edit" size={36} isz={16} title="Edit event" onClick={onEdit} />}
+            {canManage && <IconButton name="trash" size={36} isz={16} title={deleting ? 'Deleting…' : 'Delete event'} onClick={deleting ? undefined : handleDelete} />}
+          </>
+        }
       >
-        {isMobile && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0 0' }}>
-            <div style={{ width: 40, height: 4, borderRadius: 99, background: 'var(--border-2)' }} />
-          </div>
-        )}
-        {/* ── Cover ───────────────────────────────────────────── */}
-        <div
-          className={imageUrl ? '' : 'img-ph'}
-          data-cat={imageUrl ? undefined : cat}
-          style={{ height: 230, position: 'relative', flex: '0 0 230px', borderRadius: 'var(--r-xl) var(--r-xl) 0 0', overflow: 'hidden', background: imageUrl ? 'var(--surface-2)' : `linear-gradient(135deg, ${groupHex}28 0%, var(--surface-3) 100%)` }}
-        >
-          {/* Real cover image when provided */}
+        <div style={{ padding: '16px 18px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
           {imageUrl && (
             <img
               src={imageUrl}
-              alt={title}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              alt=""
+              style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 'var(--r-lg)', background: 'var(--fill)' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
           )}
 
-          {/* Overlay gradient */}
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--overlay-grad)', borderRadius: 'var(--r-xl) var(--r-xl) 0 0' }} />
-
-          {/* Top-left: source badge or event-type pill */}
-          <div style={{ position: 'absolute', top: 14, left: 16, zIndex: 2, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 10px',
-              borderRadius: 'var(--r-full)',
-              background: isMultiPerson ? groupHex + '33' : groupHex + '22',
-              backdropFilter: 'blur(8px)',
-              border: `1px solid ${groupHex}55`,
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#fff',
-            }}>
-              <Icon name={isMultiPerson ? 'users' : isGroupEvent ? 'calendar' : 'profile'} size={12} sw={2} />
-              {isMultiPerson ? 'Group event' : isGroupEvent ? 'Appointment' : 'Personal'}
-            </span>
-            {isCalEvent && data.extendedProps?.isRecurring && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '3px 10px', borderRadius: 'var(--r-full)',
-                background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)',
-                color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600,
-                border: '1px solid rgba(255,255,255,0.15)',
-              }}>
-                ↻ Recurring
-              </span>
-            )}
-            {isCalEvent && data.extendedProps?.status === 'tentative' && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '3px 10px', borderRadius: 'var(--r-full)',
-                background: 'rgba(245,158,11,0.18)', backdropFilter: 'blur(8px)',
-                color: '#f59e0b', fontSize: 11, fontWeight: 700,
-                border: '1px solid rgba(245,158,11,0.3)',
-              }}>
-                Voting open
-              </span>
-            )}
-          </div>
-
-          {/* Top-right: edit + delete (when canManage) + share (calendar) + close */}
-          <div style={{ position: 'absolute', top: 14, right: 16, display: 'flex', gap: 8, zIndex: 2 }}>
-            {canManage && (
-              <>
-                <IconButton
-                  name="edit"
-                  tone="glass"
-                  size={44}
-                  title="Edit event"
-                  onClick={onEdit}
-                />
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  title="Delete event"
-                  style={{
-                    position: 'relative',
-                    width: 44,
-                    height: 44,
-                    borderRadius: 'var(--r-sm)',
-                    border: '1px solid rgba(239,68,68,0.45)',
-                    background: deleting ? 'rgba(239,68,68,0.18)' : 'rgba(0,0,0,0.4)',
-                    color: '#ef4444',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'var(--transition)',
-                    backdropFilter: 'blur(8px)',
-                    cursor: deleting ? 'not-allowed' : 'pointer',
-                    opacity: deleting ? 0.6 : 1,
-                  }}
-                >
-                  <Icon name="trash" size={20} sw={1.8} />
-                </button>
-              </>
-            )}
-            {(
-              shareCopied ? (
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '0 12px',
-                  height: 44,
-                  borderRadius: 'var(--r-sm)',
-                  background: 'rgba(0,0,0,0.4)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.14)',
-                  fontSize: 12,
-                  fontWeight: 650,
-                  color: '#fff',
-                  whiteSpace: 'nowrap',
-                }}>
-                  Copied!
-                </span>
-              ) : (
-                <IconButton name="share" tone="glass" size={44} title="Copy link" onClick={handleShare} />
-              )
-            )}
-            <IconButton name="close" tone="glass" size={44} onClick={onClose} title="Close" />
-          </div>
-
-          {/* Bottom: date + title */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 20px 20px', zIndex: 2 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8, flexWrap: 'wrap' }}>
-              <Icon name="clock" size={14} sw={1.8} style={{ color: 'rgba(255,255,255,0.75)' }} />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>{date}</span>
-              {isCalEvent && data.start && new Date(data.start) > new Date() && (
-                <CountdownPill targetDate={data.start} size="sm" />
-              )}
+          {/* Title block */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <span style={{ width: 3, borderRadius: 2, background: groupHex, flexShrink: 0, opacity: isTentativeEv ? 0.5 : 1 }} />
+            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <h2 style={{ fontSize: 23, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.25 }}>{title}</h2>
+              <p style={{ fontSize: 14.5, color: 'var(--text-2)' }}>{dateText}</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                {data.start && new Date(data.start) > new Date() && <CountdownPill targetDate={data.start} size="sm" />}
+                {data.extendedProps?.isRecurring && <Tag><Icon name="repeat" size={11} sw={2} /> Repeats</Tag>}
+                {isTentativeEv && <Tag tone="ghost">Voting open</Tag>}
+                {isGoogle && <Tag tone="ghost">From Google Calendar · read-only</Tag>}
+              </div>
             </div>
-            <h2 style={{ fontSize: 28, fontWeight: 800, color: '#fff', lineHeight: 1.2, letterSpacing: '-0.03em' }}>
-              {title}
-            </h2>
-          </div>
-        </div>
-
-        {/* ── Body ────────────────────────────────────────────── */}
-        <div style={{ padding: '22px 24px 24px', display: 'flex', flexDirection: 'column', gap: 22 }}>
-
-          {/* Meta row */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-              <MetaItem icon="pin" primary={venue} secondary={area || undefined} />
-              {location && (
-                <MetaItem icon="map" primary={location} secondary="Location" />
-              )}
-              {creatorName ? (
-                <MetaItem icon="profile" primary={creatorName} secondary="Created by" />
-              ) : null}
-            </div>
-            {isCalEvent && data.extendedProps?.groupName && (
-              <div
-                onClick={() => { if ((data as CalEvent).extendedProps?.groupsId) { navigate(`/groups/${(data as CalEvent).extendedProps?.groupsId}`); onClose() } }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  cursor: (data as CalEvent).extendedProps?.groupsId ? 'pointer' : 'default',
-                  color: groupHex,
-                  fontSize: 13.5, fontWeight: 500,
-                  padding: '2px 0',
-                  transition: 'opacity 0.15s',
-                }}
-                onMouseEnter={e => { if ((data as CalEvent).extendedProps?.groupsId) (e.currentTarget as HTMLDivElement).style.opacity = '0.75' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1' }}
-              >
-                <Icon name="users" size={14} sw={1.8} style={{ color: groupHex, flexShrink: 0 }} />
-                {(data as CalEvent).extendedProps?.groupName}
-                {(data as CalEvent).extendedProps?.groupsId && <Icon name="chevR" size={12} sw={2} style={{ color: groupHex, opacity: 0.6 }} />}
-              </div>
-            )}
-            {isCalEvent && (data as CalEvent).extendedProps?.externalSource === 'google' && (
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7, alignSelf: 'flex-start',
-                padding: '3px 10px', borderRadius: 'var(--r-full)',
-                background: 'rgba(66,133,244,0.12)', border: '1px solid rgba(66,133,244,0.30)',
-                color: '#4285F4', fontSize: 12, fontWeight: 650,
-              }}>
-                <Icon name="calendar" size={13} sw={1.9} style={{ color: '#4285F4', flexShrink: 0 }} />
-                From Google Calendar · read-only
-              </div>
-            )}
-            {isCalEvent && typeof (data as CalEvent).extendedProps?.reminderMinutes === 'number' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--text-3)' }}>
-                <Icon name="bell" size={14} sw={1.8} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
-                <span>Reminder: {
-                  (() => {
-                    const mins = (data as CalEvent).extendedProps!.reminderMinutes as number
-                    if (mins >= 1440) return `${Math.round(mins / 1440)} day before`
-                    if (mins >= 60) return `${Math.round(mins / 60)} hour before`
-                    return `${mins} min before`
-                  })()
-                }</span>
-              </div>
-            )}
           </div>
 
-          {/* Description */}
+          {/* Details */}
+          <InsetGroup>
+            {data.extendedProps?.groupName && (
+              <InsetRow
+                first
+                label={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 4, background: groupHex }} />
+                  {data.extendedProps.groupName}
+                </span>}
+                chevron={!!groupsId}
+                onClick={groupsId ? () => { navigate(`/groups/${groupsId}`); onClose() } : undefined}
+              />
+            )}
+            {location && (
+              <InsetRow
+                first={!data.extendedProps?.groupName}
+                label={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Icon name="pin" size={15} sw={1.8} style={{ color: 'var(--text-3)' }} />{location}</span>}
+              />
+            )}
+            {creatorName && (
+              <InsetRow
+                first={!data.extendedProps?.groupName && !location}
+                label="Created by"
+                value={creatorName}
+              />
+            )}
+            {reminderText && (
+              <InsetRow
+                first={!data.extendedProps?.groupName && !location && !creatorName}
+                label="Reminder"
+                value={reminderText}
+              />
+            )}
+          </InsetGroup>
+
           {blurb && (
-            <p style={{ fontSize: 14.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
-              {blurb}
-            </p>
+            <p style={{ fontSize: 14.5, color: 'var(--text-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{blurb}</p>
           )}
 
-          {/* RSVP section — only when the current user was explicitly invited */}
-          {showRsvp && <div>
-            <h3 style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.09em',
-              textTransform: 'uppercase',
-              color: 'var(--text-3)',
-              marginBottom: 12,
-            }}>
-              Are you going?
-            </h3>
-            {(
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                {rsvpOptions.map(({ key, label, icon, color }) => {
+          {/* RSVP */}
+          {showRsvp && (
+            <section>
+              <h3 style={sectionTitle}>Are you going?</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                {rsvpOptions.map(({ key, label, icon }) => {
                   const active = rsvp === key
                   return (
                     <button
                       key={key}
+                      type="button"
+                      aria-pressed={active}
                       onClick={() => handleRsvp(key)}
                       style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: 9,
-                        padding: '14px 10px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                        minHeight: 44,
                         borderRadius: 'var(--r-md)',
-                        border: `1px solid ${active ? color : 'var(--border-2)'}`,
-                        background: active
-                          ? `color-mix(in srgb, ${color} 14%, var(--surface))`
-                          : 'var(--surface-2)',
+                        border: active ? '1px solid var(--accent)' : '1px solid var(--border-2)',
+                        background: active ? 'var(--accent)' : 'transparent',
+                        color: active ? 'var(--accent-text)' : 'var(--text-1)',
+                        fontSize: 14, fontWeight: 600,
                         cursor: 'pointer',
                         transition: 'var(--transition)',
                       }}
                     >
-                      <div style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: '50%',
-                        background: active ? color : 'var(--surface-3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: active ? (key === 'no' ? 'var(--text-1)' : '#fff') : 'var(--text-3)',
-                        transition: 'var(--transition)',
-                      }}>
-                        <Icon name={icon} size={16} sw={2.2} />
-                      </div>
-                      <span style={{
-                        fontSize: 12.5,
-                        fontWeight: 650,
-                        color: active ? color : 'var(--text-2)',
-                        transition: 'var(--transition)',
-                      }}>
-                        {label}
-                      </span>
+                      <Icon name={icon} size={15} sw={2.2} />
+                      {label}
                     </button>
                   )
                 })}
               </div>
-            )}
-          </div>}
+            </section>
+          )}
 
-          {/* Attendees — real calendar events use the actual participant list */}
+          {/* Attendees */}
           {liveParticipants.length > 0 && (
-            <div>
-              <h3 style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.09em',
-                textTransform: 'uppercase',
-                color: 'var(--text-3)',
-                marginBottom: 12,
-              }}>
-                Attendees · {liveParticipants.length}
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <section>
+              <h3 style={sectionTitle}>Attendees · {liveParticipants.length}</h3>
+              <InsetGroup>
                 {[...liveParticipants]
                   .sort((a, b) => (a.userId === createdById ? -1 : b.userId === createdById ? 1 : 0))
-                  .map((p) => {
+                  .map((p, i) => {
                     const meta = RSVP_META[p.rsvpStatus] ?? RSVP_META.pending
                     const isMe = p.userId === currentUserId
                     const isCreator = p.userId === createdById
                     return (
-                      <div key={p.userId} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 11,
-                        padding: '9px 12px',
-                        borderRadius: 'var(--r-md)',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border)',
-                      }}>
-                        <div style={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: '50%',
-                          flexShrink: 0,
-                          background: 'var(--accent-soft)',
-                          color: 'var(--accent)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 13,
-                          fontWeight: 700,
-                        }}>
-                          {p.username?.[0]?.toUpperCase() || '?'}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
-                          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {p.username}{isMe ? ' (You)' : ''}
+                      <InsetRow
+                        key={p.userId}
+                        first={i === 0}
+                        label={<span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <Avatar id={p.userId} size={28} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.username}{isMe ? ' (you)' : ''}
                           </span>
-                          {isCreator && (
-                            <span style={{
-                              flexShrink: 0,
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              letterSpacing: '0.04em',
-                              textTransform: 'uppercase',
-                              color: 'var(--accent)',
-                              background: 'var(--accent-softer)',
-                              border: '1px solid var(--accent-line)',
-                              borderRadius: 'var(--r-full)',
-                              padding: '2px 7px',
-                            }}>
-                              Host
-                            </span>
-                          )}
-                        </div>
-                        <span style={{
-                          flexShrink: 0,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontSize: 12,
-                          fontWeight: 650,
-                          color: meta.color,
-                        }}>
+                          {isCreator && <Tag tone="ghost">Host</Tag>}
+                        </span>}
+                        value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                           <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta.color }} />
                           {meta.label}
-                        </span>
-                      </div>
+                        </span>}
+                      />
                     )
                   })}
-              </div>
-            </div>
+              </InsetGroup>
+            </section>
           )}
 
-          {/* ── Reaction Bar ──────────────────────────────────── */}
           {eventId && reactionsLoaded && (
             <ReactionBar reactions={reactions} onToggle={handleReactionToggle} />
           )}
 
           {eventId && <WishlistSection eventId={calEvent?.extendedProps?.recurringEventId ?? eventId} />}
 
-          {/* ── Comment Thread ────────────────────────────────── */}
-          {eventId && (
-            <CommentThread eventId={eventId} currentUserId={currentUserId} />
-          )}
-
+          {eventId && <CommentThread eventId={eventId} currentUserId={currentUserId} />}
         </div>
-      </div>
+      </Sheet>
 
       {/* ── Recurring delete scope chooser ── */}
       {deleteScope === 'prompt' && (
@@ -678,9 +414,28 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
           onCancel={() => setDeleteScope(null)}
         />
       )}
-    </div>,
-    document.body
+    </>
   )
+}
+
+const sectionTitle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: 'var(--text-2)',
+  marginBottom: 10,
+}
+
+/** "Saturday 14 November · 18:00 – 20:00" (all-day ranges show both dates) */
+function formatWhen(ev: CalEvent): string {
+  if (!ev.start) return ''
+  const fmt = (key: string) => new Date(`${key}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+  const startKey = ev.start.split('T')[0]
+  const endKey = (ev.end ?? ev.start).split('T')[0]
+  const startT = ev.start.includes('T') ? ev.start.split('T')[1].slice(0, 5) : ''
+  const endT = ev.end?.includes('T') ? ev.end.split('T')[1].slice(0, 5) : ''
+  if (!startT) return endKey > startKey ? `${fmt(startKey)} – ${fmt(endKey)}` : `${fmt(startKey)} · All day`
+  if (endKey > startKey) return `${fmt(startKey)} ${startT} – ${fmt(endKey)} ${endT}`
+  return `${fmt(startKey)} · ${startT}${endT && endT !== startT ? ` – ${endT}` : ''}`
 }
 
 /* ── ReactionBar ────────────────────────────────────────────── */
@@ -694,17 +449,8 @@ function ReactionBar({
   onToggle: (emoji: string) => void
 }) {
   return (
-    <div>
-      <div style={{
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.09em',
-        textTransform: 'uppercase',
-        color: 'var(--text-3)',
-        marginBottom: 10,
-      }}>
-        Reactions
-      </div>
+    <section>
+      <h3 style={sectionTitle}>Reactions</h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {EMOJI_LIST.map(emoji => {
           const reaction = reactions.find(r => r.emoji === emoji)
@@ -713,54 +459,31 @@ function ReactionBar({
           return (
             <button
               key={emoji}
+              type="button"
+              aria-pressed={iMine}
               onClick={() => onToggle(emoji)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 5,
-                padding: '4px 10px',
+                minHeight: 34,
+                padding: '0 11px',
                 borderRadius: 999,
-                border: iMine ? '1px solid var(--accent)' : '1px solid var(--border)',
-                background: iMine ? 'var(--accent-soft)' : 'var(--surface-2)',
-                color: iMine ? 'var(--accent)' : 'var(--text-2)',
+                border: iMine ? '1px solid var(--text-1)' : '1px solid var(--border-2)',
+                background: iMine ? 'var(--fill)' : 'transparent',
+                color: 'var(--text-1)',
                 cursor: 'pointer',
                 transition: 'var(--transition)',
               }}
             >
               <span style={{ fontSize: 15, lineHeight: 1 }}>{emoji}</span>
               {count > 0 && (
-                <span style={{ fontSize: 12, fontWeight: 650, lineHeight: 1 }}>{count}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1 }}>{count}</span>
               )}
             </button>
           )
         })}
       </div>
-    </div>
-  )
-}
-
-/* ── Internal MetaItem ──────────────────────────────────────── */
-function MetaItem({ icon, primary, secondary }: { icon: string; primary: string; secondary?: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-      <div style={{
-        width: 38,
-        height: 38,
-        borderRadius: 'var(--r-sm)',
-        background: 'var(--surface-3)',
-        border: '1px solid var(--border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--text-3)',
-        flex: '0 0 auto',
-      }}>
-        <Icon name={icon} size={17} sw={1.8} />
-      </div>
-      <div>
-        <div style={{ fontSize: 13.5, fontWeight: 650, color: 'var(--text-1)' }}>{primary}</div>
-        {secondary && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{secondary}</div>}
-      </div>
-    </div>
+    </section>
   )
 }

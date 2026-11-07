@@ -8,10 +8,10 @@ import type { Wishlist, WishItem } from '@/types'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px', borderRadius: 'var(--r-sm)',
-  border: '1px solid var(--border-2)', background: 'var(--surface-2)',
+  border: '1px solid var(--border-2)', background: 'var(--bg)',
   color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
 }
-const errStyle: React.CSSProperties = { fontSize: 13, color: 'var(--danger, #ef4444)', margin: 0 }
+const errStyle: React.CSSProperties = { fontSize: 13, color: 'var(--danger)', margin: 0 }
 const plainBtn: React.CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4,
   display: 'inline-flex', alignItems: 'center',
@@ -22,7 +22,7 @@ function ItemDetails({ item }: { item: WishItem }) {
     <>
       {item.link && isSafeLink(item.link) && (
         <a href={item.link} target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 12.5, color: 'var(--accent)', overflowWrap: 'anywhere' }}>
+          style={{ fontSize: 12.5, color: 'var(--text-1)', textDecoration: 'underline', overflowWrap: 'anywhere' }}>
           {item.link}
         </a>
       )}
@@ -187,7 +187,7 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
   if (!loaded) return null
   if (loadError) {
     return (
-      <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <p role="alert" style={errStyle}>Couldn't load the wishlist: {loadError}</p>
         <Button variant="ghost" size="sm" onClick={() => setReload((n) => n + 1)}>Retry</Button>
       </div>
@@ -195,17 +195,18 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
   }
   if (!wl) {
     return (
-      <div style={{ marginTop: 16 }}>
-        <Button variant="soft" size="md" icon="plus" onClick={create} disabled={creating}>Add a wishlist</Button>
+      <div>
+        <Button variant="outline" size="md" icon="gift" onClick={create} disabled={creating}>Add a wishlist</Button>
         {error && <p role="alert" style={{ ...errStyle, marginTop: 8 }}>{error}</p>}
       </div>
     )
   }
 
   return (
-    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <h4 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0, overflowWrap: 'anywhere' }}>
+        <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', margin: 0, overflowWrap: 'anywhere' }}>
+          <Icon name="gift" size={15} sw={1.8} />
           {wl.ownerName ?? 'Someone'}'s wishlist
         </h4>
         {wl.isOwner && (
@@ -220,26 +221,28 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
 
       {wl.items.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Nothing on the wishlist yet.</p>}
 
-      {wl.items.map((item) => wl.isOwner ? (
-        <div key={item.itemId}>
+      {wl.items.length > 0 && <div style={{ background: 'var(--fill)', borderRadius: 'var(--r-lg)', padding: '2px 14px' }}>
+      {wl.items.map((item, idx) => wl.isOwner ? (
+        <div key={item.itemId} style={{ padding: '8px 0', borderTop: idx ? '1px solid var(--border)' : 'none' }}>
           <OwnerRow item={item} onSave={save} onRemove={remove} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><ItemDetails item={item} /></div>
         </div>
       ) : (
-        <div key={item.itemId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+        <div key={item.itemId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: idx ? '1px solid var(--border)' : 'none' }}>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span style={{ fontSize: 14.5, color: 'var(--text-1)', overflowWrap: 'anywhere' }}>{item.title}</span>
             <ItemDetails item={item} />
           </div>
           {item.claimedByMe ? (
-            <Button variant="outline" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>You're getting this — undo</Button>
+            <Button variant="outline" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>You're getting this · undo</Button>
           ) : item.taken ? (
             <Button variant="ghost" size="sm" style={{ flexShrink: 0 }} disabled>Taken</Button>
           ) : (
-            <Button variant="soft" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>I'll get this</Button>
+            <Button variant="primary" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>I'll get this</Button>
           )}
         </div>
       ))}
-    </div>
+      </div>}
+    </section>
   )
 }

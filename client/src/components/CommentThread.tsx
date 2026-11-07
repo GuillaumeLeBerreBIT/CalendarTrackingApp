@@ -72,16 +72,9 @@ export default function CommentThread({ eventId, currentUserId, title = 'Comment
 
   return (
     <div>
-      <div style={{
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.09em',
-        textTransform: 'uppercase',
-        color: 'var(--text-3)',
-        marginBottom: 12,
-      }}>
+      <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>
         {title}
-      </div>
+      </h3>
 
       {comments.length === 0 ? (
         <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 14 }}>
@@ -93,16 +86,13 @@ export default function CommentThread({ eventId, currentUserId, title = 'Comment
             <div key={c.commentId} style={{
               display: 'flex',
               gap: 10,
-              padding: '10px 12px',
-              borderRadius: 'var(--r-md)',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
+              padding: '4px 0',
               alignItems: 'flex-start',
             }}>
               <Avatar id={c.userId} size={26} name={c.username} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 3 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{c.username}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-1)' }}>{c.username}</span>
                   <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{relativeTime(c.createdAt)}</span>
                 </div>
                 <p style={{ fontSize: 13.5, color: 'var(--text-1)', lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
@@ -111,17 +101,19 @@ export default function CommentThread({ eventId, currentUserId, title = 'Comment
               </div>
               {c.userId === currentUserId && (
                 <button
+                  type="button"
                   onClick={() => handleDelete(c.commentId)}
                   title="Delete comment"
+                  aria-label="Delete comment"
                   style={{
                     flexShrink: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: 22,
-                    height: 22,
+                    width: 32,
+                    height: 32,
                     borderRadius: 'var(--r-sm)',
-                    border: '1px solid var(--border)',
+                    border: 'none',
                     background: 'transparent',
                     color: 'var(--text-3)',
                     cursor: 'pointer',
@@ -150,29 +142,31 @@ export default function CommentThread({ eventId, currentUserId, title = 'Comment
             resize: 'none',
             padding: '9px 12px',
             borderRadius: 'var(--r-md)',
-            border: '1px solid var(--border-2)',
-            background: 'var(--surface-2)',
+            border: 'none',
+            background: 'var(--fill)',
             color: 'var(--text-1)',
-            fontSize: 13.5,
+            fontSize: 15,
             lineHeight: 1.5,
             outline: 'none',
             fontFamily: 'inherit',
           }}
         />
         <button
+          type="button"
           onClick={handleSubmit}
+          aria-label="Send comment"
           disabled={submitting || !input.trim()}
           style={{
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 38,
-            height: 38,
+            width: 42,
+            height: 42,
             borderRadius: 'var(--r-md)',
-            border: '1px solid var(--accent)',
+            border: 'none',
             background: 'var(--accent)',
-            color: '#fff',
+            color: 'var(--accent-text)',
             cursor: submitting || !input.trim() ? 'not-allowed' : 'pointer',
             opacity: submitting || !input.trim() ? 0.5 : 1,
             transition: 'var(--transition)',

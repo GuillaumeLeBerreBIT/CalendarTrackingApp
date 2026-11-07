@@ -17,6 +17,8 @@ interface ButtonProps {
   title?: string
   disabled?: boolean
   type?: 'button' | 'submit' | 'reset'
+  /** id of the <form> this button submits (when rendered outside it) */
+  form?: string
 }
 
 const SIZES = {
@@ -38,6 +40,7 @@ export default function Button({
   title,
   disabled,
   type = 'button',
+  form,
 }: ButtonProps) {
   const [hover, setHover] = useState(false)
   const [press, setPress] = useState(false)
@@ -57,6 +60,7 @@ export default function Button({
   return (
     <button
       type={type}
+      form={form}
       title={title}
       disabled={disabled}
       onClick={onClick}
@@ -116,6 +120,7 @@ export function IconButton({ name, size = 40, isz, onClick, title, active, tone 
 
   return (
     <button
+      type="button"
       title={title}
       aria-label={title}
       onClick={onClick}

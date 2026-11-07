@@ -1,6 +1,9 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { createPortal } from 'react-dom'
-import Icon from '@/components/ui/Icon'
+import Sheet, { Disclosure } from '@/components/ui/Sheet'
+import Button, { IconButton } from '@/components/ui/Button'
+import { Segmented } from '@/components/ui/Primitives'
+import { Switch, Checkbox, InsetGroup, InsetRow } from '@/components/ui/Controls'
+import { Avatar } from '@/components/ui/Avatar'
 import WishlistDraft, { type GiftDraft } from '@/components/WishlistDraft'
 import { errorText } from '@/components/QuickAddInput'
 import api from '@/api/client'
@@ -10,7 +13,7 @@ import {
   type RecurrenceState, type RepeatFreq, type EndMode,
   WEEKDAYS, WEEKDAY_LABEL, parseRRule, summarize, ruleToSave, isFullyEditable,
 } from '@/lib/recurrence'
-import { parseNL, type ParsedEvent } from '@/lib/nlParser'
+import type { ParsedEvent } from '@/lib/nlParser'
 import { fromCalendarAllDayEnd } from '@/lib/allDayDates'
 
 // Max candidate date slots per tentative event (mirrors MAX_DATE_OPTIONS on the backend).
@@ -46,13 +49,17 @@ const DEFAULT_REMINDER_MINUTES = 15
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 11.5,
-  fontWeight: 700,
-  color: 'var(--text-3)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.07em',
-  marginBottom: 7,
+  fontSize: 12.5,
+  fontWeight: 500,
+  color: 'var(--text-2)',
+  marginBottom: 6,
 }
+
+const radioRow: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--text-2)', cursor: 'pointer',
+}
+
+type SectionKey = 'invite' | 'place' | 'wishlist' | 'repeat'
 
 function resolveInitialEventType(event: CalEvent | null): EventType {
   if (!event) return 'appointment'
@@ -103,25 +110,6 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
 
-  // NL quick-fill (create mode): "Lunch Friday 1pm at Marco's" → fills the form
-  const [nlText, setNlText] = useState('')
-
-  function applyNL() {
-    const text = nlText.trim()
-    if (!text) return
-    const parsed = parseNL(text)
-    setForm(f => ({
-      ...f,
-      title: parsed.title || f.title,
-      location: parsed.location ?? f.location,
-      startDate: parsed.date ?? f.startDate,
-      endDate: parsed.date ?? f.endDate,
-      startTime: parsed.time ?? f.startTime,
-      allDay: !parsed.time,
-    }))
-    setNlText('')
-  }
-
   // Tentative mode — group votes on the date
   const [isTentative, setIsTentative] = useState(false)
   const emptyOption = () => ({ startDate: '', startTime: '', endDate: '', endTime: '' })
@@ -165,6 +153,17 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const customRuleKept = !isFullyEditable(originalRule) && JSON.stringify(rec) === JSON.stringify(initialRec)
   // When editing/deleting a recurring event, ask the user the scope first
   const [scopePrompt, setScopePrompt] = useState<null | 'save' | 'delete'>(null)
+
+  // Optional sections start folded; a section with saved content starts open when editing.
+  const [openSection, setOpenSection] = useState<Record<SectionKey, boolean>>(() => ({
+    invite: false,
+    place: !!(event && (event.extendedProps?.location || event.extendedProps?.description || event.extendedProps?.imageUrl)),
+    wishlist: false,
+    repeat: false,
+  }))
+  function toggleSection(key: SectionKey) {
+    setOpenSection(s => ({ ...s, [key]: !s[key] }))
+  }
 
   // Recurrence identity of the event being edited
   const isRecurring = !!event?.extendedProps?.isRecurring
@@ -255,7 +254,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
       payload.tagNames = form.groupsId
       payload.participants = []
     }
-    if (!isEdit && wishlistEnabled) payload.wishlist = giftDrafts
+    if (!isEdit && wishlistEnabled) payload.wishlist = giftDrafts.filter(g => g.title.trim())
     return payload
   }
 
@@ -359,14 +358,13 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
   // On iOS, inputs with font-size < 16px trigger viewport auto-zoom when focused.
-  // Use 16px on mobile to prevent that; keep 13.5px on desktop for visual density.
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    background: 'var(--surface-3)',
+    background: 'var(--bg)',
     border: '1px solid var(--border-2)',
     borderRadius: 'var(--r-sm)',
     padding: '10px 12px',
-    fontSize: isMobile ? 16 : 13.5,
+    fontSize: isMobile ? 16 : 14,
     color: 'var(--text-1)',
     outline: 'none',
     transition: 'var(--transition)',
@@ -374,15 +372,12 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     minHeight: 44,
     boxSizing: 'border-box',
     // iOS native date/time inputs have a wide intrinsic min-width; without this
-    // they refuse to shrink inside a 2-col grid and overflow the modal edge.
+    // they refuse to shrink inside a 2-col grid and overflow the sheet edge.
     minWidth: 0,
   }
 
   // Date/time inputs only: reset the native WebKit appearance so the control
-  // honours its box width exactly (iOS/Chrome-iOS otherwise let the internal
-  // value text bleed to the box edge, making the two columns look like they
-  // overlap at the seam). Kept separate from inputStyle so the <select> fields
-  // keep their native dropdown chevron.
+  // honours its box width (selects keep their native chevron).
   const dateTimeStyle: React.CSSProperties = {
     ...inputStyle,
     WebkitAppearance: 'none',
@@ -390,514 +385,319 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     textAlign: 'left',
   }
 
-  // Portal to <body> so the fixed overlay escapes the .app-viewport
-  // (overflow:hidden + 100dvh) wrapper. On iOS Safari a position:fixed
-  // descendant of an overflow:hidden ancestor gets clipped and renders
-  // *behind* the bottom nav — portalling lifts it above everything.
-  return createPortal(
-    <div
-      // Close on pointerdown, not click: on touch, FullCalendar's dateClick fires
-      // on touchend and the browser's compatibility click for that same tap is then
-      // hit-tested against the freshly mounted backdrop — closing the modal it just
-      // opened. pointerdown only fires for a *new* touch, so the ghost can't reach it.
-      onPointerDown={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 500,
-        background: 'var(--scrim)',
-        backdropFilter: 'blur(6px)',
-        display: 'flex',
-        alignItems: isMobile ? 'flex-end' : 'center',
-        justifyContent: isMobile ? 'stretch' : 'center',
-        padding: isMobile ? 0 : 16,
-        animation: 'fadeIn 0.2s ease',
-      }}
-    >
-      <div
-        onPointerDown={e => e.stopPropagation()}
-        className="scroll"
-        style={isMobile ? {
-          width: '100%',
-          maxHeight: '92dvh',
-          overflowY: 'auto',
-          background: 'var(--surface)',
-          borderRadius: 'var(--r-xl) var(--r-xl) 0 0',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'slideUp 0.28s cubic-bezier(0.2,0.7,0.2,1) both',
-        } : {
-          width: 'min(480px, 100%)',
-          maxHeight: '92vh',
-          overflowY: 'auto',
-          background: 'var(--surface)',
-          borderRadius: 'var(--r-xl)',
-          border: '1px solid var(--border-2)',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'scaleIn 0.24s cubic-bezier(0.2,0.7,0.2,1) both',
-        }}
+  const repeatSummary = rec.repeat === 'none' ? 'Does not repeat' : summarize(rec)
+  const reminderSummary = REMINDER_OPTIONS.find(o => o.value === reminderMinutes)?.label ?? 'None'
+  const inviteSummary = eventType === 'social'
+    ? 'Everyone in the group'
+    : `${selectedParticipants.length} invited`
+  const placeSummary = [form.location, form.description && 'note', form.imageUrl && 'cover'].filter(Boolean).join(' · ') || 'None'
+  const giftCount = giftDrafts.filter(g => g.title.trim()).length
+  const wishlistSummary = wishlistEnabled ? `${giftCount} gift${giftCount === 1 ? '' : 's'}` : 'Off'
+
+  return (
+    <>
+      <Sheet
+        title={isEdit ? 'Edit event' : 'New event'}
+        onClose={onClose}
+        actions={isEdit ? (
+          <Button variant="danger" size="sm" icon="trash" onClick={handleDelete} disabled={deleting} title="Delete event">
+            {deleting ? 'Deleting…' : 'Delete'}
+          </Button>
+        ) : undefined}
+        footer={
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Button variant="secondary" onClick={onClose} style={{ flex: '0 0 auto' }}>Cancel</Button>
+            <Button type="submit" form="event-form" disabled={saving} full style={{ flex: 1 }}>{submitLabel}</Button>
+          </div>
+        }
       >
-        {/* Mobile drag handle */}
-        {isMobile && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-            <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--border-2)' }} />
-          </div>
-        )}
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '18px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
-            {isEdit ? 'Edit event' : 'New event'}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isEdit && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                title="Delete event"
-                style={{
-                  width: 34, height: 34,
-                  borderRadius: 'var(--r-sm)',
-                  border: '1px solid rgba(244,63,94,0.3)',
-                  background: 'transparent',
-                  color: '#fb7185',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: deleting ? 'not-allowed' : 'pointer',
-                  opacity: deleting ? 0.5 : 1,
-                  transition: 'var(--transition)',
-                }}
-              >
-                <Icon name="trash" size={15} sw={2.2} />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                width: 34, height: 34,
-                borderRadius: 'var(--r-sm)',
-                border: '1px solid var(--border-2)',
-                background: 'transparent',
-                color: 'var(--text-3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-              }}
-            >
-              <Icon name="close" size={15} sw={2} />
-            </button>
-          </div>
-        </div>
+        <form id="event-form" onSubmit={handleSubmit} style={{ padding: '16px 18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
-
-          {/* ── NL quick-fill (new events only) ── */}
+          {/* ── Event type (new events only) ── */}
           {!isEdit && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                value={nlText}
-                onChange={e => setNlText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { e.preventDefault(); applyNL() }
-                }}
-                placeholder="Quick fill: &quot;Lunch Friday 1pm at Marco's&quot;"
-                style={{ ...inputStyle, flex: 1 }}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Segmented
+                options={typeOptions.map(({ value, icon, label }) => ({ value, icon, label }))}
+                value={eventType}
+                onChange={(v) => setEventType(v as EventType)}
               />
-              <button
-                type="button"
-                onClick={applyNL}
-                disabled={!nlText.trim()}
-                title="Fill form from text"
-                style={{
-                  padding: '0 14px',
-                  borderRadius: 'var(--r-sm)',
-                  border: 'none',
-                  background: nlText.trim() ? 'var(--accent-soft)' : 'var(--surface-3)',
-                  color: nlText.trim() ? 'var(--accent)' : 'var(--text-3)',
-                  fontWeight: 650,
-                  fontSize: 13,
-                  cursor: nlText.trim() ? 'pointer' : 'default',
-                  minHeight: 44,
-                  flexShrink: 0,
-                  transition: 'var(--transition)',
-                }}
-              >
-                Fill
-              </button>
-            </div>
-          )}
-
-          {/* ── Event type selector (new events only) ── */}
-          {!isEdit && (
-            <>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 5,
-                padding: 4,
-                background: 'var(--surface-3)',
-                borderRadius: 'var(--r-md)',
-                border: '1px solid var(--border)',
-              }}>
-                {typeOptions.map(({ value, icon, label }) => {
-                  const active = eventType === value
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setEventType(value)}
-                      style={{
-                        padding: '8px 4px',
-                        borderRadius: 'calc(var(--r-md) - 4px)',
-                        border: active ? '1px solid var(--border-2)' : '1px solid transparent',
-                        background: active ? 'var(--surface)' : 'transparent',
-                        color: active ? 'var(--text-1)' : 'var(--text-3)',
-                        fontSize: 12,
-                        fontWeight: 650,
-                        cursor: 'pointer',
-                        transition: 'var(--transition)',
-                        boxShadow: active ? 'var(--shadow-sm)' : 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 5,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <Icon name={icon} size={13} sw={1.8} />
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.5 }}>
                 {typeOptions.find(o => o.value === eventType)?.hint}
               </p>
-            </>
-          )}
-
-          {/* ── Tentative toggle (group events only, new events only) ── */}
-          {!isEdit && isGroupType && (
-            <button
-              type="button"
-              aria-pressed={isTentative}
-              onClick={toggleTentative}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '10px 14px',
-                borderRadius: 'var(--r-md)',
-                border: isTentative ? '1px solid rgba(245,158,11,0.4)' : '1px solid var(--border)',
-                background: isTentative ? 'rgba(245,158,11,0.07)' : 'var(--surface-2)',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-                width: '100%',
-                textAlign: 'left',
-              }}
-            >
-              {/* Custom checkbox */}
-              <div style={{
-                width: 18,
-                height: 18,
-                borderRadius: 5,
-                border: isTentative ? '2px solid #f59e0b' : '2px solid var(--border-2)',
-                background: isTentative ? '#f59e0b' : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'var(--transition)',
-              }}>
-                {isTentative && <Icon name="check" size={11} sw={3} style={{ color: '#0b0b12' }} />}
-              </div>
-              <div>
-                <span style={{ fontSize: 13.5, fontWeight: 650, color: isTentative ? '#f59e0b' : 'var(--text-2)' }}>
-                  Tentative
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 6 }}>
-                  — let the group vote on the date
-                </span>
-              </div>
-            </button>
+            </div>
           )}
 
           {/* ── Title ── */}
-          <div>
-            <label style={labelStyle}>Title</label>
+          <input
+            required
+            autoFocus={!isMobile}
+            aria-label="Title"
+            value={form.title}
+            onChange={e => set('title', e.target.value)}
+            placeholder={
+              eventType === 'personal' ? 'Title, e.g. Doctor appointment' :
+              eventType === 'social' ? 'Title, e.g. Family dinner' :
+              'Title, e.g. School pickup'
+            }
+            style={{ ...inputStyle, fontSize: isMobile ? 18 : 17, fontWeight: 600, minHeight: 48 }}
+          />
+
+          {/* ── Group ── */}
+          {isGroupType && (
+            <div>
+              <label style={labelStyle} htmlFor="event-group">Group</label>
+              <select
+                id="event-group"
+                value={form.groupsId}
+                onChange={e => set('groupsId', e.target.value)}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                <option value="">Select a group…</option>
+                {groups.filter(g => g.groups_id != null).map(g => (
+                  <option key={String(g.groups_id)} value={String(g.groups_id)}>
+                    {g.groups_title || g.tag_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* ── When ── */}
+          <InsetGroup>
+            {!isEdit && isGroupType && (
+              <InsetRow
+                first
+                label={<span>Let the group vote on the date <span style={{ color: 'var(--text-3)', fontSize: 13 }}>· tentative</span></span>}
+                value={<Switch checked={isTentative} onChange={toggleTentative} label="Tentative: let the group vote on the date" />}
+              />
+            )}
+            {!isTentative && (
+              <InsetRow
+                first={isEdit || !isGroupType}
+                label="All day"
+                value={<Switch checked={form.allDay} onChange={(v) => set('allDay', v)} label="All day" />}
+              />
+            )}
+            {!isTentative && (
+              <div style={{ padding: '10px 14px 14px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }}>
+                  <div>
+                    <label style={labelStyle} htmlFor="event-start-date">Starts</label>
+                    <input id="event-start-date" type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={dateTimeStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle} htmlFor="event-end-date">Ends</label>
+                    <input id="event-end-date" type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={dateTimeStyle} />
+                  </div>
+                </div>
+                {!form.allDay && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }}>
+                    <input type="time" aria-label="Start time" value={form.startTime} onChange={e => set('startTime', e.target.value)} style={dateTimeStyle} />
+                    <input type="time" aria-label="End time" value={form.endTime} onChange={e => set('endTime', e.target.value)} style={dateTimeStyle} />
+                  </div>
+                )}
+              </div>
+            )}
+            {isTentative && (
+              <div style={{ padding: '10px 14px 14px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {dateOptions.map((opt, idx) => (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>Option {idx + 1}</span>
+                      {dateOptions.length > 2 && (
+                        <IconButton name="close" size={28} isz={13} title={`Remove option ${idx + 1}`} onClick={() => removeDateOption(idx)} />
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 6 }}>
+                      <input type="date" aria-label={`Option ${idx + 1} date`} value={opt.startDate} onChange={e => setDateOption(idx, 'startDate', e.target.value)} style={dateTimeStyle} />
+                      <input type="time" aria-label={`Option ${idx + 1} start time`} value={opt.startTime} onChange={e => setDateOption(idx, 'startTime', e.target.value)} style={dateTimeStyle} />
+                      <input type="time" aria-label={`Option ${idx + 1} end time (optional)`} value={opt.endTime} onChange={e => setDateOption(idx, 'endTime', e.target.value)} style={dateTimeStyle} />
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <Button variant="outline" size="sm" icon="plus" onClick={addDateOption} disabled={dateOptions.length >= MAX_DATE_OPTIONS}>
+                    Add option
+                  </Button>
+                </div>
+              </div>
+            )}
+          </InsetGroup>
+
+          {/* ── Invite ── */}
+          {isGroupType && form.groupsId && (
+            <Disclosure
+              label="Invite"
+              icon="groups"
+              summary={inviteSummary}
+              open={openSection.invite || (eventType === 'appointment' && selectedParticipants.length === 0 && groupMembers.length > 0)}
+              onToggle={() => toggleSection('invite')}
+            >
+              {eventType === 'social' && (
+                <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                  Everyone in this group will be invited and can RSVP.
+                </p>
+              )}
+              {eventType === 'appointment' && groupMembers.length === 0 && (
+                <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading members…</p>
+              )}
+              {eventType === 'appointment' && groupMembers.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                    <button type="button" onClick={() => setSelectedParticipants(groupMembers.map(m => m.user_id))}
+                      style={{ color: 'var(--text-1)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      Select all
+                    </button>
+                    <button type="button" onClick={() => setSelectedParticipants([])}
+                      style={{ color: 'var(--text-2)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      Clear
+                    </button>
+                  </div>
+                  <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                    {groupMembers.map((m, i) => {
+                      const checked = selectedParticipants.includes(m.user_id)
+                      return (
+                        <div
+                          key={m.user_id}
+                          onClick={() => toggleParticipant(m.user_id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', minHeight: 48, cursor: 'pointer',
+                            borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                          }}
+                        >
+                          <Avatar id={m.user_id} size={28} />
+                          <span style={{ flex: 1, fontSize: 14.5, color: 'var(--text-1)', fontWeight: 500 }}>{m.username}</span>
+                          <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}>
+                            <Checkbox checked={checked} onChange={() => toggleParticipant(m.user_id)} label={`Invite ${m.username}`} shape="round" />
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {selectedParticipants.length === 0 && (
+                    <p style={{ fontSize: 12.5, color: 'var(--danger)' }}>
+                      Pick at least one person: an event needs at least one attendee.
+                    </p>
+                  )}
+                </>
+              )}
+            </Disclosure>
+          )}
+
+          {/* ── Location & note ── */}
+          <Disclosure
+            label="Location & note"
+            icon="pin"
+            summary={placeSummary}
+            open={openSection.place}
+            onToggle={() => toggleSection('place')}
+          >
             <input
-              required
-              autoFocus={!isMobile}
-              value={form.title}
-              onChange={e => set('title', e.target.value)}
-              placeholder={
-                eventType === 'personal' ? 'e.g. Doctor appointment' :
-                eventType === 'social' ? 'e.g. Family dinner' :
-                'e.g. School pickup'
-              }
+              type="text"
+              aria-label="Location"
+              value={form.location}
+              onChange={e => set('location', e.target.value)}
+              placeholder="Location or address"
               style={inputStyle}
             />
-          </div>
-
-          {/* ── Description ── */}
-          <div>
-            <label style={labelStyle}>
-              Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
             <textarea
+              aria-label="Note"
               value={form.description}
               onChange={e => set('description', e.target.value)}
-              placeholder="Any extra details…"
-              rows={2}
-              style={{ ...inputStyle, resize: 'none', minHeight: 'unset' }}
+              placeholder="Note: any extra details"
+              rows={3}
+              style={{ ...inputStyle, resize: 'vertical', minHeight: 'unset' }}
             />
-          </div>
-
-          {/* ── Location ── */}
-          <div>
-            <label style={labelStyle}>
-              Location <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <span style={{ position: 'absolute', left: 12, color: 'var(--text-3)', pointerEvents: 'none', display: 'flex' }}>
-                <Icon name="pin" size={15} sw={1.8} />
-              </span>
-              <input
-                type="text"
-                value={form.location}
-                onChange={e => set('location', e.target.value)}
-                placeholder="Add location or address"
-                style={{ ...inputStyle, paddingLeft: 36 }}
-              />
-            </div>
-          </div>
-
-          {/* ── Cover image ── */}
-          <div>
-            <label style={labelStyle}>
-              Cover image <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <span style={{ position: 'absolute', left: 12, color: 'var(--text-3)', pointerEvents: 'none', display: 'flex' }}>
-                <Icon name="share" size={15} sw={1.8} />
-              </span>
-              <input
-                type="url"
-                value={form.imageUrl}
-                onChange={e => set('imageUrl', e.target.value)}
-                placeholder="Paste an image URL"
-                style={{ ...inputStyle, paddingLeft: 36 }}
-              />
-            </div>
+            <input
+              type="url"
+              aria-label="Cover image URL"
+              value={form.imageUrl}
+              onChange={e => set('imageUrl', e.target.value)}
+              placeholder="Cover image URL (optional)"
+              style={inputStyle}
+            />
             {form.imageUrl && (
               <img
                 src={form.imageUrl}
                 alt="Cover preview"
-                style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 'var(--r-sm)', marginTop: 6 }}
+                style={{ width: '100%', height: 72, objectFit: 'cover', borderRadius: 'var(--r-sm)' }}
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
             )}
-          </div>
+          </Disclosure>
 
-          {/* ── All day (hidden when tentative) ── */}
-          {!isTentative && (
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 9,
-              cursor: 'pointer', fontSize: 13.5, color: 'var(--text-2)', userSelect: 'none',
-            }}>
-              <input
-                type="checkbox"
-                checked={form.allDay}
-                onChange={e => set('allDay', e.target.checked)}
-                style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
-              />
-              All day
-            </label>
-          )}
-
-          {/* ── Normal dates (hidden when tentative) ── */}
-          {!isTentative && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Start date</label>
-                <input type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={dateTimeStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>End date</label>
-                <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={dateTimeStyle} />
-              </div>
-            </div>
-          )}
-
-          {/* ── Normal times (hidden when tentative) ── */}
-          {!isTentative && !form.allDay && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Start time</label>
-                <input type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} style={dateTimeStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>End time</label>
-                <input type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} style={dateTimeStyle} />
-              </div>
-            </div>
-          )}
-
-          {/* ── Tentative date options ── */}
-          {isTentative && (
-            <div>
-              <label style={labelStyle}>Date options</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {dateOptions.map((opt, idx) => (
-                  <div key={idx} style={{
-                    padding: '10px 12px',
-                    borderRadius: 'var(--r-sm)',
-                    border: '1px dashed var(--border-2)',
-                    background: 'var(--surface-2)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-3)' }}>
-                        Option {idx + 1}
-                      </span>
-                      {dateOptions.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => removeDateOption(idx)}
-                          title="Remove option"
-                          style={{
-                            width: 22, height: 22,
-                            borderRadius: 'var(--r-sm)',
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--text-3)',
-                            cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            padding: 0,
-                          }}
-                        >
-                          <Icon name="close" size={13} sw={2} />
-                        </button>
-                      )}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
-                      <div>
-                        <label style={{ ...labelStyle, marginBottom: 4 }}>Date</label>
-                        <input
-                          type="date"
-                          value={opt.startDate}
-                          onChange={e => setDateOption(idx, 'startDate', e.target.value)}
-                          style={{ ...dateTimeStyle, minHeight: 38 }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ ...labelStyle, marginBottom: 4 }}>Start time</label>
-                        <input
-                          type="time"
-                          value={opt.startTime}
-                          onChange={e => setDateOption(idx, 'startTime', e.target.value)}
-                          style={{ ...dateTimeStyle, minHeight: 38 }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ ...labelStyle, marginBottom: 4 }}>
-                        End time <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={opt.endTime}
-                        onChange={e => setDateOption(idx, 'endTime', e.target.value)}
-                        style={{ ...dateTimeStyle, minHeight: 38 }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={addDateOption}
-                disabled={dateOptions.length >= MAX_DATE_OPTIONS}
-                style={{
-                  marginTop: 8,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '7px 12px',
-                  borderRadius: 'var(--r-sm)',
-                  border: '1px solid var(--border-2)',
-                  background: 'transparent',
-                  color: dateOptions.length >= MAX_DATE_OPTIONS ? 'var(--text-3)' : 'var(--accent)',
-                  fontSize: 12.5,
-                  fontWeight: 650,
-                  cursor: dateOptions.length >= MAX_DATE_OPTIONS ? 'not-allowed' : 'pointer',
-                  opacity: dateOptions.length >= MAX_DATE_OPTIONS ? 0.5 : 1,
-                  transition: 'var(--transition)',
-                }}
-              >
-                <Icon name="plus" size={13} sw={2.2} />
-                Add option
-              </button>
-            </div>
-          )}
-
-          {/* ── Repeat / recurrence ── */}
-          <div>
-            <label style={labelStyle}>Repeat</label>
-            <select
-              value={rec.repeat}
-              onChange={e => setRec(r => ({ ...r, repeat: e.target.value as RepeatFreq }))}
-              style={{ ...inputStyle, cursor: 'pointer' }}
+          {/* ── Wishlist (new events only) ── */}
+          {!isEdit && (
+            <Disclosure
+              label="Wishlist"
+              icon="gift"
+              summary={wishlistSummary}
+              open={openSection.wishlist}
+              onToggle={() => toggleSection('wishlist')}
             >
-              <option value="none">Does not repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-            {customRuleKept && (
-              <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '8px 0 0' }}>
-                Custom repeat from another calendar ({originalRule}). It is kept unless you change these settings.
-              </p>
-            )}
+              <WishlistDraft enabled={wishlistEnabled} onEnabled={setWishlistEnabled} items={giftDrafts} onChange={setGiftDrafts} disabled={saving} />
+            </Disclosure>
+          )}
+
+          {/* ── Repeat & reminder ── */}
+          <Disclosure
+            label="Repeat & reminder"
+            icon="repeat"
+            summary={`${repeatSummary} · ${reminderSummary === 'None' ? 'no reminder' : reminderSummary}`}
+            open={openSection.repeat}
+            onToggle={() => toggleSection('repeat')}
+          >
+            <div>
+              <label style={labelStyle} htmlFor="event-repeat">Repeat</label>
+              <select
+                id="event-repeat"
+                value={rec.repeat}
+                onChange={e => setRec(r => ({ ...r, repeat: e.target.value as RepeatFreq }))}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                <option value="none">Does not repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+              {customRuleKept && (
+                <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '8px 0 0' }}>
+                  Custom repeat from another calendar ({originalRule}). It is kept unless you change these settings.
+                </p>
+              )}
+            </div>
 
             {rec.repeat !== 'none' && (
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
-                {/* Interval */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Every</span>
+                  <span style={{ fontSize: 13.5, color: 'var(--text-2)' }}>Every</span>
                   <input
                     type="number" min={1} max={99} value={rec.interval}
+                    aria-label="Repeat interval"
                     onChange={e => setRec(r => ({ ...r, interval: Math.max(1, parseInt(e.target.value) || 1) }))}
-                    style={{ ...inputStyle, width: 72, minHeight: 38 }}
+                    style={{ ...inputStyle, width: 72 }}
                   />
-                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                  <span style={{ fontSize: 13.5, color: 'var(--text-2)' }}>
                     {rec.repeat === 'daily' ? 'day(s)' : rec.repeat === 'weekly' ? 'week(s)' : rec.repeat === 'monthly' ? 'month(s)' : 'year(s)'}
                   </span>
                 </div>
 
-                {/* Weekdays (weekly only) */}
                 {rec.repeat === 'weekly' && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {WEEKDAYS.map(d => {
+                    {WEEKDAYS.map((d, i) => {
                       const on = rec.weekdays.includes(d)
                       return (
                         <button
                           key={d} type="button"
+                          aria-pressed={on}
                           onClick={() => setRec(r => ({ ...r, weekdays: on ? r.weekdays.filter(x => x !== d) : [...r.weekdays, d] }))}
                           style={{
-                            width: 34, height: 34, borderRadius: '50%', cursor: 'pointer',
-                            border: `1px solid ${on ? 'var(--accent)' : 'var(--border-2)'}`,
-                            background: on ? 'var(--accent)' : 'var(--surface-3)',
+                            width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
+                            border: on ? 'none' : '1px solid var(--border-2)',
+                            background: on ? 'var(--accent)' : (i >= 5 ? 'var(--weekend)' : 'var(--bg)'),
                             color: on ? 'var(--accent-text)' : 'var(--text-2)',
-                            fontSize: 12, fontWeight: 700,
+                            fontSize: 12, fontWeight: 600,
                           }}
                         >{WEEKDAY_LABEL[d]}</button>
                       )
@@ -905,205 +705,56 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
                   </div>
                 )}
 
-                {/* End condition */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
+                  <label style={radioRow}>
                     <input type="radio" name="endmode" checked={rec.endMode === 'never'} onChange={() => setRec(r => ({ ...r, endMode: 'never' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
                     Never ends
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
+                  <label style={radioRow}>
                     <input type="radio" name="endmode" checked={rec.endMode === 'on'} onChange={() => setRec(r => ({ ...r, endMode: 'on' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
                     On
-                    <input type="date" value={rec.endDate} onChange={e => setRec(r => ({ ...r, endDate: e.target.value, endMode: 'on' as EndMode }))} style={{ ...dateTimeStyle, width: 160, minHeight: 36 }} />
+                    <input type="date" aria-label="Repeat end date" value={rec.endDate} onChange={e => setRec(r => ({ ...r, endDate: e.target.value, endMode: 'on' as EndMode }))} style={{ ...dateTimeStyle, width: 160 }} />
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
+                  <label style={radioRow}>
                     <input type="radio" name="endmode" checked={rec.endMode === 'after'} onChange={() => setRec(r => ({ ...r, endMode: 'after' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
                     After
-                    <input type="number" min={1} value={rec.count} onChange={e => setRec(r => ({ ...r, count: Math.max(1, parseInt(e.target.value) || 1), endMode: 'after' as EndMode }))} style={{ ...inputStyle, width: 72, minHeight: 36 }} />
+                    <input type="number" min={1} aria-label="Number of times" value={rec.count} onChange={e => setRec(r => ({ ...r, count: Math.max(1, parseInt(e.target.value) || 1), endMode: 'after' as EndMode }))} style={{ ...inputStyle, width: 72 }} />
                     times
                   </label>
                 </div>
 
-                <p style={{ fontSize: 12.5, color: 'var(--accent)', margin: 0, fontWeight: 600 }}>{summarize(rec)}</p>
+                <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600 }}>{summarize(rec)}</p>
               </div>
             )}
-          </div>
 
-          {/* ── Reminder ── */}
-          <div>
-            <label style={labelStyle}>Remind me</label>
-            <select
-              value={reminderMinutes === null ? '' : String(reminderMinutes)}
-              onChange={e => setReminderMinutes(e.target.value === '' ? null : parseInt(e.target.value, 10))}
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            >
-              {REMINDER_OPTIONS.map(o => (
-                <option key={o.label} value={o.value === null ? '' : String(o.value)}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* ── Group section ── */}
-          {isGroupType && (
-            <>
-              <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
-
-              <div>
-                <label style={labelStyle}>Group</label>
-                <select
-                  value={form.groupsId}
-                  onChange={e => set('groupsId', e.target.value)}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                >
-                  <option value="">Select a group…</option>
-                  {groups.filter(g => g.groups_id != null).map(g => (
-                    <option key={String(g.groups_id)} value={String(g.groups_id)}>
-                      {g.groups_title || g.tag_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Social: info banner */}
-              {eventType === 'social' && form.groupsId && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 14px',
-                  borderRadius: 'var(--r-md)',
-                  background: 'var(--accent-softer)',
-                  border: '1px solid var(--accent-line)',
-                }}>
-                  <Icon name="groups" size={16} sw={1.8} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>
-                    Everyone in this group will be invited and can RSVP.
-                  </p>
-                </div>
-              )}
-
-              {/* Appointment: member checkboxes */}
-              {eventType === 'appointment' && groupMembers.length > 0 && (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <label style={{ ...labelStyle, marginBottom: 0 }}>Who's invited</label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" onClick={() => setSelectedParticipants(groupMembers.map(m => m.user_id))}
-                        style={{ fontSize: 11.5, color: 'var(--accent)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                        All
-                      </button>
-                      <span style={{ color: 'var(--border-2)' }}>·</span>
-                      <button type="button" onClick={() => setSelectedParticipants([])}
-                        style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                        None
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                    {groupMembers.map((m, i) => {
-                      const checked = selectedParticipants.includes(m.user_id)
-                      return (
-                        <label
-                          key={m.user_id}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', cursor: 'pointer',
-                            borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-                            background: checked ? 'var(--accent-softer)' : 'transparent',
-                            transition: 'var(--transition)',
-                          }}
-                        >
-                          <input type="checkbox" checked={checked} onChange={() => toggleParticipant(m.user_id)}
-                            style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }} />
-                          <div style={{
-                            width: 28, height: 28, borderRadius: '50%',
-                            background: 'var(--accent-soft)', color: 'var(--accent)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 12, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            {m.username?.[0]?.toUpperCase()}
-                          </div>
-                          <span style={{ fontSize: 13.5, color: 'var(--text-1)', fontWeight: 500 }}>{m.username}</span>
-                          {checked && (
-                            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--accent)', fontWeight: 650 }}>Invited</span>
-                          )}
-                        </label>
-                      )
-                    })}
-                  </div>
-
-                  {selectedParticipants.length === 0 && (
-                    <p style={{ fontSize: 12, color: '#fb7185', marginTop: 8 }}>
-                      Pick at least one person — an event needs at least one attendee.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {eventType === 'appointment' && form.groupsId && groupMembers.length === 0 && (
-                <p style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Loading members…</p>
-              )}
-            </>
-          )}
-
-          {!isEdit && (
-            <WishlistDraft enabled={wishlistEnabled} onEnabled={setWishlistEnabled} items={giftDrafts} onChange={setGiftDrafts} disabled={saving} />
-          )}
+            <div>
+              <label style={labelStyle} htmlFor="event-reminder">Remind me</label>
+              <select
+                id="event-reminder"
+                value={reminderMinutes === null ? '' : String(reminderMinutes)}
+                onChange={e => setReminderMinutes(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                {REMINDER_OPTIONS.map(o => (
+                  <option key={o.label} value={o.value === null ? '' : String(o.value)}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </Disclosure>
 
           {/* ── Error ── */}
           {error && (
-            <p style={{
-              fontSize: 13, color: '#fb7185',
-              background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.2)',
-              borderRadius: 'var(--r-sm)', padding: '9px 12px', margin: 0,
+            <p role="alert" style={{
+              fontSize: 13, color: 'var(--danger)',
+              background: 'var(--fill)', borderRadius: 'var(--r-sm)', padding: '10px 12px',
             }}>
               {error}
             </p>
           )}
-
-          {/* ── Actions ── */}
-          <div style={{ display: 'flex', gap: 10, paddingTop: 4, paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                flex: 1,
-                background: saving ? 'var(--accent-soft)' : 'var(--accent)',
-                color: 'var(--accent-text)',
-                border: 'none',
-                borderRadius: 'var(--r-sm)',
-                padding: '11px 16px',
-                fontSize: 13.5,
-                fontWeight: 650,
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.7 : 1,
-                transition: 'var(--transition)',
-                boxShadow: saving ? 'none' : '0 4px 14px var(--accent-glow)',
-              }}
-            >
-              {submitLabel}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                background: 'var(--surface-3)',
-                color: 'var(--text-2)',
-                border: '1px solid var(--border-2)',
-                borderRadius: 'var(--r-sm)',
-                padding: '11px 16px',
-                fontSize: 13.5,
-                fontWeight: 650,
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
         </form>
-      </div>
+      </Sheet>
 
       {/* ── Recurring scope chooser ── */}
       {scopePrompt && (
@@ -1116,7 +767,6 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
           onCancel={() => setScopePrompt(null)}
         />
       )}
-    </div>,
-    document.body
+    </>
   )
 }

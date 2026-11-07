@@ -88,6 +88,7 @@ export function Segmented({ options, value, onChange, size = 'md' }: SegmentedPr
         return (
           <button
             key={o.value}
+            type="button"
             aria-pressed={active}
             onClick={() => onChange(o.value)}
             style={{
