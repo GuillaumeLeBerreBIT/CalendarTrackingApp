@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { Switch as UISwitch } from '@/components/ui/Controls'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
@@ -9,38 +10,9 @@ import { Link } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
 import type { NotificationPrefs, ProfileStats } from '@/types'
 
-// ── Toggle switch ───────────────────────────────────────────────────────────────
-function Switch({ on, onChange }: { on: boolean; onChange: () => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      onClick={onChange}
-      style={{
-        width: 42,
-        height: 24,
-        borderRadius: 99,
-        border: 'none',
-        cursor: 'pointer',
-        background: on ? 'var(--accent)' : 'var(--surface-3)',
-        position: 'relative',
-        transition: 'var(--transition)',
-        flexShrink: 0,
-      }}
-    >
-      <span style={{
-        position: 'absolute',
-        top: 3,
-        left: on ? 21 : 3,
-        width: 18,
-        height: 18,
-        borderRadius: '50%',
-        background: '#fff',
-        transition: 'var(--transition)',
-      }} />
-    </button>
-  )
+// Shared Compact Mono switch, adapted to this page's call shape.
+function Switch({ on, onChange, label = 'Toggle' }: { on: boolean; onChange: () => void; label?: string }) {
+  return <UISwitch checked={on} onChange={() => onChange()} label={label} />
 }
 
 // Browser's IANA zone, e.g. "Europe/Paris" — sent with daily-summary saves.
@@ -95,17 +67,16 @@ const inputStyle: React.CSSProperties = {
 function StatCard({ n, label }: { n: number | string; label: string }) {
   return (
     <div style={{
-      padding: '18px 16px',
+      padding: '16px',
       borderRadius: 'var(--r-lg)',
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      textAlign: 'center',
+      background: 'var(--fill)',
+      textAlign: 'left',
     }}>
       <div style={{
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: 700,
         color: 'var(--text-1)',
-        letterSpacing: '-0.03em',
+        letterSpacing: '-0.02em',
         fontVariantNumeric: 'tabular-nums',
         lineHeight: 1,
       }}>
@@ -156,7 +127,7 @@ function SettingsRow({ icon, title, subtitle, first = false }: SettingsRowProps)
         width: 36,
         height: 36,
         borderRadius: 'var(--r-sm)',
-        background: 'var(--surface-3)',
+        background: 'var(--bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -528,19 +499,18 @@ export default function ProfilePage() {
       {/* Avatar + name hero */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32, textAlign: 'center' }}>
         <div style={{
-          width: 84,
-          height: 84,
+          width: 72,
+          height: 72,
           borderRadius: '50%',
           background: 'var(--accent)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: 'var(--accent-text)',
-          fontSize: 34,
+          fontSize: 28,
           fontWeight: 700,
           letterSpacing: '-0.02em',
           marginBottom: 14,
-          boxShadow: '0 8px 24px var(--accent-glow)',
           userSelect: 'none',
         }}>
           {letter}
@@ -571,8 +541,7 @@ export default function ProfilePage() {
       {/* Account section */}
       <Section title="Account">
         <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
           borderRadius: 'var(--r-lg)',
           overflow: 'hidden',
         }}>
@@ -698,8 +667,7 @@ export default function ProfilePage() {
       {/* Notification preferences */}
       <Section title="Notifications">
         <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
           borderRadius: 'var(--r-lg)',
           overflow: 'hidden',
         }}>
@@ -817,8 +785,7 @@ export default function ProfilePage() {
       {/* Calendar sync */}
       <Section title="Calendar sync">
         <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
           borderRadius: 'var(--r-lg)',
           padding: '16px',
         }}>
@@ -827,7 +794,7 @@ export default function ProfilePage() {
               width: 36,
               height: 36,
               borderRadius: 'var(--r-sm)',
-              background: 'var(--surface-3)',
+              background: 'var(--bg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -988,7 +955,7 @@ export default function ProfilePage() {
                 width: 36,
                 height: 36,
                 borderRadius: 'var(--r-sm)',
-                background: 'var(--surface-3)',
+                background: 'var(--bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1094,8 +1061,7 @@ export default function ProfilePage() {
       {/* Appearance — per device */}
       <Section title="Appearance">
         <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
           borderRadius: 'var(--r-lg)',
           padding: '12px 16px',
           display: 'flex',
@@ -1123,8 +1089,7 @@ export default function ProfilePage() {
       {/* Settings section */}
       <Section title="Settings">
         <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
           borderRadius: 'var(--r-lg)',
           overflow: 'hidden',
         }}>
@@ -1158,7 +1123,7 @@ export default function ProfilePage() {
                 width: 36,
                 height: 36,
                 borderRadius: 'var(--r-sm)',
-                background: 'var(--surface-3)',
+                background: 'var(--bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1211,8 +1176,7 @@ export default function ProfilePage() {
       {/* Privacy & data (GDPR) */}
       <Section title="Privacy & data">
         <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
           borderRadius: 'var(--r-lg)',
           overflow: 'hidden',
         }}>

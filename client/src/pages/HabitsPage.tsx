@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Checkbox } from '@/components/ui/Controls'
 import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useHabitStore } from '@/store/habitStore'
 import api from '@/api/client'
@@ -101,7 +102,7 @@ function HabitCard({
       background: 'var(--surface)',
       border: '1px solid var(--border)',
       borderRadius: 'var(--r-lg)',
-      padding: '18px 20px',
+      padding: '16px 18px',
       marginBottom: 12,
     }}>
       {/* Header row */}
@@ -114,17 +115,19 @@ function HabitCard({
           {title}
         </span>
         <Tag tone="neutral">{frequency === 'daily' ? 'Daily' : 'Weekly'}</Tag>
+        <Checkbox shape="round" checked={completedToday} onChange={() => onLog(habit_id)} label={completedToday ? `Undo today's log for ${title}` : `Log ${title} for today`} />
+        <span style={{ width: 4 }} />
         {confirmingDelete ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button
               onClick={() => onDelete(habit_id)}
               style={{
-                background: 'hsl(0 70% 50% / 0.15)',
-                border: '1px solid hsl(0 70% 50% / 0.35)',
+                background: 'transparent',
+                border: '1px solid var(--border-2)',
                 borderRadius: 'var(--r-sm)',
-                color: 'hsl(0 70% 65%)',
-                fontSize: 12, fontWeight: 650,
-                padding: '4px 10px', cursor: 'pointer',
+                color: 'var(--danger)',
+                fontSize: 12.5, fontWeight: 600,
+                padding: '0 10px', minHeight: 32, cursor: 'pointer',
               }}
             >
               Delete
@@ -155,8 +158,8 @@ function HabitCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{showFlame ? '🔥' : '⚡'}</span>
         <span style={{
-          fontSize: 26, fontWeight: 700, color,
-          letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+          fontSize: 24, fontWeight: 700, color: 'var(--text-1)',
+          letterSpacing: '-0.02em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0,
         }}>
           {streak}
         </span>
@@ -165,19 +168,19 @@ function HabitCard({
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <WeeklyArc completions={currentWeekCompletions ?? 0} target={currentWeekTarget!} color={color} size={40} />
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>this week</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 500 }}>This week</div>
               <div style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500 }}>{currentWeekCompletions ?? 0}/{currentWeekTarget}×</div>
             </div>
           </div>
         ) : (
           <span style={{ marginLeft: 'auto', fontSize: 11, color: completedToday ? color : 'var(--text-3)', fontWeight: completedToday ? 700 : 400 }}>
-            {completedToday ? '✓ logged today — tap grid to undo' : 'tap today\'s cell to log'}
+            {completedToday ? 'Logged today' : 'Not logged today'}
           </span>
         )}
       </div>
       {hasWeeklyTarget && (
         <div style={{ fontSize: 10.5, color: completedToday ? color : 'var(--text-3)', fontWeight: completedToday ? 600 : 400, marginBottom: 2, textAlign: 'right' }}>
-          {completedToday ? '✓ logged today — tap grid to undo' : 'tap today\'s cell to log'}
+          {completedToday ? 'Logged today' : 'Not logged today'}
         </div>
       )}
 

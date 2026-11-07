@@ -153,9 +153,9 @@ interface SectionProps {
 
 export function Section({ title, count, children }: SectionProps) {
   return (
-    <section style={{ marginBottom: 30 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
-        <h2 style={{ fontSize: 16, color: 'var(--text-1)' }}>{title}</h2>
+    <section style={{ marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 4px 8px' }}>
+        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0, color: 'var(--text-2)' }}>{title}</h2>
         {count !== undefined && (
           <span style={{
             fontSize: 12,

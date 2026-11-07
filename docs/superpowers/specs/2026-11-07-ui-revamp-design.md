@@ -84,7 +84,8 @@ needed in dark (elevation = lighter grey). Spacing on a 4px grid; 16px phone gut
   22px for shopping items; ink fill + inverse check when done), `InsetGroup` + `InsetRow`
   (iOS-style grouped rows on `--fill`, 48px rows, hairline dividers, label left, value +
   chevron right).
-- Later phase: `Sheet` (bottom sheet on phone, right-hand inspector on desktop).
+- `Sheet` (bottom sheet on phone, right-hand inspector on desktop), `Disclosure`, `SheetDialog`
+  (built in Phase B; every dialog in the app now uses them).
 
 ## Layout (decided)
 

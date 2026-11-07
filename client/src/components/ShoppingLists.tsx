@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import Sheet from '@/components/ui/Sheet'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
@@ -41,7 +42,6 @@ function NewListSheet({ groups, onClose, onCreated }: {
   const setGroupId = setChosen
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -58,24 +58,8 @@ function NewListSheet({ groups, onClose, onCreated }: {
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000, display: 'flex',
-        alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : 16,
-        background: 'hsl(0 0% 0% / 0.5)',
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <form onSubmit={save} style={{
-        width: '100%', maxWidth: 440, margin: '0 auto', background: 'var(--surface)',
-        borderRadius: isMobile ? 'var(--r-lg) var(--r-lg) 0 0' : 'var(--r-lg)',
-        boxShadow: isMobile ? undefined : 'var(--shadow-lg)',
-        padding: isMobile ? '20px 20px 32px' : 24, display: 'flex', flexDirection: 'column', gap: 16,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>New list</h3>
-          <button type="button" onClick={onClose} aria-label="Close" style={plainBtn}><Icon name="close" size={20} /></button>
-        </div>
+    <Sheet title="New list" onClose={onClose} width={420}>
+      <form onSubmit={save} style={{ padding: '18px 18px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label style={labelStyle} htmlFor="shop-title">Name</label>
           <input id="shop-title" style={inputStyle} placeholder="e.g. Groceries" value={title}
@@ -95,7 +79,7 @@ function NewListSheet({ groups, onClose, onCreated }: {
           <Button variant="primary" size="md" type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create list'}</Button>
         </div>
       </form>
-    </div>
+    </Sheet>
   )
 }
 

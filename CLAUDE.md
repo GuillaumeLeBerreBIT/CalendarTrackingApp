@@ -100,10 +100,13 @@ client/
         Button.tsx       — Button + IconButton (primary/secondary/ghost/outline/soft/danger)
         Primitives.tsx   — Tag, Progress, Segmented, RsvpPill, Section, Empty
         Controls.tsx     — Switch, Checkbox (square tasks / round shopping), InsetGroup + InsetRow
+        Sheet.tsx        — Sheet (bottom sheet on phone, right inspector on desktop), Disclosure
+                           (folded optional section), SheetDialog (Sheet + padded body for small forms)
       AppShell.tsx       — Desktop sidebar + mobile bottom nav + PWAInstallBanner
       ProtectedRoute.tsx — Checks auth via fetchMe(), redirects to /login if needed
-      EventModal.tsx     — Full event detail modal (RSVP, attendees, map preview)
-      EventFormModal.tsx — Create/edit event form (NL parse, recurrence, reminders)
+      EventModal.tsx     — Event view in a Sheet (details rows, RSVP, attendees, reactions, wishlist, comments)
+      EventFormModal.tsx — Create/edit event in a Sheet: type, title, group, when up front; Invite,
+                           Location & note, Wishlist, Repeat & reminder folded (Disclosure)
       CountdownPill.tsx  — Live countdown badge (Xd Yh)
       HabitHeatmap.tsx   — 16-week completion grid (flex cells, tap-to-log today)
       WeeklyArc.tsx      — SVG ring showing weekly target progress
@@ -226,8 +229,14 @@ All UI components live in `client/src/components/ui/`. Use these everywhere:
 - `<Progress value={3} total={10} color="var(--g-work)" />` — thin progress bar
 - `<Segmented options={[...]} value={v} onChange={fn} />` — toggle switcher
 - `<RsvpPill status="going|maybe|no" />` — RSVP status chip
-- `<Section title="...">` — page section wrapper
+- `<Section title="...">` — page section wrapper (small 13px heading above an inset group)
 - `<Empty text="..." />` — empty state placeholder
+- `<Sheet title onClose footer? actions?>` — every dialog/form; never hand-roll a fixed overlay
+- `<SheetDialog title onClose>` — Sheet with a padded body (small create/edit forms)
+- `<Disclosure label summary open onToggle>` — folded optional form section
+- `<Switch>`, `<Checkbox shape="square|round">`, `<InsetGroup>` + `<InsetRow>` — settings-style rows
+- Page titles use `className="page-title"` (22px phone / 19px desktop); labels are sentence case,
+  never uppercase small caps; text on `var(--accent)` is always `var(--accent-text)`
 
 ---
 

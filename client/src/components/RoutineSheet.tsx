@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import Sheet from '@/components/ui/Sheet'
 import api from '@/api/client'
-import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import {
   ROUTINE_DAYS, END_PRESETS, localToday, nextDateOnOrAfter, routinePayload, formatDay,
@@ -97,38 +97,10 @@ export default function RoutineSheet({ routine, groups, onClose, onSaved }: {
   const keepEndLabel = existing?.endMode === 'on' && existing.endDate
     ? `Keep (until ${formatDay(existing.endDate)})` : 'Keep (no end)'
 
-  // Bottom sheet on mobile, centred dialog on desktop (same split as EventFormModal).
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000, display: 'flex',
-        alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : 16,
-        background: 'hsl(0 0% 0% / 0.5)',
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <form
-        onSubmit={save}
-        style={{
-          width: '100%', maxWidth: 480, margin: '0 auto', maxHeight: '92vh', overflowY: 'auto',
-          background: 'var(--surface)',
-          borderRadius: isMobile ? 'var(--r-lg) var(--r-lg) 0 0' : 'var(--r-lg)',
-          boxShadow: isMobile ? undefined : 'var(--shadow-lg)',
-          padding: isMobile ? '20px 20px 32px' : 24, display: 'flex', flexDirection: 'column', gap: 16,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
-            {editing ? 'Edit routine' : 'New routine'}
-          </h3>
-          <button type="button" onClick={onClose} aria-label="Close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
-            <Icon name="close" size={20} />
-          </button>
-        </div>
-
+    <Sheet title={editing ? 'Edit routine' : 'New routine'} onClose={onClose} width={460}>
+      <form onSubmit={save} style={{ padding: '18px 18px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label style={labelStyle} htmlFor="routine-title">Name</label>
           <input id="routine-title" style={inputStyle} placeholder="e.g. Swim training" value={title}
@@ -227,6 +199,6 @@ export default function RoutineSheet({ routine, groups, onClose, onSaved }: {
           </Button>
         </div>
       </form>
-    </div>
+    </Sheet>
   )
 }
