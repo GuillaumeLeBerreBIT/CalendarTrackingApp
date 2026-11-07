@@ -87,7 +87,6 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)',
-  letterSpacing: '0.04em', textTransform: 'uppercase',
   marginBottom: 6, display: 'block',
 }
 
@@ -140,7 +139,7 @@ function AddCountdownModal({ onClose, onCreate }: {
         padding: isMobile ? '20px 20px 32px' : 24, display: 'flex', flexDirection: 'column', gap: 16,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
             Add Countdown
           </h3>
           <button
@@ -264,10 +263,7 @@ export default function CountdownsPage() {
         gap: 12, marginBottom: 24,
       }}>
         <div>
-          <h1 style={{
-            fontSize: 26, fontWeight: 900, color: 'var(--text-1)',
-            letterSpacing: '-0.03em', margin: 0,
-          }}>
+          <h1 className="page-title">
             Countdowns
           </h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '6px 0 0' }}>

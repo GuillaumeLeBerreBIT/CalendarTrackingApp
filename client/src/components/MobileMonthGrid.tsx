@@ -185,9 +185,7 @@ export default function MobileMonthGrid({
             fontSize: 10.5,
             fontWeight: 700,
             color: 'var(--text-3)',
-            letterSpacing: '0.04em',
             padding: '2px 0',
-            textTransform: 'uppercase',
             background: i >= 5 ? 'var(--weekend)' : 'transparent',
           }}>
             {label}
@@ -243,10 +241,8 @@ export default function MobileMonthGrid({
                 padding: '4px 2px 5px',
                 border: 'none',
                 // Weekend columns read as one continuous grey band (owner rule)
-                borderRadius: i % 7 >= 5 && !(isSelected && !isToday) ? 0 : 'var(--r-sm)',
-                background: isSelected && !isToday
-                  ? 'var(--accent-soft)'
-                  : (i % 7 >= 5 ? 'var(--weekend)' : 'transparent'),
+                borderRadius: i % 7 >= 5 ? 0 : 'var(--r-sm)',
+                background: i % 7 >= 5 ? 'var(--weekend)' : 'transparent',
                 cursor: 'pointer',
                 transition: 'background 150ms ease-out',
                 minHeight: 44,
@@ -265,14 +261,15 @@ export default function MobileMonthGrid({
                 borderRadius: '50%',
                 fontSize: 12.5,
                 fontWeight: isToday || isSelected ? 700 : 500,
-                color: isToday
-                  ? '#fff'
-                  : isSelected
-                    ? 'var(--accent)'
-                    : otherMonth
-                      ? 'var(--text-3)'
-                      : 'var(--text-2)',
-                background: isToday ? 'var(--accent)' : 'transparent',
+                // Same language as the desktop grid: selected = ink circle, today = ring.
+                color: isSelected
+                  ? 'var(--accent-text)'
+                  : otherMonth
+                    ? 'var(--text-3)'
+                    : 'var(--text-1)',
+                background: isSelected ? 'var(--accent)' : 'transparent',
+                boxSizing: 'border-box',
+                border: isToday && !isSelected ? '1px solid var(--text-1)' : 'none',
                 flexShrink: 0,
                 transition: 'background 150ms ease-out, color 150ms ease-out',
               }}>

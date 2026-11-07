@@ -19,10 +19,10 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.04em',
-  textTransform: 'uppercase', marginBottom: 6, display: 'block',
+  fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)',
+  marginBottom: 6, display: 'block',
 }
-const errStyle: React.CSSProperties = { fontSize: 13, color: 'var(--danger, #ef4444)', margin: 0 }
+const errStyle: React.CSSProperties = { fontSize: 13, color: 'var(--danger)', margin: 0 }
 const plainBtn: React.CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4,
   display: 'inline-flex', alignItems: 'center',
@@ -73,7 +73,7 @@ function NewListSheet({ groups, onClose, onCreated }: {
         padding: isMobile ? '20px 20px 32px' : 24, display: 'flex', flexDirection: 'column', gap: 16,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>New list</h3>
+          <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>New list</h3>
           <button type="button" onClick={onClose} aria-label="Close" style={plainBtn}><Icon name="close" size={20} /></button>
         </div>
         <div>
@@ -226,7 +226,7 @@ function ListCard({ list, patchItems, track, onRenamed, onRemoved }: {
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, position: 'relative' }}>
         <div style={{ minWidth: 0 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: 0, overflowWrap: 'anywhere' }}>{list.title}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0, overflowWrap: 'anywhere' }}>{list.title}</h3>
           <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '3px 0 0' }}>
             {list.groupTitle ?? 'Just me'}{list.createdByName ? ` · by ${list.createdByName}` : ''}
           </p>
@@ -327,7 +327,7 @@ export default function ShoppingLists() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Shopping</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Shopping</h2>
         <Button variant="primary" icon="plus" size="md" onClick={() => setSheet(true)}>New list</Button>
       </div>
 

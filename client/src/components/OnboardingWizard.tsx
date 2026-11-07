@@ -27,12 +27,10 @@ const inputStyle: CSSProperties = {
 
 const labelStyle: CSSProperties = {
   display: 'block',
-  fontSize: 11.5,
-  fontWeight: 650,
-  color: 'var(--text-3)',
+  fontSize: 12.5,
+  fontWeight: 600,
+  color: 'var(--text-2)',
   marginBottom: 6,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
 }
 
 // ── Step dots ─────────────────────────────────────────────────────────────────
@@ -78,14 +76,14 @@ function Wordmark() {
         boxShadow: '0 8px 32px var(--accent-glow)',
       }}>
         <svg width={24} height={24} viewBox="0 0 24 24" fill="none"
-          stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          stroke="currentColor" style={{ color: 'var(--accent-text)' }} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <rect x="3" y="4" width="18" height="18" rx="3" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
           <line x1="3" y1="10" x2="21" y2="10" />
         </svg>
       </div>
-      <span style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.035em', color: 'var(--text-1)', lineHeight: 1 }}>
+      <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.035em', color: 'var(--text-1)', lineHeight: 1 }}>
         Eventli
       </span>
     </div>
@@ -214,7 +212,7 @@ function StepGroup({ onAdvance }: { onAdvance: () => void }) {
         }}>
           <Icon name="users" size={26} sw={1.6} />
         </div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
           Create or join a group
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '8px 0 0', lineHeight: 1.5 }}>
@@ -377,7 +375,7 @@ function StepDone({ onFinish, finishing }: { onFinish: () => void; finishing: bo
         <Icon name="check" size={28} sw={2.2} />
       </div>
 
-      <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 24px', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 24px', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
         You&rsquo;re all set
       </h2>
 

@@ -141,7 +141,7 @@ export default function RoutinesPage() {
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: 'var(--text-1)', letterSpacing: '-0.03em', margin: 0 }}>
+          <h1 className="page-title">
             Routines
           </h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '6px 0 0' }}>

@@ -81,8 +81,6 @@ function UpNextCard({ event }: { event: CalEvent }) {
       <p style={{
         fontSize: 10.5,
         fontWeight: 700,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
         color: 'var(--accent)',
         marginBottom: 6,
       }}>

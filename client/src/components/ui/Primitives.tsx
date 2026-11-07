@@ -230,7 +230,7 @@ export function MapPreview({ area, venue }: { area: string; venue: string }) {
 export function Stat({ n, label }: { n: number | string; label: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
       <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
     </div>
   )

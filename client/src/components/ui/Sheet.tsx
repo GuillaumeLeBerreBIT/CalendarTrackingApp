@@ -167,3 +167,12 @@ export function Disclosure({ label, icon, summary, open, onToggle, children }: D
     </div>
   )
 }
+
+/* ── SheetDialog: a Sheet with a padded body, for small forms ── */
+export function SheetDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <Sheet title={title} onClose={onClose} width={420}>
+      <div style={{ padding: '18px 18px 24px' }}>{children}</div>
+    </Sheet>
+  )
+}

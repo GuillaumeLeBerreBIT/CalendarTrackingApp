@@ -24,8 +24,8 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.04em',
-  textTransform: 'uppercase', marginBottom: 6, display: 'block',
+  fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)',
+  marginBottom: 6, display: 'block',
 }
 
 type EndChoice = EndPreset | 'keep'
@@ -120,7 +120,7 @@ export default function RoutineSheet({ routine, groups, onClose, onSaved }: {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
             {editing ? 'Edit routine' : 'New routine'}
           </h3>
           <button type="button" onClick={onClose} aria-label="Close"
@@ -160,7 +160,7 @@ export default function RoutineSheet({ routine, groups, onClose, onSaved }: {
                     minWidth: 52, padding: '9px 10px', borderRadius: 'var(--r-full)', fontSize: 13, fontWeight: 650,
                     cursor: 'pointer', transition: 'var(--transition)',
                     background: on ? 'var(--accent)' : 'var(--surface-2)',
-                    color: on ? '#fff' : 'var(--text-2)',
+                    color: on ? 'var(--accent-text)' : 'var(--text-2)',
                     border: `1px solid ${on ? 'var(--accent)' : 'var(--border-2)'}`,
                   }}>
                   {d.short}

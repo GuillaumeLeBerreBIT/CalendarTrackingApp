@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useHabitStore } from '@/store/habitStore'
 import api from '@/api/client'
 import Button from '@/components/ui/Button'
@@ -23,12 +24,10 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 12,
-  fontWeight: 650,
-  color: 'var(--text-3)',
+  fontSize: 12.5,
+  fontWeight: 600,
+  color: 'var(--text-2)',
   marginBottom: 6,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
 }
 
 // ── Preset pickers ────────────────────────────────────────────────────────────
@@ -43,36 +42,6 @@ const PRESET_COLORS = [
 ]
 
 // ── Modal wrapper ─────────────────────────────────────────────────────────────
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', padding: 16,
-    }}>
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-xl)',
-        border: '1px solid var(--border-2)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%',
-        maxWidth: 420,
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <div style={{ padding: 20 }}>{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // ── Log confirmation toast ────────────────────────────────────────────────────
 function LogToast({ weeklyHit }: { weeklyHit?: boolean }) {
@@ -86,7 +55,7 @@ function LogToast({ weeklyHit }: { weeklyHit?: boolean }) {
       padding: '10px 18px',
       borderRadius: 'var(--r-full)',
       background: 'var(--accent)',
-      color: '#fff',
+      color: 'var(--accent-text)',
       fontSize: 14,
       fontWeight: 700,
       boxShadow: '0 4px 20px var(--accent-glow)',
@@ -186,7 +155,7 @@ function HabitCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{showFlame ? '🔥' : '⚡'}</span>
         <span style={{
-          fontSize: 26, fontWeight: 800, color,
+          fontSize: 26, fontWeight: 700, color,
           letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0,
         }}>
           {streak}
@@ -483,10 +452,7 @@ export default function HabitsPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: 24, gap: 12,
         }}>
-          <h1 style={{
-            fontSize: 'clamp(22px,4vw,28px)', fontWeight: 800,
-            color: 'var(--text-1)', letterSpacing: '-0.03em', margin: 0,
-          }}>
+          <h1 className="page-title">
             Habits
           </h1>
           <Button variant="primary" size="md" onClick={() => setShowCreateModal(true)}>

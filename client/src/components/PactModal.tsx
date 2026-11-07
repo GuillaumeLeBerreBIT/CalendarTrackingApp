@@ -18,12 +18,10 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 11.5,
-  fontWeight: 650,
-  color: 'var(--text-3)',
+  fontSize: 12.5,
+  fontWeight: 600,
+  color: 'var(--text-2)',
   marginBottom: 6,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
 }
 
 interface PactModalProps {

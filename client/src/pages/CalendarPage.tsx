@@ -379,7 +379,7 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', paddingBottom: 8 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', paddingBottom: 8 }}>
         Calendars
       </div>
 
@@ -439,7 +439,7 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
 
       {/* Divider + stats */}
       <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 8 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 8 }}>
         This month
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

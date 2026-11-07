@@ -103,7 +103,7 @@ function StatCard({ n, label }: { n: number | string; label: string }) {
     }}>
       <div style={{
         fontSize: 28,
-        fontWeight: 800,
+        fontWeight: 700,
         color: 'var(--text-1)',
         letterSpacing: '-0.03em',
         fontVariantNumeric: 'tabular-nums',
@@ -535,9 +535,9 @@ export default function ProfilePage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#fff',
+          color: 'var(--accent-text)',
           fontSize: 34,
-          fontWeight: 800,
+          fontWeight: 700,
           letterSpacing: '-0.02em',
           marginBottom: 14,
           boxShadow: '0 8px 24px var(--accent-glow)',
@@ -545,7 +545,7 @@ export default function ProfilePage() {
         }}>
           {letter}
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
           {user?.username ?? 'Your Profile'}
         </h1>
         {user?.email && (
@@ -578,7 +578,7 @@ export default function ProfilePage() {
         }}>
           {/* Email row */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-            <p style={{ fontSize: 11.5, fontWeight: 650, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>
+            <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 4px' }}>
               Email
             </p>
             <p style={{ fontSize: 14, color: 'var(--text-1)', margin: 0 }}>{user?.email}</p>
@@ -586,7 +586,7 @@ export default function ProfilePage() {
 
           {/* Username row */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-            <p style={{ fontSize: 11.5, fontWeight: 650, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>
+            <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 6px' }}>
               Username
             </p>
             {editing ? (
@@ -632,7 +632,7 @@ export default function ProfilePage() {
 
           {/* Home city row — default location for the Discover feed */}
           <div style={{ padding: '14px 16px' }}>
-            <p style={{ fontSize: 11.5, fontWeight: 650, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>
+            <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 6px' }}>
               Home city
             </p>
             {editingCity ? (

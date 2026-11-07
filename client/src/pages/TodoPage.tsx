@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useSearchParams } from 'react-router-dom'
 import api from '@/api/client'
 import type { TaskList, Task, Group } from '@/types'
@@ -36,37 +37,6 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 6,
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-      padding: 16,
-    }}>
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-xl)',
-        border: '1px solid var(--border-2)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%',
-        maxWidth: 400,
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <div style={{ padding: 20 }}>{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // Priority badge styles
 const priorityStyle = (priority: string): React.CSSProperties => {
@@ -161,7 +131,7 @@ function AssigneeEditor({
       background: 'var(--surface-2)',
       border: '1px solid var(--border-2)',
     }}>
-      <p style={{ fontSize: 11.5, fontWeight: 650, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 8px' }}>
         Assign to
       </p>
       {loadingMembers ? (
@@ -204,7 +174,7 @@ function AssigneeEditor({
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}>
-                  {on && <Icon name="check" size={10} sw={2.8} style={{ color: '#fff' }} />}
+                  {on && <Icon name="check" size={10} sw={2.8} style={{ color: 'var(--accent-text)' }} />}
                 </span>
               </button>
             )
@@ -580,7 +550,7 @@ function TasksTab() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.03em' }}>Tasks</h1>
+          <h1 className="page-title">Tasks</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '4px 0 0' }}>
             {taskLists.length} list{taskLists.length !== 1 ? 's' : ''}
           </p>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/api/client'
 import CountdownPill from '@/components/CountdownPill'
@@ -58,37 +59,6 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-      padding: 16,
-    }}>
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-xl)',
-        border: '1px solid var(--border-2)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%',
-        maxWidth: 420,
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <div style={{ padding: 20 }}>{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
 interface GroupHabit {
@@ -658,7 +628,7 @@ export default function GroupDetailPage() {
             justifyContent: 'center',
             color: '#fff',
             fontSize: 32,
-            fontWeight: 800,
+            fontWeight: 700,
             flexShrink: 0,
             boxShadow: 'var(--shadow-md)',
           }}>
@@ -666,7 +636,7 @@ export default function GroupDetailPage() {
           </div>
           <div style={{ paddingBottom: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.03em' }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
                 {groupName}
               </h1>
               {groupTag && <Tag tone="neutral">#{groupTag}</Tag>}
@@ -878,7 +848,7 @@ export default function GroupDetailPage() {
           {/* ── Tentative events (voting open) ── */}
           {tentativeEvents.length > 0 && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#f59e0b', marginBottom: 10 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: '#f59e0b', marginBottom: 10 }}>
                 Voting open
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -927,7 +897,7 @@ export default function GroupDetailPage() {
                           background: 'rgba(245,158,11,0.10)',
                         }}>
                           <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: '#f59e0b' }}>TBD</div>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b', lineHeight: 1.2 }}>?</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b', lineHeight: 1.2 }}>?</div>
                         </div>
                         {/* Info */}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1130,7 +1100,7 @@ export default function GroupDetailPage() {
 
           {allUpcoming.length > 0 && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 10 }}>Upcoming</p>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10 }}>Upcoming</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {upcomingEvents.map(ev => {
                   const dateStr = ev.start.split('T')[0]
@@ -1154,7 +1124,7 @@ export default function GroupDetailPage() {
                         <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: groupColor }}>
                           {date.toLocaleDateString('en-US', { month: 'short' })}
                         </div>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.1 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.1 }}>
                           {date.getDate()}
                         </div>
                       </div>
@@ -1218,7 +1188,7 @@ export default function GroupDetailPage() {
           )}
           {pastEvents.length > 0 && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 10 }}>Past</p>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10 }}>Past</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {pastEvents.map(ev => (
                   <div key={ev.id} style={{
@@ -1730,7 +1700,7 @@ export default function GroupDetailPage() {
       flexDirection: 'column',
       gap: 16,
     }}>
-      <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#fb7185', margin: 0 }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: '#fb7185', margin: 0 }}>
         Danger zone
       </p>
 

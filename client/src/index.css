@@ -318,3 +318,24 @@ input, textarea, select {
     padding-right: 16px;
   }
 }
+
+/* ── Page title (Compact Mono): 22px on phone, 19px on desktop ── */
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+  margin: 0;
+}
+@media (min-width: 1024px) {
+  .page-title { font-size: 19px; }
+}
+/* Page body: one width for list pages */
+.page-body {
+  padding: 16px 16px 32px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+@media (min-width: 1024px) {
+  .page-body { padding: 22px 28px 40px; }
+}

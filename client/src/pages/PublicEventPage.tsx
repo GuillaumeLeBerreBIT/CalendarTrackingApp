@@ -21,7 +21,7 @@ function Logo() {
         flexShrink: 0,
       }}>
         <svg width={20} height={20} viewBox="0 0 24 24" fill="none"
-          stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          stroke="currentColor" style={{ color: 'var(--accent-text)' }} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="3" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
@@ -30,7 +30,7 @@ function Logo() {
       </div>
       <span style={{
         fontSize: 22,
-        fontWeight: 800,
+        fontWeight: 700,
         letterSpacing: '-0.03em',
         color: 'var(--text-1)',
         lineHeight: 1,
@@ -249,14 +249,14 @@ export default function PublicEventPage() {
           {!loading && event && (
             <>
               {/* Category label */}
-              <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: isPoll ? '#f59e0b' : 'var(--accent)', margin: 0 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: isPoll ? '#f59e0b' : 'var(--accent)', margin: 0 }}>
                 {isPoll ? 'Pick a date' : 'Event'}
               </p>
 
               {/* Title */}
               <h1 style={{
                 fontSize: 26,
-                fontWeight: 800,
+                fontWeight: 700,
                 color: 'var(--text-1)',
                 margin: 0,
                 letterSpacing: '-0.03em',
