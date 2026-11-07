@@ -44,12 +44,13 @@ export default function Button({
   const s = SIZES[size]
 
   const VARIANTS: Record<Variant, { bg: string; c: string; b: string; sh: string }> = {
-    primary:   { bg: active ? 'var(--accent-press)' : (hover ? 'var(--accent-hover)' : 'var(--accent)'),     c: 'var(--accent-text)', b: 'transparent',        sh: hover ? '0 6px 20px var(--accent-glow)' : 'var(--shadow-sm)' },
-    secondary: { bg: hover ? 'var(--surface-hi)' : 'var(--surface-3)',                                         c: 'var(--text-1)',      b: 'var(--border-2)',     sh: 'none' },
-    ghost:     { bg: hover ? 'var(--surface-3)' : 'transparent',                                               c: 'var(--text-2)',      b: 'transparent',        sh: 'none' },
-    outline:   { bg: hover ? 'var(--accent-softer)' : 'transparent',                                           c: 'var(--accent)',      b: 'var(--accent-line)', sh: 'none' },
-    soft:      { bg: active ? 'var(--accent)' : (hover ? 'var(--accent-soft)' : 'var(--accent-softer)'),       c: active ? 'var(--accent-text)' : 'var(--accent)', b: active ? 'transparent' : 'var(--accent-line)', sh: 'none' },
-    danger:    { bg: hover ? 'rgba(244,63,94,0.16)' : 'transparent',                                           c: '#fb7185',            b: 'rgba(244,63,94,0.3)', sh: 'none' },
+    // Compact Mono: one ink primary per screen; everything else outline or plain text.
+    primary:   { bg: active ? 'var(--accent-press)' : (hover ? 'var(--accent-hover)' : 'var(--accent)'), c: 'var(--accent-text)', b: 'transparent',     sh: 'none' },
+    secondary: { bg: hover ? 'var(--surface-2)' : 'var(--surface)',                                     c: 'var(--text-1)',      b: 'var(--border-2)', sh: 'none' },
+    ghost:     { bg: hover ? 'var(--surface-2)' : 'transparent',                                        c: 'var(--text-2)',      b: 'transparent',     sh: 'none' },
+    outline:   { bg: hover ? 'var(--surface-2)' : 'transparent',                                        c: 'var(--text-1)',      b: 'var(--border-2)', sh: 'none' },
+    soft:      { bg: active ? 'var(--accent)' : (hover ? 'var(--surface-hi)' : 'var(--fill)'),          c: active ? 'var(--accent-text)' : 'var(--text-1)', b: 'transparent', sh: 'none' },
+    danger:    { bg: hover ? 'var(--surface-2)' : 'transparent',                                        c: 'var(--danger)',      b: 'transparent',     sh: 'none' },
   }
   const v = VARIANTS[variant]
 
@@ -76,10 +77,10 @@ export default function Button({
         background: v.bg,
         color: v.c,
         fontSize: s.fs,
-        fontWeight: 650,
+        fontWeight: variant === 'ghost' || variant === 'danger' ? 500 : 600,
         letterSpacing: '-0.01em',
         boxShadow: v.sh,
-        transform: press ? 'translateY(1px) scale(0.99)' : 'none',
+        transform: press ? 'scale(0.98)' : 'none',
         transition: 'var(--transition)',
         whiteSpace: 'nowrap',
         opacity: disabled ? 0.5 : 1,
@@ -116,6 +117,7 @@ export function IconButton({ name, size = 40, isz, onClick, title, active, tone 
   return (
     <button
       title={title}
+      aria-label={title}
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -145,8 +147,8 @@ export function IconButton({ name, size = 40, isz, onClick, title, active, tone 
           width: 7,
           height: 7,
           borderRadius: '50%',
-          background: 'var(--accent)',
-          boxShadow: '0 0 0 2px var(--surface)',
+          background: 'var(--danger)',
+          boxShadow: '0 0 0 2px var(--bg)',
         }} />
       )}
     </button>
