@@ -647,9 +647,8 @@ export default function GroupDetailPage() {
   const membersSection = (
     <Section title="Members" count={members.length}>
       <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-lg)',
-        border: '1px solid var(--border)',
+        background: 'var(--fill)',
+        borderRadius: 12,
         overflow: 'hidden',
       }}>
         {members.length === 0 ? (
@@ -664,35 +663,24 @@ export default function GroupDetailPage() {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '13px 16px',
-                  borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                  borderTop: i === 0 ? 'none' : '1px solid var(--divider)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Avatar id={m.user_id} size={36} ring ringColor="var(--surface)" label={m.username} name={m.username} />
+                  <Avatar id={m.user_id} size={32} label={m.username} name={m.username} />
                   <div>
                     <p style={{
-                      fontSize: 14, margin: 0,
-                      fontWeight: isAdmin ? 700 : 500,
+                      fontSize: 15, margin: 0,
+                      fontWeight: 500,
                       color: 'var(--text-1)',
                     }}>
                       {m.username}{isYou && <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 400, marginLeft: 6 }}>you</span>}
-                    </p>
-                    <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>
-                      {isAdmin ? 'Organiser' : 'Member'}
                     </p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {isAdmin && (
-                    <span style={{
-                      fontSize: 11.5, fontWeight: 650, padding: '3px 9px',
-                      borderRadius: 'var(--r-full)',
-                      background: `color-mix(in srgb, ${groupColor} 15%, transparent)`,
-                      color: groupColor,
-                      border: `1px solid color-mix(in srgb, ${groupColor} 30%, transparent)`,
-                    }}>
-                      Organiser
-                    </span>
+                    <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Organiser</span>
                   )}
                   {isCurrentUserAdmin && !isYou && (
                     kickConfirmId === m.user_id ? (
@@ -1053,17 +1041,16 @@ export default function GroupDetailPage() {
                       display: 'flex', alignItems: 'center', gap: 13,
                       padding: '12px 14px',
                       borderRadius: 'var(--r-md)',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
+                      background: 'var(--fill)',
                     }}>
                       {/* Date block */}
                       <div style={{
                         width: 46, flexShrink: 0, textAlign: 'center',
                         padding: '5px 0',
                         borderRadius: 'var(--r-sm)',
-                        background: `color-mix(in srgb, ${groupColor} 14%, var(--surface-2))`,
+                        background: 'var(--bg)',
                       }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: groupColor }}>
+                        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)' }}>
                           {date.toLocaleDateString('en-US', { month: 'short' })}
                         </div>
                         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.1 }}>
@@ -1170,9 +1157,8 @@ export default function GroupDetailPage() {
             const total = tl.taskItems.length
             return (
               <div key={tl.taskListInfo.idTl} style={{
-                background: 'var(--surface)',
-                borderRadius: 'var(--r-lg)',
-                border: '1px solid var(--border)',
+                background: 'var(--fill)',
+                borderRadius: 12,
                 overflow: 'hidden',
               }}>
                 {/* List header */}
@@ -1245,9 +1231,8 @@ export default function GroupDetailPage() {
         <Empty text="No activity yet." />
       ) : (
         <div style={{
-          background: 'var(--surface)',
-          borderRadius: 'var(--r-lg)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
+          borderRadius: 12,
           padding: '4px 16px',
         }}>
           {activity.map((item, i) => (
@@ -1265,7 +1250,7 @@ export default function GroupDetailPage() {
     <div style={{ marginBottom: 24 }}>
       {/* Section label */}
       <div style={{ marginBottom: 10 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Group Pact</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Group pact</p>
         <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
           Bet a real calendar event on the group's habit completions — hit the target and it unlocks for everyone.
         </p>
@@ -1284,7 +1269,7 @@ export default function GroupDetailPage() {
           <div style={{ paddingLeft: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Icon name="trophy" size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Group Pact</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Group pact</span>
               <span style={{
                 marginLeft: 'auto', fontSize: 11, fontWeight: 650,
                 color: 'var(--text-3)',
@@ -1337,23 +1322,23 @@ export default function GroupDetailPage() {
       ) : null}
 
       {isCurrentUserAdmin && (!activePact || activePact.status !== 'active') && (
-        <button
+        <button type="button"
           onClick={() => setShowPactModal(true)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginTop: activePact ? 10 : 0,
-            width: '100%',
-            padding: '11px 14px',
-            background: 'var(--accent-soft)',
-            border: '1px dashed color-mix(in srgb, var(--accent) 40%, transparent)',
-            borderRadius: 'var(--r-lg)',
-            color: 'var(--accent)',
-            fontSize: 13.5, fontWeight: 650,
+            display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: activePact ? 10 : 0,
+            height: 36,
+            padding: '0 14px',
+            background: 'var(--bg)',
+            border: '1px solid var(--border-2)',
+            borderRadius: 8,
+            color: 'var(--text-1)',
+            fontSize: 14, fontWeight: 500,
             cursor: 'pointer',
             transition: 'var(--transition)',
           }}
         >
           <Icon name="trophy" size={15} />
-          Start a Group Pact
+          Start a group pact
         </button>
       )}
 
