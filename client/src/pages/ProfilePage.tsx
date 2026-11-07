@@ -3,7 +3,8 @@ import { useAuthStore } from '@/store/authStore'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
-import { Section } from '@/components/ui/Primitives'
+import { Section, Segmented } from '@/components/ui/Primitives'
+import { readThemePref, setThemePref, parseThemePref, type ThemePref } from '@/lib/theme'
 import { Link } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
 import type { NotificationPrefs, ProfileStats } from '@/types'
@@ -178,6 +179,7 @@ function SettingsRow({ icon, title, subtitle, first = false }: SettingsRowProps)
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ProfilePage() {
   const { user, fetchMe, logout } = useAuthStore()
+  const [themePref, setThemePrefState] = useState<ThemePref>(readThemePref)
   const [editing, setEditing] = useState(false)
   const [username, setUsername] = useState(user?.username ?? '')
   const [saving, setSaving] = useState(false)
@@ -1086,6 +1088,35 @@ export default function ProfilePage() {
               </p>
             )}
           </div>
+        </div>
+      </Section>
+
+      {/* Appearance — per device */}
+      <Section title="Appearance">
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>Theme</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Saved on this device</p>
+          </div>
+          <Segmented
+            options={[
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+              { value: 'system', label: 'System' },
+            ]}
+            value={themePref}
+            onChange={(v) => { const p = parseThemePref(v); setThemePrefState(p); setThemePref(p) }}
+          />
         </div>
       </Section>
 

@@ -79,28 +79,28 @@ export function Segmented({ options, value, onChange, size = 'md' }: SegmentedPr
     <div style={{
       display: 'inline-flex',
       gap: 2,
-      padding: 3,
-      background: 'var(--surface-3)',
+      padding: 2,
+      background: 'var(--fill)',
       borderRadius: 'var(--r-sm)',
-      border: '1px solid var(--border)',
     }}>
       {options.map(o => {
         const active = o.value === value
         return (
           <button
             key={o.value}
+            aria-pressed={active}
             onClick={() => onChange(o.value)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
               padding: pad,
-              borderRadius: 'calc(var(--r-sm) - 3px)',
+              borderRadius: 'var(--r-xs)',
               border: 'none',
-              background: active ? 'var(--surface-hi)' : 'transparent',
-              color: active ? 'var(--text-1)' : 'var(--text-3)',
+              background: active ? 'var(--seg-on)' : 'transparent',
+              color: active ? 'var(--text-1)' : 'var(--text-2)',
               fontSize: fs,
-              fontWeight: 650,
+              fontWeight: active ? 600 : 500,
               boxShadow: active ? 'var(--shadow-sm)' : 'none',
               transition: 'var(--transition)',
               cursor: 'pointer',
