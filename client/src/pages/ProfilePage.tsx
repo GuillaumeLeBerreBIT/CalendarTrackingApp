@@ -686,9 +686,9 @@ export default function ProfilePage() {
             fontSize: 13,
             padding: '9px 13px',
             borderRadius: 'var(--r-sm)',
-            background: isError ? 'rgba(244,63,94,0.1)' : 'rgba(34,211,170,0.1)',
-            color: isError ? '#fb7185' : 'var(--g-work)',
-            border: `1px solid ${isError ? 'rgba(244,63,94,0.2)' : 'rgba(34,211,170,0.2)'}`,
+            background: isError ? 'color-mix(in srgb, var(--danger) 10%, transparent)' : 'rgba(34,211,170,0.1)',
+            color: isError ? 'var(--danger)' : 'var(--g-work)',
+            border: `1px solid ${isError ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'rgba(34,211,170,0.2)'}`,
           }}>
             {message}
           </p>
@@ -730,7 +730,7 @@ export default function ProfilePage() {
               <p style={{
                 flexBasis: '100%',
                 fontSize: 12,
-                color: '#fb7185',
+                color: 'var(--danger)',
                 margin: '4px 0 0',
                 lineHeight: 1.5,
               }}>
@@ -1080,9 +1080,9 @@ export default function ProfilePage() {
                 fontSize: 13,
                 padding: '9px 13px',
                 borderRadius: 'var(--r-sm)',
-                background: 'rgba(244,63,94,0.1)',
-                color: '#fb7185',
-                border: '1px solid rgba(244,63,94,0.2)',
+                background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
+                color: 'var(--danger)',
+                border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)',
               }}>
                 {importError}
               </p>
@@ -1252,7 +1252,7 @@ export default function ProfilePage() {
       <Section title="Danger zone">
         <div style={{
           background: 'var(--surface)',
-          border: '1px solid rgba(244,63,94,0.25)',
+          border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
           borderRadius: 'var(--r-lg)',
           padding: '16px',
         }}>
@@ -1284,7 +1284,7 @@ export default function ProfilePage() {
                 autoFocus
               />
               {deleteError && (
-                <p style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{deleteError}</p>
+                <p style={{ fontSize: 12.5, color: 'var(--danger)', margin: 0 }}>{deleteError}</p>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button type="submit" variant="danger" size="sm" disabled={deleting || !deletePassword}>

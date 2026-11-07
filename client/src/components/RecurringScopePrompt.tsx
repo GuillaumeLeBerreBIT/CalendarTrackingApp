@@ -70,9 +70,9 @@ function ScopeButton({ label, onClick, danger = false }: { label: string; onClic
       style={{
         width: '100%', textAlign: 'left', padding: '12px 14px',
         borderRadius: 'var(--r-sm)', cursor: 'pointer',
-        border: danger ? '1px solid rgba(244,63,94,0.3)' : '1px solid var(--border-2)',
-        background: danger ? 'rgba(244,63,94,0.06)' : 'var(--surface-2)',
-        color: danger ? '#fb7185' : 'var(--text-1)',
+        border: danger ? '1px solid color-mix(in srgb, var(--danger) 30%, transparent)' : '1px solid var(--border-2)',
+        background: danger ? 'color-mix(in srgb, var(--danger) 6%, transparent)' : 'var(--surface-2)',
+        color: danger ? 'var(--danger)' : 'var(--text-1)',
         fontSize: 13.5, fontWeight: 600, transition: 'var(--transition)',
         minHeight: 44,
       }}

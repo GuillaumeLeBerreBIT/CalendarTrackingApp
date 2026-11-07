@@ -28,24 +28,6 @@ export function groupColorFor(group: { groups_id: string | number; shared_color?
   return group.shared_color || groupColorById(group.groups_id)
 }
 
-// ── Striped image-placeholder overlay ────────────────────────────────────────
-function ImgPh({ opacity = 0.25 }: { opacity?: number }) {
-  return (
-    <svg
-      aria-hidden="true"
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity }}
-      preserveAspectRatio="xMidYMid slice"
-    >
-      <defs>
-        <pattern id="stripes" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-          <rect width="9" height="18" fill="rgba(255,255,255,0.18)" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#stripes)" />
-    </svg>
-  )
-}
-
 // ── Group card ────────────────────────────────────────────────────────────────
 interface GroupCardProps {
   group: Group
@@ -79,8 +61,7 @@ function GroupCard({ group, onClick }: GroupCardProps) {
         background: 'var(--surface)',
         borderRadius: 'var(--r-lg)',
         border: `1px solid ${hovered ? 'var(--border-hi)' : 'var(--border)'}`,
-        boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-        transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
+        boxShadow: 'none',
         transition: 'var(--transition)',
         cursor: 'pointer',
         overflow: 'hidden',
@@ -88,44 +69,16 @@ function GroupCard({ group, onClick }: GroupCardProps) {
         flexDirection: 'column',
       }}
     >
-      {/* Color header band */}
-      <div style={{
-        position: 'relative',
-        height: 64,
-        background: `linear-gradient(120deg, color-mix(in srgb, ${color} 60%, transparent), color-mix(in srgb, ${color} 22%, var(--surface)))`,
-        overflow: 'hidden',
-        flexShrink: 0,
-      }}>
-        <ImgPh />
-        {/* "Group" kind badge */}
-        <span style={{
-          position: 'absolute',
-          top: 10,
-          left: 12,
-          padding: '3px 9px',
-          borderRadius: 'var(--r-full)',
-          background: 'rgba(0,0,0,0.48)',
-          backdropFilter: 'blur(8px)',
-          color: '#fff',
-          fontSize: 11,
-          fontWeight: 650,
-          letterSpacing: '0.02em',
-        }}>
-          Group
-        </span>
-      </div>
-
       {/* Body */}
-      <div style={{ padding: '12px 17px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '16px 16px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Icon row */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Group icon square */}
           <div style={{
-            width: 48,
-            height: 48,
+            width: 40,
+            height: 40,
             borderRadius: 'var(--r-md)',
             background: color,
-            border: '2px solid var(--surface)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -133,7 +86,6 @@ function GroupCard({ group, onClick }: GroupCardProps) {
             fontSize: 20,
             fontWeight: 700,
             flexShrink: 0,
-            boxShadow: `0 4px 14px color-mix(in srgb, ${color} 40%, transparent)`,
           }}>
             {letter}
           </div>
@@ -142,7 +94,7 @@ function GroupCard({ group, onClick }: GroupCardProps) {
 
         {/* Title + member count */}
         <div>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
             {group.groups_title}
           </h3>
           <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '3px 0 0', lineHeight: 1 }}>
@@ -248,8 +200,8 @@ function InviteCard({ inv, onAccept, onDecline }: { inv: Invite; onAccept: () =>
       gap: 12,
       padding: '14px 16px',
       borderRadius: 'var(--r-lg)',
-      background: 'rgba(245,158,11,0.07)',
-      border: '1px solid rgba(245,158,11,0.28)',
+      background: 'var(--fill)',
+      border: '1px solid var(--border-2)',
       flexWrap: 'wrap',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -257,13 +209,13 @@ function InviteCard({ inv, onAccept, onDecline }: { inv: Invite; onAccept: () =>
           width: 36,
           height: 36,
           borderRadius: 'var(--r-sm)',
-          background: 'rgba(245,158,11,0.18)',
+          background: 'var(--fill)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
         }}>
-          <Icon name="bell" size={16} style={{ color: '#f59e0b' }} />
+          <Icon name="bell" size={16} style={{ color: 'var(--text-1)' }} />
         </div>
         <div style={{ minWidth: 0 }}>
           <p style={{ fontSize: 14, fontWeight: 650, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -488,15 +440,15 @@ export default function GroupsPage() {
           marginBottom: 20,
           padding: '12px 16px',
           borderRadius: 'var(--r-md)',
-          background: 'rgba(239,68,68,0.08)',
-          border: '1px solid rgba(239,68,68,0.25)',
+          background: 'color-mix(in srgb, var(--danger) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
           color: 'var(--text-1)',
           fontSize: 13.5,
           display: 'flex',
           alignItems: 'center',
           gap: 10,
         }}>
-          <Icon name="bell" size={16} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <Icon name="bell" size={16} style={{ color: 'var(--danger)', flexShrink: 0 }} />
           {error}
         </div>
       )}
@@ -538,8 +490,8 @@ export default function GroupsPage() {
                       position: 'absolute',
                       inset: 0,
                       borderRadius: 'var(--r-lg)',
-                      border: isSelected ? '2px solid #ef4444' : '2px solid transparent',
-                      background: isSelected ? 'rgba(239,68,68,0.10)' : 'transparent',
+                      border: isSelected ? '2px solid var(--danger)' : '2px solid transparent',
+                      background: isSelected ? 'color-mix(in srgb, var(--danger) 10%, transparent)' : 'transparent',
                       transition: 'var(--transition)',
                       cursor: 'pointer',
                       display: 'flex',
@@ -552,8 +504,8 @@ export default function GroupsPage() {
                       width: 22,
                       height: 22,
                       borderRadius: '50%',
-                      border: isSelected ? '2px solid #ef4444' : '2px solid rgba(255,255,255,0.5)',
-                      background: isSelected ? '#ef4444' : 'rgba(0,0,0,0.4)',
+                      border: isSelected ? '2px solid var(--danger)' : '2px solid rgba(255,255,255,0.5)',
+                      background: isSelected ? 'var(--danger)' : 'rgba(0,0,0,0.4)',
                       backdropFilter: 'blur(4px)',
                       display: 'flex',
                       alignItems: 'center',
@@ -672,12 +624,12 @@ export default function GroupsPage() {
             {/* Icon */}
             <div style={{
               width: 48, height: 48, borderRadius: 'var(--r-md)',
-              background: 'rgba(239,68,68,0.12)',
-              border: '1px solid rgba(239,68,68,0.25)',
+              background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: 20,
             }}>
-              <Icon name="trash" size={22} style={{ color: '#ef4444' }} />
+              <Icon name="trash" size={22} style={{ color: 'var(--danger)' }} />
             </div>
 
             <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
@@ -704,7 +656,7 @@ export default function GroupsPage() {
                   padding: '4px 0',
                   fontSize: 13.5, color: 'var(--text-1)',
                 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0, marginTop: 7 }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--danger)', flexShrink: 0, marginTop: 7 }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span>{g.groups_title}</span>
                     <GroupDeletePreview groupId={g.groups_id} />
@@ -714,7 +666,7 @@ export default function GroupsPage() {
             </div>
 
             {bulkDeleteError && (
-              <p role="alert" style={{ fontSize: 13, color: '#fb7185', margin: '-12px 0 16px' }}>{bulkDeleteError}</p>
+              <p role="alert" style={{ fontSize: 13, color: 'var(--danger)', margin: '-12px 0 16px' }}>{bulkDeleteError}</p>
             )}
 
             <div style={{ display: 'flex', gap: 10 }}>

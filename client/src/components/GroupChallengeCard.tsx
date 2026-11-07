@@ -185,7 +185,7 @@ export default function GroupChallengeCard({ challenge, groupId, isAdmin, onDele
                     <span style={{
                       fontSize: 12,
                       fontWeight: 700,
-                      color: i === 0 ? '#f59e0b' : i === 1 ? 'var(--text-2)' : 'var(--text-3)',
+                      color: i === 0 ? 'var(--text-1)' : i === 1 ? 'var(--text-2)' : 'var(--text-3)',
                       width: 20,
                       flexShrink: 0,
                       textAlign: 'center',

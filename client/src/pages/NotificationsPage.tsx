@@ -11,7 +11,7 @@ const TYPE_META: Record<string, { icon: string; color: string }> = {
   event_invite:    { icon: 'cal',    color: 'var(--accent)' },
   rsvp_reply:      { icon: 'check',  color: 'var(--g-work)' },
   event_changed:   { icon: 'cal',    color: 'var(--g-family)' },
-  event_cancelled: { icon: 'close',  color: '#fb7185' },
+  event_cancelled: { icon: 'close',  color: 'var(--danger)' },
 }
 
 function relativeTime(iso: string): string {

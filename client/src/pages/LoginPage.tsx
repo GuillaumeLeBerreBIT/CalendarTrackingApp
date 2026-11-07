@@ -187,12 +187,12 @@ export default function LoginPage() {
           {/* Error */}
           {error && (
             <div style={{
-              background: 'rgba(244,63,94,0.12)',
-              border: '1px solid rgba(244,63,94,0.3)',
+              background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)',
               borderRadius: 'var(--r-sm)',
               padding: '10px 13px',
               fontSize: 13,
-              color: '#fb7185',
+              color: 'var(--danger)',
             }}>
               {error}
             </div>

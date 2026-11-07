@@ -166,13 +166,13 @@ export default function JoinGroupPage() {
                 width: 52,
                 height: 52,
                 borderRadius: '50%',
-                background: 'rgba(244,63,94,0.12)',
-                border: '1px solid rgba(244,63,94,0.25)',
+                background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                color: '#fb7185',
+                color: 'var(--danger)',
               }}>
                 <Icon name="close" size={22} sw={2} />
               </div>
@@ -214,12 +214,12 @@ export default function JoinGroupPage() {
               {/* Error from join attempt */}
               {joinError && (
                 <div style={{
-                  background: 'rgba(244,63,94,0.12)',
-                  border: '1px solid rgba(244,63,94,0.3)',
+                  background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)',
                   borderRadius: 'var(--r-sm)',
                   padding: '10px 13px',
                   fontSize: 13,
-                  color: '#fb7185',
+                  color: 'var(--danger)',
                 }}>
                   {joinError}
                 </div>

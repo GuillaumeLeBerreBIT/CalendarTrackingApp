@@ -282,7 +282,7 @@ function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 3,
                             padding: '1px 6px', borderRadius: 'var(--r-full)',
-                            background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                            background: 'var(--fill)', color: 'var(--text-1)',
                             fontSize: 10, fontWeight: 700, flexShrink: 0,
                           }}>
                             Voting

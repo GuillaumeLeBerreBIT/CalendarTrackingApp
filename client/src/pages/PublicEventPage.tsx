@@ -81,7 +81,7 @@ interface EventPreview {
 const AVAILABILITY_PILLS: { value: Availability; label: string; title: string; color: string; bg: string }[] = [
   { value: 'yes',   label: '✓', title: 'Yes, I can make it',  color: 'var(--g-work)',   bg: 'rgba(34,211,170,0.14)' },
   { value: 'maybe', label: '~', title: 'Maybe',                color: 'var(--g-family)', bg: 'rgba(245,158,11,0.14)' },
-  { value: 'no',    label: '✕', title: "No, I can't",          color: '#fb7185',         bg: 'rgba(244,63,94,0.12)' },
+  { value: 'no',    label: '✕', title: "No, I can't",          color: 'var(--danger)',         bg: 'color-mix(in srgb, var(--danger) 12%, transparent)' },
 ]
 
 function formatDateTime(date: string, time?: string | null): string {
@@ -232,13 +232,13 @@ export default function PublicEventPage() {
                 width: 52,
                 height: 52,
                 borderRadius: '50%',
-                background: 'rgba(244,63,94,0.12)',
-                border: '1px solid rgba(244,63,94,0.25)',
+                background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                color: '#fb7185',
+                color: 'var(--danger)',
               }}>
                 <Icon name="calendar" size={22} sw={1.8} />
               </div>
@@ -249,7 +249,7 @@ export default function PublicEventPage() {
           {!loading && event && (
             <>
               {/* Category label */}
-              <p style={{ fontSize: 12.5, fontWeight: 600, color: isPoll ? '#f59e0b' : 'var(--accent)', margin: 0 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: isPoll ? 'var(--text-1)' : 'var(--accent)', margin: 0 }}>
                 {isPoll ? 'Pick a date' : 'Event'}
               </p>
 
@@ -430,7 +430,7 @@ export default function PublicEventPage() {
                   </div>
 
                   {voteError && (
-                    <p style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{voteError}</p>
+                    <p style={{ fontSize: 12.5, color: 'var(--danger)', margin: 0 }}>{voteError}</p>
                   )}
 
                   <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>

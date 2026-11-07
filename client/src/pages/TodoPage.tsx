@@ -40,10 +40,9 @@ const labelStyle: React.CSSProperties = {
 
 // Priority badge styles
 const priorityStyle = (priority: string): React.CSSProperties => {
-  if (priority === 'high')   return { background: 'rgba(244,63,94,0.12)', color: '#fb7185' }
-  if (priority === 'medium') return { background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }
-  if (priority === 'low')    return { background: 'rgba(34,197,94,0.12)', color: '#4ade80' }
-  return { background: 'var(--surface-3)', color: 'var(--text-3)' }
+  // Colour is for groups; only "high" earns the danger tone.
+  if (priority === 'high') return { background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }
+  return { background: 'var(--fill)', color: 'var(--text-2)' }
 }
 
 // ── Custom checkbox ───────────────────────────────────────────────────────────
@@ -55,9 +54,9 @@ function TaskCheckbox({ done, color, onClick }: { done: boolean; color: string; 
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: 20,
-        height: 20,
-        borderRadius: 6,
+        width: 18,
+        height: 18,
+        borderRadius: 5,
         border: done
           ? 'none'
           : `2px solid ${hover ? color : 'var(--border-hi)'}`,
@@ -68,7 +67,6 @@ function TaskCheckbox({ done, color, onClick }: { done: boolean; color: string; 
         justifyContent: 'center',
         cursor: 'pointer',
         transition: 'var(--transition)',
-        boxShadow: done ? `0 2px 8px color-mix(in srgb, ${color} 40%, transparent)` : 'none',
       }}
     >
       {done && <Icon name="check" size={11} sw={2.8} style={{ color: '#fff' }} />}
@@ -352,10 +350,10 @@ function TaskListCard({ tl, isExpanded, onToggleExpand, onAddTask, onToggleTask,
   return (
     <div style={{
       background: 'var(--surface)',
-      borderRadius: 'var(--r-xl)',
+      borderRadius: 'var(--r-lg)',
       border: '1px solid var(--border)',
-      boxShadow: 'var(--shadow-sm)',
       overflow: 'hidden',
+      borderLeft: `3px solid ${color}`,
     }}>
       {/* Header */}
       <div
@@ -427,8 +425,9 @@ function TaskListCard({ tl, isExpanded, onToggleExpand, onAddTask, onToggleTask,
               cursor: 'pointer',
               fontSize: 12.5,
               fontWeight: 650,
-              color: 'var(--accent)',
-              padding: '4px 8px',
+              color: 'var(--text-1)',
+              padding: '0 10px',
+              minHeight: 32,
               borderRadius: 'var(--r-sm)',
               whiteSpace: 'nowrap',
             }}

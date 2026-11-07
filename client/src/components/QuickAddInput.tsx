@@ -80,7 +80,7 @@ export default function QuickAddInput({ kind, placeholder, onAdd }: {
           color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
         }}
       />
-      {error && <p role="alert" style={{ fontSize: 12.5, color: 'var(--danger, #ef4444)', margin: '6px 0 0' }}>{error}</p>}
+      {error && <p role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', margin: '6px 0 0' }}>{error}</p>}
     </div>
   )
 }

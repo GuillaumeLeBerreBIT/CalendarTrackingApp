@@ -218,7 +218,7 @@ export default function RoutineSheet({ routine, groups, onClose, onSaved }: {
           </select>
         </div>
 
-        {error && <p role="alert" style={{ fontSize: 13, color: 'var(--danger, #ef4444)', margin: 0 }}>{error}</p>}
+        {error && <p role="alert" style={{ fontSize: 13, color: 'var(--danger)', margin: 0 }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <Button variant="ghost" size="md" onClick={onClose}>Cancel</Button>

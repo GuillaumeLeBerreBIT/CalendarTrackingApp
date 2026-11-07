@@ -65,7 +65,7 @@ function RoutineCard({ routine, onEdit, onStop, onDelete }: {
           ? <button style={{ ...linkStyle, color: 'var(--accent)' }} onClick={() => onEdit(routine)}>Edit</button>
           : <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Custom repeat — edit it from the calendar</span>}
         {!routine.ended && <button style={linkStyle} onClick={() => onStop(routine)}>Stop</button>}
-        <button style={{ ...linkStyle, color: 'var(--danger, #ef4444)' }} onClick={() => onDelete(routine)}>Delete</button>
+        <button style={{ ...linkStyle, color: 'var(--danger)' }} onClick={() => onDelete(routine)}>Delete</button>
       </div>
     </div>
   )
@@ -151,7 +151,7 @@ export default function RoutinesPage() {
         <Button variant="soft" size="sm" icon="plus" onClick={() => setSheet({})}>Add</Button>
       </div>
 
-      {actionError && <p role="alert" style={{ fontSize: 13, color: 'var(--danger, #ef4444)', marginBottom: 12 }}>{actionError}</p>}
+      {actionError && <p role="alert" style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 12 }}>{actionError}</p>}
 
       {routines === null ? (
         <p style={{ color: 'var(--text-3)', fontSize: 14 }}>Loading…</p>

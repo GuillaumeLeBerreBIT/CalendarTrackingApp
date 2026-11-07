@@ -30,23 +30,6 @@ const AVAILABILITY_PILLS: { value: Availability; label: string; title: string; c
   { value: 'no',    label: '✕',  title: "Can't make it",   color: 'var(--text-2)',   bg: 'var(--surface-3)' },
 ]
 
-function ImgPh({ opacity = 0.22 }: { opacity?: number }) {
-  return (
-    <svg
-      aria-hidden="true"
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity }}
-      preserveAspectRatio="xMidYMid slice"
-    >
-      <defs>
-        <pattern id="dp-stripes" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-          <rect width="10" height="20" fill="rgba(255,255,255,0.18)" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#dp-stripes)" />
-    </svg>
-  )
-}
-
 const inputStyle: React.CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
@@ -571,72 +554,40 @@ export default function GroupDetailPage() {
   // ── Cover + hero ────────────────────────────────────────────────────────────
   const coverSection = (
     <div style={{ position: 'relative' }}>
-      {/* Cover band */}
-      <div style={{
-        height: 190,
-        background: `linear-gradient(120deg, color-mix(in srgb, ${groupColor} 55%, transparent), color-mix(in srgb, ${groupColor} 18%, var(--bg)))`,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <ImgPh />
-        {/* Gradient overlay to bg */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
-          background: 'linear-gradient(to bottom, transparent, var(--bg))',
-        }} />
-        {/* Back button */}
-        <button
-          onClick={() => navigate('/groups')}
-          style={{
-            position: 'absolute', top: 16, left: 16,
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '7px 13px',
-            borderRadius: 'var(--r-full)',
-            background: 'rgba(0,0,0,0.4)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.14)',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          <Icon name="chevL" size={14} sw={2.2} />
-          Groups
-        </button>
+      {/* Back link */}
+      <div style={{ padding: '12px clamp(8px, 3vw, 16px) 0' }}>
+        <Button variant="ghost" size="sm" icon="chevL" onClick={() => navigate('/groups')}>Groups</Button>
       </div>
 
       {/* Hero row */}
       <div style={{
-        padding: `16px clamp(16px, 4vw, 24px) 20px`,
+        padding: `8px clamp(16px, 4vw, 24px) 18px`,
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: 16,
       }}>
         {/* Left: avatar + info */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
-            width: 80,
-            height: 80,
+            width: 52,
+            height: 52,
             borderRadius: 'var(--r-lg)',
             background: groupColor,
-            border: '3px solid var(--bg)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#fff',
-            fontSize: 32,
+            fontSize: 22,
             fontWeight: 700,
             flexShrink: 0,
-            boxShadow: 'var(--shadow-md)',
           }}>
             {letter}
           </div>
-          <div style={{ paddingBottom: 4 }}>
+          <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
+              <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
                 {groupName}
               </h1>
               {groupTag && <Tag tone="neutral">#{groupTag}</Tag>}
@@ -664,8 +615,8 @@ export default function GroupDetailPage() {
         </div>
 
         {/* Right: action buttons */}
-        <div style={{ display: 'flex', gap: 8, paddingBottom: 4 }}>
-          <Button variant="ghost" icon="share" size="sm" onClick={handleShareLink} disabled={shareLink}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button variant="outline" icon="share" size="sm" onClick={handleShareLink} disabled={shareLink}>
             {shareCopied ? 'Copied!' : 'Share'}
           </Button>
           <Button variant="primary" icon="plus" size="sm" onClick={() => setShowEventModal(true)}>
@@ -848,7 +799,7 @@ export default function GroupDetailPage() {
           {/* ── Tentative events (voting open) ── */}
           {tentativeEvents.length > 0 && (
             <div>
-              <p style={{ fontSize: 12.5, fontWeight: 600, color: '#f59e0b', marginBottom: 10 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10 }}>
                 Voting open
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -894,10 +845,10 @@ export default function GroupDetailPage() {
                           width: 46, flexShrink: 0, textAlign: 'center',
                           padding: '5px 0',
                           borderRadius: 'var(--r-sm)',
-                          background: 'rgba(245,158,11,0.10)',
+                          background: 'var(--fill)',
                         }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: '#f59e0b' }}>TBD</div>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b', lineHeight: 1.2 }}>?</div>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-1)' }}>TBD</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.2 }}>?</div>
                         </div>
                         {/* Info */}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -909,10 +860,10 @@ export default function GroupDetailPage() {
                             <span style={{
                               display: 'inline-flex', alignItems: 'center', gap: 4,
                               padding: '2px 8px', borderRadius: 'var(--r-full)',
-                              background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                              background: 'var(--fill)', color: 'var(--text-1)',
                               fontSize: 11, fontWeight: 700, flexShrink: 0,
                             }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-2)', display: 'inline-block' }} />
                               Voting open
                             </span>
                           </div>
@@ -1273,7 +1224,6 @@ export default function GroupDetailPage() {
                           background: done ? groupColor : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           transition: 'var(--transition)',
-                          boxShadow: done ? `0 2px 8px color-mix(in srgb, ${groupColor} 40%, transparent)` : 'none',
                         }}>
                           {done && <Icon name="check" size={11} sw={2.8} style={{ color: '#fff' }} />}
                         </div>
@@ -1381,15 +1331,15 @@ export default function GroupDetailPage() {
         </div>
       ) : activePact && activePact.status === 'failed' ? (
         <div style={{
-          background: 'color-mix(in srgb, #ef4444 6%, var(--surface))',
-          border: '1px solid color-mix(in srgb, #ef4444 18%, transparent)',
+          background: 'color-mix(in srgb, var(--danger) 6%, var(--surface))',
+          border: '1px solid color-mix(in srgb, var(--danger) 18%, transparent)',
           borderRadius: 'var(--r-lg)',
           padding: '13px 16px',
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <Icon name="close" size={15} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <Icon name="close" size={15} style={{ color: 'var(--danger)', flexShrink: 0 }} />
           <div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: '#fb7185', margin: 0 }}>Pact Failed</p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', margin: 0 }}>Pact Failed</p>
             <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>The group didn't hit the target in time.</p>
           </div>
         </div>
@@ -1691,8 +1641,8 @@ export default function GroupDetailPage() {
   // ── Danger zone + leave ──────────────────────────────────────────────────────
   const dangerZone = (
     <div style={{
-      background: 'color-mix(in srgb, #ef4444 6%, var(--surface))',
-      border: '1px solid color-mix(in srgb, #ef4444 20%, transparent)',
+      background: 'color-mix(in srgb, var(--danger) 6%, var(--surface))',
+      border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)',
       borderRadius: 'var(--r-lg)',
       padding: 16,
       marginTop: 32,
@@ -1700,7 +1650,7 @@ export default function GroupDetailPage() {
       flexDirection: 'column',
       gap: 16,
     }}>
-      <p style={{ fontSize: 12.5, fontWeight: 600, color: '#fb7185', margin: 0 }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--danger)', margin: 0 }}>
         Danger zone
       </p>
 
@@ -1715,7 +1665,7 @@ export default function GroupDetailPage() {
               Leave this group? You will lose access to all its events and tasks.
             </p>
             {leaveError && (
-              <p style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{leaveError}</p>
+              <p style={{ fontSize: 12.5, color: 'var(--danger)', margin: 0 }}>{leaveError}</p>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Button variant="danger" size="sm" disabled={leaving} onClick={leaveGroup}>
@@ -1746,7 +1696,7 @@ export default function GroupDetailPage() {
 
       {/* Delete group (admin only) */}
       {isCurrentUserAdmin && (
-        <div style={{ borderTop: '1px solid color-mix(in srgb, #ef4444 20%, transparent)', paddingTop: 16 }}>
+        <div style={{ borderTop: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', paddingTop: 16 }}>
           {showDeleteConfirm ? (
             <div style={{
               background: 'var(--surface-2)', borderRadius: 'var(--r-md)',
@@ -1757,7 +1707,7 @@ export default function GroupDetailPage() {
               </p>
               <GroupDeletePreview groupId={groupId!} />
               {deleteError && (
-                <p role="alert" style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{deleteError}</p>
+                <p role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', margin: 0 }}>{deleteError}</p>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Button variant="danger" size="sm" disabled={deleting} onClick={deleteGroup}>
