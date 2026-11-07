@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom'
 import Icon from '@/components/ui/Icon'
 import WishlistDraft, { type GiftDraft } from '@/components/WishlistDraft'
 import { errorText } from '@/components/QuickAddInput'
-import type { DateSelectArg } from '@fullcalendar/core'
 import api from '@/api/client'
-import type { CalEvent, Group, Member } from '@/types'
+import type { CalEvent, DateSelection, Group, Member } from '@/types'
 import RecurringScopePrompt from '@/components/RecurringScopePrompt'
 import {
   type RecurrenceState, type RepeatFreq, type EndMode,
@@ -19,7 +18,7 @@ const MAX_DATE_OPTIONS = 6
 
 interface Props {
   event: CalEvent | null
-  selectInfo: DateSelectArg | null
+  selectInfo: DateSelection | null
   groups: Group[]
   currentUserId?: string | null
   prefill?: ParsedEvent

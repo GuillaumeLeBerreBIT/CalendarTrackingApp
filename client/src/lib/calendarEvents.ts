@@ -1,20 +1,13 @@
 // Calendar event shapes, in one place.
 //
 // App state holds events in Eventli's convention: `allDay` is explicit and an
-// all-day `end` is INCLUSIVE. FullCalendar wants an EXCLUSIVE all-day end, so
-// toFullCalendarEvents() is applied only to the array handed to <FullCalendar>
-// — never to state, the agenda, the mobile grid, or the edit form.
+// all-day `end` is INCLUSIVE everywhere on the client (our own calendar views).
 import type { CalEvent } from '../types'
-import { addDaysStr, toCalendarAllDayEnd } from './allDayDates'
+import { addDaysStr } from './allDayDates'
 
 /** API → app state. renderEvents sends no allDay; a date-only start means all-day. */
 export function normalizeApiEvent(ev: CalEvent): CalEvent {
   return { ...ev, allDay: !ev.start.includes('T') }
-}
-
-/** App state → FullCalendar input. Returns new objects; input is not modified. */
-export function toFullCalendarEvents(events: CalEvent[]): CalEvent[] {
-  return events.map((ev) => (ev.allDay ? { ...ev, end: toCalendarAllDayEnd(ev.end) } : ev))
 }
 
 /** Every YYYY-MM-DD the event covers, start to inclusive end, at most maxDays. */

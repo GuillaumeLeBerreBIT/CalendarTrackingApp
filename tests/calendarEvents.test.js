@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeApiEvent, toFullCalendarEvents, eventDays, agendaDayKey, eventWindow } from "../client/src/lib/calendarEvents.ts";
+import { normalizeApiEvent, eventDays, agendaDayKey, eventWindow } from "../client/src/lib/calendarEvents.ts";
 
 const ev = (start, end) => ({ id: "1", title: "t", start, end });
 
@@ -9,19 +9,6 @@ describe("normalizeApiEvent", () => {
   });
   it("marks timed events not all-day", () => {
     expect(normalizeApiEvent(ev("2026-10-13T10:00", "2026-10-13T11:00")).allDay).toBe(false);
-  });
-});
-
-describe("toFullCalendarEvents", () => {
-  it("makes all-day ends exclusive without touching app state (agenda/edit regression)", () => {
-    const state = [normalizeApiEvent(ev("2026-12-31", "2026-12-31")), normalizeApiEvent(ev("2026-10-14T10:00", "2026-10-14T11:00"))];
-    const fc = toFullCalendarEvents(state);
-    expect(fc[0].end).toBe("2027-01-01");
-    expect(fc[1].end).toBe("2026-10-14T11:00");
-    expect(state[0].end).toBe("2026-12-31"); // what the agenda and edit form see
-  });
-  it("leap day", () => {
-    expect(toFullCalendarEvents([normalizeApiEvent(ev("2028-02-29", "2028-02-29"))])[0].end).toBe("2028-03-01");
   });
 });
 
