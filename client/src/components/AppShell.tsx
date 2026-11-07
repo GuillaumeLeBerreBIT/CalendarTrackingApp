@@ -25,7 +25,7 @@ function Logo() {
         flexShrink: 0,
       }}>
         <svg width={17} height={17} viewBox="0 0 24 24" fill="none"
-          stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          stroke="var(--accent-text)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="3" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
@@ -33,8 +33,8 @@ function Logo() {
         </svg>
       </div>
       <span style={{
-        fontSize: 18,
-        fontWeight: 800,
+        fontSize: 17,
+        fontWeight: 700,
         letterSpacing: '-0.03em',
         color: 'var(--text-1)',
         lineHeight: 1,
@@ -46,11 +46,17 @@ function Logo() {
 }
 
 // ── Nav items config ──────────────────────────────────────────
+// Desktop sidebar uses `label`; the phone bottom nav uses `short` and adds "Me".
 const NAV_ITEMS = [
-  { to: '/calendar',  label: 'Calendar', icon: 'calendar', exact: false },
-  { to: '/groups',    label: 'Groups',   icon: 'groups',   exact: false },
-  { to: '/todo',      label: 'Tasks',    icon: 'task',     exact: false },
-  { to: '/habits',    label: 'Habits',   icon: 'flame',    exact: false },
+  { to: '/calendar',  label: 'Calendar',         short: 'Calendar', icon: 'calendar', exact: false },
+  { to: '/todo',      label: 'Tasks & shopping', short: 'Tasks',    icon: 'task',     exact: false },
+  { to: '/groups',    label: 'Groups',           short: 'Groups',   icon: 'groups',   exact: false },
+  { to: '/habits',    label: 'Habits',           short: 'Habits',   icon: 'flame',    exact: false },
+] as const
+
+const MOBILE_NAV = [
+  ...NAV_ITEMS,
+  { to: '/profile', label: 'Me', short: 'Me', icon: 'profile', exact: false },
 ] as const
 
 // ── Format time for "Up Next" card ───────────────────────────
@@ -199,9 +205,9 @@ export default function AppShell() {
   // ── Desktop sidebar ─────────────────────────────────────────
   const Sidebar = (
     <aside style={{
-      width: 230,
+      width: 220,
       flexShrink: 0,
-      background: 'var(--surface)',
+      background: 'var(--bg-deep)',
       borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
@@ -228,7 +234,7 @@ export default function AppShell() {
               className={`nav-item${isActive ? ' nav-item--on' : ''}`}
               onClick={() => navigate(to)}
             >
-              <Icon name={icon} size={20} />
+              <Icon name={icon} size={18} />
               {label}
             </button>
           )
@@ -300,15 +306,12 @@ export default function AppShell() {
       justifyContent: 'space-between',
       padding: '14px 16px',
       paddingTop: 'calc(14px + env(safe-area-inset-top, 0px))',
-      background: 'var(--surface)',
+      background: 'var(--bg)',
       borderBottom: '1px solid var(--border)',
       flexShrink: 0,
     }}>
       <Logo />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <IconButton name="bell" badge={unread > 0} title="Notifications" onClick={() => navigate('/notifications')} />
-        <IconButton name="settings" title="Profile & settings" onClick={() => navigate('/profile')} />
-      </div>
+      <IconButton name="bell" badge={unread > 0} title="Notifications" onClick={() => navigate('/notifications')} />
     </header>
   )
 
@@ -322,7 +325,7 @@ export default function AppShell() {
       WebkitBackdropFilter: 'blur(16px)',
       flexShrink: 0,
     }}>
-      {NAV_ITEMS.map(({ to, label, icon, exact }) => {
+      {MOBILE_NAV.map(({ to, short, icon, exact }) => {
         const isActive = exact
           ? location.pathname === to
           : location.pathname.startsWith(to)
@@ -340,9 +343,9 @@ export default function AppShell() {
               minHeight: 44,
               background: 'transparent',
               border: 'none',
-              color: isActive ? 'var(--accent)' : 'var(--text-3)',
-              fontWeight: isActive ? 700 : 500,
-              fontSize: 10.5,
+              color: isActive ? 'var(--text-1)' : 'var(--text-3)',
+              fontWeight: isActive ? 600 : 500,
+              fontSize: 11,
               letterSpacing: '0.01em',
               transition: 'var(--transition)',
               cursor: 'pointer',
@@ -351,9 +354,9 @@ export default function AppShell() {
             <Icon
               name={icon}
               size={22}
-              style={{ color: isActive ? 'var(--accent)' : 'var(--text-3)' }}
+              style={{ color: isActive ? 'var(--text-1)' : 'var(--text-3)' }}
             />
-            {label}
+            {short}
           </button>
         )
       })}
