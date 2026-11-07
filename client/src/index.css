@@ -246,37 +246,6 @@ input, textarea, select {
 /* ── Focus ────────────────────────────────────────────────── */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ── FullCalendar theme overrides ─────────────────────────── */
-.fc {
-  --fc-border-color: var(--border);
-  --fc-today-bg-color: var(--accent-softer);
-  --fc-highlight-color: var(--accent-soft);
-  --fc-button-bg-color: var(--accent);
-  --fc-button-border-color: var(--accent);
-  --fc-button-hover-bg-color: var(--accent-hover);
-  --fc-button-hover-border-color: var(--accent-hover);
-  --fc-button-active-bg-color: var(--accent-press);
-  --fc-button-active-border-color: var(--accent-press);
-  --fc-page-bg-color: transparent;
-  --fc-neutral-bg-color: var(--surface-2);
-  --fc-list-event-hover-bg-color: var(--surface-2);
-}
-.fc .fc-toolbar-title    { font-size: 1.1rem; font-weight: 700; color: var(--text-1); letter-spacing: -0.02em; }
-.fc .fc-button           { border-radius: var(--r-xs); font-size: 13px; font-weight: 600; }
-.fc .fc-col-header-cell  { background: transparent; }
-.fc .fc-col-header-cell-cushion { color: var(--text-3); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-.fc .fc-daygrid-day-number { color: var(--text-2); font-size: 12.5px; font-weight: 600; }
-.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
-  background: var(--accent);
-  color: #fff;
-  border-radius: 50%;
-  width: 24px; height: 24px;
-  display: flex; align-items: center; justify-content: center;
-}
-.fc-theme-standard td, .fc-theme-standard th { border-color: var(--border); }
-.fc-event { cursor: pointer; border-radius: var(--r-xs); }
-.fc .fc-event-title { font-size: 11.5px; font-weight: 600; }
-
 /* ── Cursor helpers ───────────────────────────────────────── */
 [role="button"], [tabindex] { cursor: pointer; }
 
@@ -341,88 +310,10 @@ input, textarea, select {
   .skeleton { animation: none; background: var(--surface-3); }
 }
 
-/* CalendarPage — custom layout (headerToolbar=false) */
-.fc .fc-view-harness { height: 100% !important; }
-.fc-daygrid-event {
-  background-color: var(--fc-event-bg-color, var(--surface-2));
-  border: none !important;
-  border-left: 3px solid var(--fc-event-border-color, var(--border)) !important;
-  border-radius: var(--r-xs) !important;
-  transition: filter 0.15s;
-}
-.fc-daygrid-event:hover { filter: brightness(1.2); }
-.fc-daygrid-event.fc-event-tentative { border-left-style: dashed !important; opacity: 0.65; }
-.fc .fc-daygrid-day-frame { padding: 2px 3px; }
-.fc .fc-daygrid-event-harness { margin-top: 1px; }
-
-/* "+N more" link + its popover (dayMaxEvents) — dark theme overrides,
-   FullCalendar defaults to a white popover */
-.fc .fc-daygrid-more-link {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--accent);
-  padding: 0 3px;
-  border-radius: var(--r-xs);
-}
-.fc .fc-daygrid-more-link:hover { background: var(--accent-soft); }
-.fc-theme-standard .fc-popover {
-  background: var(--surface-2);
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-sm, 10px);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
-}
-.fc-theme-standard .fc-popover-header {
-  background: var(--surface-3);
-  color: var(--text-1);
-  font-size: 12px;
-  font-weight: 600;
-}
-.fc .fc-popover-close { color: var(--text-3); opacity: 1; }
-
 /* ── Mobile page padding reduction ───────────────────────── */
 @media (max-width: 1023px) {
   .page-content {
     padding-left: 16px;
     padding-right: 16px;
   }
-
-  /* Compact month grid: tighter cells, smaller day numbers, slimmer pills */
-  .fc .fc-daygrid-day-frame { padding: 1px 2px; }
-  .fc .fc-daygrid-day-number { font-size: 11px; padding: 2px 4px; }
-  .fc .fc-col-header-cell-cushion { font-size: 9.5px; }
-  .fc-daygrid-event { border-left-width: 2px !important; }
-
-  /* ── Mobile detailed layout: Klender-style readable rows ──
-     Text runs nearly edge-to-edge: no pill side margins, minimal
-     cell padding, fine type that clips at the cell boundary. */
-  .mobile-detailed .fc .fc-daygrid-day-frame {
-    padding: 1px 1px;
-    min-height: 64px;
-  }
-  .mobile-detailed .fc .fc-daygrid-day-number {
-    font-size: 11px;
-    padding: 2px 4px;
-  }
-  .mobile-detailed .fc-daygrid-event {
-    overflow: hidden;
-    max-width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-    border-radius: 4px !important;
-    letter-spacing: -0.01em;
-  }
-  .mobile-detailed .fc .fc-daygrid-event-harness { margin-top: 2px; }
-
-  /* ── Mobile tap-to-create: clean single tap, no native long-press cruft ──
-     Tapping an empty day cell fires dateClick → opens the prefilled form.
-     touch-action: manipulation kills the 300ms double-tap-zoom delay; the
-     callout/user-select resets stop the long-press text magnifier ("weirdly
-     zoomed" view) so a tap reads as a tap, not a text selection. */
-  .mobile-detailed .fc {
-    touch-action: manipulation;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  .mobile-detailed .fc .fc-daygrid-day-frame { cursor: pointer; }
 }

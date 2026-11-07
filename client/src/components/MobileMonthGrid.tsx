@@ -188,6 +188,7 @@ export default function MobileMonthGrid({
             letterSpacing: '0.04em',
             padding: '2px 0',
             textTransform: 'uppercase',
+            background: i >= 5 ? 'var(--weekend)' : 'transparent',
           }}>
             {label}
           </div>
@@ -220,7 +221,7 @@ export default function MobileMonthGrid({
           touchStartY.current = null
         }}
       >
-        {cells.map(({ dateStr, otherMonth }) => {
+        {cells.map(({ dateStr, otherMonth }, i) => {
           const isToday = dateStr === todayStr
           const isSelected = dateStr === selectedDateStr
           const dayEvs = eventsByDate.get(dateStr) ?? []
@@ -241,10 +242,11 @@ export default function MobileMonthGrid({
                 gap: 2,
                 padding: '4px 2px 5px',
                 border: 'none',
-                borderRadius: 'var(--r-sm)',
+                // Weekend columns read as one continuous grey band (owner rule)
+                borderRadius: i % 7 >= 5 && !(isSelected && !isToday) ? 0 : 'var(--r-sm)',
                 background: isSelected && !isToday
                   ? 'var(--accent-soft)'
-                  : 'transparent',
+                  : (i % 7 >= 5 ? 'var(--weekend)' : 'transparent'),
                 cursor: 'pointer',
                 transition: 'background 150ms ease-out',
                 minHeight: 44,
