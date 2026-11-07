@@ -3,8 +3,11 @@ import { fieldStyle } from '@/components/ui/Controls'
 import Sheet from '@/components/ui/Sheet'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
-import Button from '@/components/ui/Button'
-import { Empty } from '@/components/ui/Primitives'
+import Button, { IconButton } from '@/components/ui/Button'
+import { Pill } from '@/components/ui/Primitives'
+import { InsetGroup, InsetRow } from '@/components/ui/Controls'
+import { Link } from 'react-router-dom'
+import { groupColorFor } from '@/pages/GroupsPage'
 import QuickAddInput, { errorText } from '@/components/QuickAddInput'
 
 /** RLS hides writes a member may not make, which surfaces as 404; say why. */
@@ -26,7 +29,7 @@ const plainBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center',
 }
 
-interface GroupOpt { id: string; title: string }
+interface GroupOpt { id: string; title: string; color?: string }
 
 function NewListSheet({ groups, onClose, onCreated }: {
   groups: GroupOpt[]
@@ -80,38 +83,42 @@ function NewListSheet({ groups, onClose, onCreated }: {
   )
 }
 
-function ItemRow({ item, onTick, onRemove }: {
+function ItemRow({ item, onTick, onRemove, compact }: {
   item: ListItem
   onTick: (item: ListItem) => void
   onRemove: (item: ListItem) => void
+  compact?: boolean
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+    <div className="row-hover" style={{ display: 'flex', alignItems: 'center', minHeight: compact ? 38 : 48, padding: compact ? '0 4px' : '0 8px 0 16px' }}>
       <button type="button" onClick={() => onTick(item)}
-        aria-label={item.isDone ? `Restore ${item.title}` : `Tick off ${item.title}`}
-        style={{ ...plainBtn, flex: 1, minWidth: 0, gap: 10, textAlign: 'left', padding: '6px 0', justifyContent: 'flex-start' }}>
+        aria-pressed={item.isDone}
+        aria-label={item.isDone ? `Put ${item.title} back` : `Got ${item.title}`}
+        style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: compact ? 10 : 12, border: 0, background: 'transparent', padding: '8px 0', textAlign: 'left', cursor: 'pointer' }}>
         <span style={{
-          width: 18, height: 18, borderRadius: 5, flex: '0 0 auto', display: 'inline-flex',
-          alignItems: 'center', justifyContent: 'center',
-          border: '1.5px solid var(--border-2)',
+          width: compact ? 18 : 22, height: compact ? 18 : 22, borderRadius: 11, flex: '0 0 auto', boxSizing: 'border-box',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          border: item.isDone ? 'none' : '1.5px solid var(--border-hi)',
           background: item.isDone ? 'var(--accent)' : 'transparent', color: 'var(--accent-text)',
         }}>
-          {item.isDone && <Icon name="check" size={12} />}
+          {item.isDone && <Icon name="check" size={compact ? 10 : 12} sw={3.2} />}
         </span>
         <span style={{
-          fontSize: 14.5, overflowWrap: 'anywhere',
+          fontSize: compact ? 14 : 16, overflowWrap: 'anywhere',
           color: item.isDone ? 'var(--text-3)' : 'var(--text-1)',
           textDecoration: item.isDone ? 'line-through' : 'none',
         }}>{item.title}</span>
       </button>
-      <button type="button" onClick={() => onRemove(item)} aria-label={`Remove ${item.title}`} style={plainBtn}>
-        <Icon name="close" size={16} />
-      </button>
+      {!compact && (
+        <button type="button" onClick={() => onRemove(item)} aria-label={`Remove ${item.title}`} style={{ ...plainBtn, width: 36, height: 36, justifyContent: 'center' }}>
+          <Icon name="close" size={14} />
+        </button>
+      )}
     </div>
   )
 }
 
-function ListCard({ list, patchItems, track, onRenamed, onRemoved }: {
+function ListView({ list, patchItems, track, onRenamed, onRemoved, compact, groupColor }: {
   list: ShoppingList
   /** Functional update of this list's items against the latest state. */
   patchItems: (fn: (items: ListItem[]) => ListItem[]) => void
@@ -119,9 +126,11 @@ function ListCard({ list, patchItems, track, onRenamed, onRemoved }: {
   track: <T>(p: Promise<T>) => Promise<T>
   onRenamed: (title: string) => void
   onRemoved: (listId: string) => void
+  compact?: boolean
+  groupColor: string
 }) {
   const pendingItems = useRef(new Set<string>())
-  const [showDone, setShowDone] = useState(false)
+  const [showDone, setShowDone] = useState(true)
   const [menu, setMenu] = useState(false)
   const [error, setError] = useState('')
   const { open, done } = splitDone(list.items)
@@ -200,66 +209,80 @@ function ListCard({ list, patchItems, track, onRenamed, onRemoved }: {
     }
   }
 
-  return (
-    <div style={{
-      background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
-      padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, position: 'relative' }}>
-        <div style={{ minWidth: 0 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0, overflowWrap: 'anywhere' }}>{list.title}</h3>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '3px 0 0' }}>
-            {list.groupTitle ?? 'Just me'}{list.createdByName ? ` · by ${list.createdByName}` : ''}
-          </p>
-        </div>
-        <button type="button" onClick={() => setMenu((m) => !m)} aria-label="List options" style={plainBtn}>
-          <Icon name="dots" size={20} />
-        </button>
-        {menu && (
-          <div style={{
-            position: 'absolute', right: 0, top: 30, zIndex: 5, background: 'var(--surface-hi)',
-            border: '1px solid var(--border-2)', borderRadius: 'var(--r-sm)', boxShadow: 'var(--shadow-lg)',
-            display: 'flex', flexDirection: 'column', minWidth: 130, padding: 4,
-          }}>
-            <Button variant="ghost" size="sm" icon="edit" onClick={rename} style={{ justifyContent: 'flex-start' }}>Rename</Button>
-            <Button variant="ghost" size="sm" icon="trash" onClick={deleteList} style={{ justifyContent: 'flex-start' }}>Delete</Button>
-          </div>
-        )}
-      </div>
+  const meta = [list.groupTitle ?? 'Just me', list.createdByName ? `by ${list.createdByName}` : null, `${open.length} to get`].filter(Boolean).join(' · ')
 
-      <QuickAddInput kind="shopping" placeholder="Add an item (paste a list to add many)" onAdd={add} />
-
-      {error && <p role="alert" style={errStyle}>{error}</p>}
-
+  if (compact) {
+    return (
       <div>
-        {open.map((i) => <ItemRow key={i.itemId} item={i} onTick={tick} onRemove={remove} />)}
-        {open.length === 0 && done.length === 0 && (
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Nothing on this list yet.</p>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2, gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: 0, color: 'var(--text-1)', overflowWrap: 'anywhere' }}>{list.title}</h2>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: groupColor }} />{list.groupTitle ?? 'Just me'}
+          </span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>Shopping{list.createdByName ? ` · by ${list.createdByName}` : ''}</div>
+        <div style={{ marginBottom: 6 }}><QuickAddInput kind="shopping" small placeholder="Add item, paste a list" onAdd={add} /></div>
+        {error && <p role="alert" style={errStyle}>{error}</p>}
+        {[...open, ...done].map((i) => <ItemRow key={i.itemId} item={i} onTick={tick} onRemove={remove} compact />)}
+        {open.length === 0 && done.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '6px 4px' }}>Nothing on this list yet.</p>}
       </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '4px 8px 8px 16px' }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 className="page-title" style={{ fontSize: 22, overflowWrap: 'anywhere' }}>{list.title}</h1>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--text-3)' }}>{meta}</p>
+        </div>
+        <IconButton name="dots" size={44} isz={20} title="List options" onClick={() => setMenu(true)} />
+      </div>
+
+      <div style={{ padding: '0 16px 8px' }}>
+        <QuickAddInput kind="shopping" placeholder="Add item, paste a whole list" onAdd={add} />
+      </div>
+      {error && <p role="alert" style={{ ...errStyle, margin: '0 16px 8px' }}>{error}</p>}
+
+      {open.map((i) => <ItemRow key={i.itemId} item={i} onTick={tick} onRemove={remove} />)}
+      {open.length === 0 && done.length === 0 && (
+        <p style={{ fontSize: 14, color: 'var(--text-3)', margin: '12px 16px' }}>Nothing on this list yet.</p>
+      )}
 
       {done.length > 0 && (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button type="button" onClick={() => setShowDone((s) => !s)} aria-expanded={showDone}
-              style={{ ...plainBtn, fontSize: 13, fontWeight: 650, color: 'var(--text-2)', gap: 6 }}>
-              <Icon name="chevron-down" size={14} style={{ transform: showDone ? 'none' : 'rotate(-90deg)' }} />
-              Done ({done.length})
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 8px 0 16px', marginTop: 8, borderTop: '1px solid var(--border)' }}>
+            <button type="button" onClick={() => setShowDone((v) => !v)} aria-expanded={showDone}
+              style={{ ...plainBtn, height: 36, padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', gap: 6 }}>
+              <Icon name={showDone ? 'chevD' : 'chevR'} size={14} sw={2.2} />
+              In the basket ({done.length})
             </button>
-            <Button variant="ghost" size="sm" onClick={clearDone}>Clear done</Button>
+            <button type="button" onClick={clearDone} style={{ ...plainBtn, height: 36, padding: '0 8px', fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>Clear</button>
           </div>
           {showDone && done.map((i) => <ItemRow key={i.itemId} item={i} onTick={tick} onRemove={remove} />)}
-        </div>
+        </>
+      )}
+
+      {menu && (
+        <Sheet title={list.title} onClose={() => setMenu(false)}>
+          <div style={{ padding: '12px 16px 24px' }}>
+            <InsetGroup>
+              <InsetRow first label="Rename list" chevron onClick={rename} />
+              <InsetRow label={<span style={{ color: 'var(--danger)' }}>Delete list</span>} onClick={deleteList} />
+            </InsetGroup>
+          </div>
+        </Sheet>
       )}
     </div>
   )
 }
 
-export default function ShoppingLists() {
+export default function ShoppingLists({ compact = false }: { compact?: boolean }) {
   const [lists, setLists] = useState<ShoppingList[] | null>(null)
   const [loadError, setLoadError] = useState('')
   const [groups, setGroups] = useState<GroupOpt[]>([])
   const [sheet, setSheet] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const seq = useRef(0)
   const pending = useRef(0)
@@ -298,43 +321,62 @@ export default function ShoppingLists() {
     api.get('/groups')
       .then(({ data }) => {
         if (!data.success || !Array.isArray(data.userGroups)) return
-        setGroups(data.userGroups.map((g: { groupInfo: { groupId: string | number; title: string } }) => ({
+        setGroups(data.userGroups.map((g: { groupInfo: { groupId: string | number; title: string; sharedColor?: string | null } }) => ({
           id: String(g.groupInfo.groupId), title: g.groupInfo.title,
+          color: groupColorFor({ groups_id: g.groupInfo.groupId, shared_color: g.groupInfo.sharedColor }),
         })))
       })
       .catch(() => { /* "Just me" is still offered */ })
   }, [])
 
+  const colorOf = (l: ShoppingList) => groups.find((g) => g.id === l.groupId)?.color ?? 'var(--text-1)'
+  const current = lists?.find((l) => l.listId === selectedId) ?? lists?.[0] ?? null
+
+  const view = current && (
+    <ListView key={current.listId} list={current} track={track} compact={compact} groupColor={colorOf(current)}
+      patchItems={(fn) => patchList(current.listId, (x) => ({ ...x, items: fn(x.items) }))}
+      onRenamed={(title) => patchList(current.listId, (x) => ({ ...x, title }))}
+      onRemoved={(id) => { setLists((cur) => (cur ?? []).filter((x) => x.listId !== id)); setSelectedId(null) }} />
+  )
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Shopping</h2>
-        <Button variant="primary" icon="plus" size="md" onClick={() => setSheet(true)}>New list</Button>
-      </div>
-
-      {loadError && <p role="alert" style={{ ...errStyle, marginBottom: 12 }}>{loadError}</p>}
+      {loadError && <p role="alert" style={{ ...errStyle, margin: compact ? '0 0 8px' : '0 16px 8px' }}>{loadError}</p>}
 
       {lists === null ? (
-        !loadError && <p style={{ fontSize: 13.5, color: 'var(--text-3)' }}>Loading…</p>
+        !loadError && <p style={{ fontSize: 14, color: 'var(--text-3)', padding: compact ? 0 : '12px 16px' }}>Loading…</p>
       ) : lists.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-          <div style={{ width: '100%' }}><Empty text="No shopping lists yet. Create one to get started." /></div>
-          <Button variant="soft" icon="plus" size="md" onClick={() => setSheet(true)}>New list</Button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: compact ? 'flex-start' : 'center', padding: compact ? 0 : '32px 16px' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-3)' }}>No shopping lists yet.</p>
+          <Button variant="secondary" icon="plus" onClick={() => setSheet(true)}>New shopping list</Button>
         </div>
+      ) : compact ? (
+        <>
+          {lists.length > 1 && (
+            <div className="no-scrollbar" style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12 }}>
+              {lists.map((l) => (
+                <Pill key={l.listId} on={l.listId === current?.listId} dot={colorOf(l)} onClick={() => setSelectedId(l.listId)}>{l.title}</Pill>
+              ))}
+            </div>
+          )}
+          {view}
+          <Link to="/todo?tab=shopping" style={{ display: 'block', marginTop: 10, fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>All shopping lists →</Link>
+        </>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {lists.map((l) => (
-            <ListCard key={l.listId} list={l} track={track}
-              patchItems={(fn) => patchList(l.listId, (x) => ({ ...x, items: fn(x.items) }))}
-              onRenamed={(title) => patchList(l.listId, (x) => ({ ...x, title }))}
-              onRemoved={(id) => setLists((cur) => (cur ?? []).filter((x) => x.listId !== id))} />
-          ))}
-        </div>
+        <>
+          <div className="no-scrollbar" style={{ display: 'flex', gap: 8, padding: '4px 16px 12px', overflowX: 'auto' }}>
+            {lists.map((l) => (
+              <Pill key={l.listId} on={l.listId === current?.listId} dot={colorOf(l)} onClick={() => setSelectedId(l.listId)}>{l.title}</Pill>
+            ))}
+            <Pill icon="plus" title="New list" onClick={() => setSheet(true)}>{''}</Pill>
+          </div>
+          {view}
+        </>
       )}
 
       {sheet && (
         <NewListSheet groups={groups} onClose={() => setSheet(false)}
-          onCreated={(list) => { setLists((cur) => [list, ...(cur ?? [])]); setSheet(false) }} />
+          onCreated={(list) => { setLists((cur) => [list, ...(cur ?? [])]); setSelectedId(list.listId); setSheet(false) }} />
       )}
     </div>
   )

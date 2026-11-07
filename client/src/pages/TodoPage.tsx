@@ -1,13 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { fieldStyle } from '@/components/ui/Controls'
-import { SheetDialog as Modal } from '@/components/ui/Sheet'
+import { SheetDialog as Modal, useIsPhone } from '@/components/ui/Sheet'
 import { useSearchParams } from 'react-router-dom'
 import api from '@/api/client'
 import type { TaskList, Task, Group } from '@/types'
 import Icon from '@/components/ui/Icon'
-import Button from '@/components/ui/Button'
+import Button, { IconButton } from '@/components/ui/Button'
 import { Avatar, AvatarStack } from '@/components/ui/Avatar'
-import { Empty, Segmented } from '@/components/ui/Primitives'
+import { Segmented } from '@/components/ui/Primitives'
 import ShoppingLists from '@/components/ShoppingLists'
 import { groupColorById } from './GroupsPage'
 import EventFormModal from '@/components/EventFormModal'
@@ -28,41 +28,28 @@ const labelStyle: React.CSSProperties = {
 }
 
 
-// Priority badge styles
-const priorityStyle = (priority: string): React.CSSProperties => {
-  // Colour is for groups; only "high" earns the danger tone.
-  if (priority === 'high') return { background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }
-  return { background: 'var(--fill)', color: 'var(--text-2)' }
-}
 
-// ── Custom checkbox ───────────────────────────────────────────────────────────
-function TaskCheckbox({ done, color, onClick }: { done: boolean; color: string; onClick: () => void }) {
-  const [hover, setHover] = useState(false)
+// ── Task checkbox (board: 18px square, ink when done) ─────────────────────────
+function TaskCheckbox({ done, onClick, label }: { done: boolean; onClick: () => void; label: string }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      aria-pressed={done}
+      aria-label={label}
       style={{
-        width: 18,
-        height: 18,
-        borderRadius: 5,
-        border: done
-          ? 'none'
-          : `2px solid ${hover ? color : 'var(--border-hi)'}`,
-        background: done ? color : 'transparent',
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        transition: 'var(--transition)',
+        width: 18, height: 18, borderRadius: 5, flex: '0 0 18px', boxSizing: 'border-box', padding: 0,
+        border: done ? 'none' : '1.5px solid var(--border-hi)',
+        background: done ? 'var(--accent)' : 'transparent', color: 'var(--accent-text)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
       }}
     >
-      {done && <Icon name="check" size={11} sw={2.8} style={{ color: '#fff' }} />}
+      {done && <Icon name="check" size={11} sw={3.2} />}
     </button>
   )
 }
+
+const fmtDue = (d: string) => new Date(d.length === 10 ? `${d}T00:00:00` : d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 
 // ── Assignee multi-select editor ──────────────────────────────────────────────
 function AssigneeEditor({
@@ -179,10 +166,9 @@ function AssigneeEditor({
   )
 }
 
-// ── Task item ─────────────────────────────────────────────────────────────────
-function TaskItem({ task, color, taskListId, onToggle, onAssign, onSchedule }: {
+// ── Task row (board: 40px, check · title · due · assignee) ────────────────────
+function TaskItem({ task, taskListId, onToggle, onAssign, onSchedule }: {
   task: Task
-  color: string
   taskListId: string
   onToggle: () => void
   onAssign: (userIds: string[]) => Promise<void>
@@ -193,277 +179,124 @@ function TaskItem({ task, color, taskListId, onToggle, onAssign, onSchedule }: {
   const assigneeIds = assignees.map((a) => a.userId)
   const assigneeNames: Record<string, string> = {}
   assignees.forEach((a) => { if (a.username) assigneeNames[a.userId] = a.username })
+  const done = task.is_completed
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: 12,
-      padding: '11px 16px',
-      minHeight: 44,
-    }}>
-      <div style={{ paddingTop: 1, flexShrink: 0 }}>
-        <TaskCheckbox done={task.is_completed} color={color} onClick={onToggle} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{
-          fontSize: 13.5,
-          fontWeight: 500,
-          color: task.is_completed ? 'var(--text-3)' : 'var(--text-1)',
-          textDecoration: task.is_completed ? 'line-through' : 'none',
-          margin: 0,
-          lineHeight: 1.4,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {task.task_title}
-        </p>
-        {task.task_description && (
-          <p style={{
-            fontSize: 12,
-            color: 'var(--text-3)',
-            margin: '3px 0 0',
-            lineHeight: 1.45,
-            textDecoration: task.is_completed ? 'line-through' : 'none',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}>
-            {task.task_description}
-          </p>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-          {task.priority && (
-            <span style={{
-              fontSize: 11,
-              fontWeight: 650,
-              padding: '2px 7px',
-              borderRadius: 'var(--r-full)',
-              ...priorityStyle(task.priority),
-            }}>
-              {task.priority}
-            </span>
+    <div>
+      <div className="row-hover" style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 40, padding: '0 8px', borderRadius: 8 }}>
+        <TaskCheckbox done={done} onClick={onToggle} label={done ? `Reopen ${task.task_title}` : `Complete ${task.task_title}`} />
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '9px 0' }}>
+          <span style={{
+            fontSize: 15, color: done ? 'var(--text-3)' : 'var(--text-1)', textDecoration: done ? 'line-through' : 'none',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{task.task_title}</span>
+          {task.task_description && (
+            <span style={{ fontSize: 13, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.task_description}</span>
           )}
-          {task.due_date && (
-            <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
-              Due {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
-          )}
-        </div>
-        {editing && (
-          <AssigneeEditor
-            taskListId={taskListId}
-            current={assignees}
-            onClose={() => setEditing(false)}
-            onSave={onAssign}
-          />
-        )}
-      </div>
-      {/* Schedule on calendar */}
-      <button
-        onClick={onSchedule}
-        title="Schedule on calendar"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 28,
-          height: 28,
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--text-3)',
-          borderRadius: 'var(--r-sm)',
-          flexShrink: 0,
-          transition: 'color 0.15s',
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-3)' }}
-      >
-        <Icon name="cal" size={15} sw={1.8} />
-      </button>
-
-      {/* Assignee avatars + assign trigger */}
-      <button
-        onClick={() => setEditing((v) => !v)}
-        title="Assign members"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '2px 4px',
-          flexShrink: 0,
-        }}
-      >
-        {assigneeIds.length > 0 ? (
-          <AvatarStack ids={assigneeIds} names={assigneeNames} size={22} max={3} ringColor="var(--surface)" />
-        ) : (
-          <span style={{
-            width: 24,
-            height: 24,
-            borderRadius: '50%',
-            border: '1.5px dashed var(--border-hi)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-3)',
-          }}>
-            <Icon name="plus" size={13} sw={2} />
-          </span>
-        )}
-      </button>
-    </div>
-  )
-}
-
-// ── Task list card ────────────────────────────────────────────────────────────
-interface TaskListCardProps {
-  tl: TaskList
-  isExpanded: boolean
-  onToggleExpand: () => void
-  onAddTask: () => void
-  onToggleTask: (id: string, done: boolean) => void
-  onAssign: (taskId: string, userIds: string[]) => Promise<void>
-  onScheduleTask: (task: Task, groupsId: string) => void
-}
-
-function TaskListCard({ tl, isExpanded, onToggleExpand, onAddTask, onToggleTask, onAssign, onScheduleTask }: TaskListCardProps) {
-  const { idTl, idG, title, tag_group, group_title } = tl.taskListInfo
-  const color = groupColorById(idG)
-  const pct = tl.totalTasks > 0 ? Math.round((tl.totalCompletedTasks / tl.totalTasks) * 100) : 0
-
-  return (
-    <div style={{
-      background: 'var(--surface)',
-      borderRadius: 'var(--r-lg)',
-      border: '1px solid var(--border)',
-      overflow: 'hidden',
-      borderLeft: `3px solid ${color}`,
-    }}>
-      {/* Header */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggleExpand}
-        onKeyDown={(e) => e.key === 'Enter' && onToggleExpand()}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '13px 16px',
-          cursor: 'pointer',
-          userSelect: 'none',
-        }}
-      >
-        {/* Left: chevron + title + tag */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <Icon
-            name={isExpanded ? 'chevD' : 'chevR'}
-            size={14}
-            sw={2.2}
-            style={{ color: 'var(--text-3)', flexShrink: 0 }}
-          />
-          <span style={{
-            fontSize: 14.5,
-            fontWeight: 700,
-            color: 'var(--text-1)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>
-            {title}
-          </span>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 650,
-            padding: '2px 8px',
-            borderRadius: 'var(--r-full)',
-            background: 'var(--surface-3)',
-            color: 'var(--text-3)',
-            flexShrink: 0,
-          }}>
-            {group_title ? `${group_title} · ` : ''}#{tag_group}
-          </span>
-        </div>
-
-        {/* Right: progress + add task */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-              {tl.totalCompletedTasks}/{tl.totalTasks} done
-            </span>
-            <div style={{ width: 20, height: 4, borderRadius: 99, background: 'var(--surface-3)', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${pct}%`,
-                background: color,
-                borderRadius: 99,
-                transition: 'width 0.5s ease',
-              }} />
-            </div>
-          </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onAddTask() }}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 12.5,
-              fontWeight: 650,
-              color: 'var(--text-1)',
-              padding: '0 10px',
-              minHeight: 32,
-              borderRadius: 'var(--r-sm)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            + Task
-          </button>
-        </div>
-      </div>
-
-      {/* Tasks */}
-      {isExpanded && (
-        <div style={{ borderTop: '1px solid var(--border)' }}>
-          {tl.taskItems.length === 0 ? (
-            <div style={{ padding: '8px 16px 12px' }}>
-              <Empty text="No tasks yet." />
-            </div>
+        </span>
+        {task.priority === 'high' && !done && <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--danger)' }}>High</span>}
+        {task.due_date && <span style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmtDue(task.due_date)}</span>}
+        <IconButton name="cal" size={32} isz={15} title="Put on the calendar" onClick={onSchedule} />
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          aria-label={assigneeIds.length ? `Assigned to ${assignees.map(a => a.username).join(', ')}. Change` : 'Assign someone'}
+          style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+        >
+          {assigneeIds.length > 0 ? (
+            <AvatarStack ids={assigneeIds} names={assigneeNames} size={24} max={2} ringColor="var(--bg)" />
           ) : (
-            tl.taskItems.map((task: Task, i: number) => (
-              <div
-                key={task.task_id}
-                style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}
-              >
-                <TaskItem
-                  task={task}
-                  color={color}
-                  taskListId={idTl}
-                  onToggle={() => onToggleTask(task.task_id, task.is_completed)}
-                  onAssign={(userIds) => onAssign(task.task_id, userIds)}
-                  onSchedule={() => onScheduleTask(task, idG)}
-                />
-              </div>
-            ))
+            <span style={{ width: 24, height: 24, borderRadius: 12, border: '1.5px dashed var(--border-hi)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
+              <Icon name="plus" size={12} sw={2} />
+            </span>
           )}
+        </button>
+      </div>
+      {editing && (
+        <div style={{ padding: '0 8px 8px 38px' }}>
+          <AssigneeEditor taskListId={taskListId} current={assignees} onClose={() => setEditing(false)} onSave={onAssign} />
         </div>
       )}
     </div>
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
-function TasksTab() {
+// ── Inline "Add a task, press Enter" row ─────────────────────────────────────
+function AddTaskRow({ onAdd, onDetails }: { onAdd: (title: string) => Promise<void>; onDetails: () => void }) {
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function submit() {
+    const t = value.trim()
+    if (!t || busy) return
+    setBusy(true)
+    try { await onAdd(t); setValue('') } finally { setBusy(false) }
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 40, padding: '0 8px', color: 'var(--text-3)' }}>
+      <Icon name="plus" size={18} sw={2} style={{ flex: '0 0 18px' }} />
+      <input
+        data-bare
+        value={value}
+        disabled={busy}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } }}
+        placeholder="Add a task, press Enter"
+        aria-label="Add a task"
+        maxLength={200}
+        style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', fontSize: 15, color: 'var(--text-1)', fontFamily: 'inherit', boxShadow: 'none' }}
+      />
+      <button type="button" onClick={onDetails} style={{ border: 0, background: 'transparent', color: 'var(--text-3)', fontSize: 13, cursor: 'pointer', padding: '0 4px', height: 32 }}>
+        Details
+      </button>
+    </div>
+  )
+}
+
+// ── Task list section (board: plain header line, rows, add row) ──────────────
+function TaskListSection({ tl, onAddTask, onQuickAdd, onToggleTask, onAssign, onScheduleTask }: {
+  tl: TaskList
+  onAddTask: () => void
+  onQuickAdd: (title: string) => Promise<void>
+  onToggleTask: (id: string, done: boolean) => void
+  onAssign: (taskId: string, userIds: string[]) => Promise<void>
+  onScheduleTask: (task: Task, groupsId: string) => void
+}) {
+  const { idTl, idG, title, tag_group, group_title } = tl.taskListInfo
+  const color = groupColorById(idG)
+  return (
+    <section>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 8px', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: 0, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</h2>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: color }} />{group_title || tag_group}
+        </span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{tl.totalCompletedTasks}/{tl.totalTasks}</span>
+      </div>
+      {tl.taskItems.map((task: Task) => (
+        <TaskItem
+          key={task.task_id}
+          task={task}
+          taskListId={idTl}
+          onToggle={() => onToggleTask(task.task_id, task.is_completed)}
+          onAssign={(userIds) => onAssign(task.task_id, userIds)}
+          onSchedule={() => onScheduleTask(task, idG)}
+        />
+      ))}
+      <AddTaskRow onAdd={onQuickAdd} onDetails={onAddTask} />
+    </section>
+  )
+}
+
+// ── Tasks column ──────────────────────────────────────────────────────────────
+function TasksTab({ createListOpen, setCreateListOpen, onCount }: {
+  createListOpen: boolean
+  setCreateListOpen: (open: boolean) => void
+  onCount: (open: number) => void
+}) {
   const [taskLists, setTaskLists] = useState<TaskList[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [createListOpen, setCreateListOpen] = useState(false)
   const [createTaskOpen, setCreateTaskOpen] = useState<string | null>(null)
   const [scheduleTask, setScheduleTask] = useState<{ task: Task; groupsId: string } | null>(null)
   const [listForm, setListForm] = useState({ title: '', description: '', groups_id: '' })
@@ -483,16 +316,14 @@ function TasksTab() {
         })) ?? []
         setTaskLists(lists)
         setGroups(gs)
-        const defaultExpanded: Record<string, boolean> = {}
-        lists.forEach((tl: TaskList) => { defaultExpanded[tl.taskListInfo.idTl] = true })
-        setExpanded(defaultExpanded)
+        onCount(lists.reduce((n, tl) => n + tl.taskItems.filter(t => !t.is_completed).length, 0))
       }
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function toggleTask(taskId: string, isCompleted: boolean) {
     await api.patch('/updateTask', { taskId, isCompleted: !isCompleted })
@@ -502,6 +333,11 @@ function TasksTab() {
   async function assignTask(taskId: string, userIds: string[]) {
     await api.put(`/task/${taskId}/assignees`, { userIds })
     load()
+  }
+
+  async function quickAdd(taskListId: string, title: string) {
+    await api.post('/createTask', { task_title: title, task_description: '', priority: 'medium', due_date: '', task_list_id: taskListId })
+    await load()
   }
 
   async function handleCreateList(e: FormEvent) {
@@ -530,40 +366,25 @@ function TasksTab() {
     }
   }
 
-  function toggleExpand(id: string) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
-  }
-
   return (
-    <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 760, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div>
-          <h1 className="page-title">Tasks</h1>
-          <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '4px 0 0' }}>
-            {taskLists.length} list{taskLists.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <Button variant="primary" icon="plus" size="md" onClick={() => setCreateListOpen(true)}>
-          New list
-        </Button>
-      </div>
-
+    <div>
       {loading ? (
-        <p style={{ fontSize: 13.5, color: 'var(--text-3)', padding: '24px 0' }}>Loading…</p>
+        <p style={{ fontSize: 14, color: 'var(--text-3)', padding: '24px 8px' }}>Loading…</p>
       ) : taskLists.length === 0 ? (
-        <Empty text="No task lists yet. Create one to get started." />
+        <div style={{ padding: '32px 8px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <p style={{ fontSize: 14, color: 'var(--text-3)' }}>No task lists yet.</p>
+          <Button variant="secondary" icon="plus" onClick={() => setCreateListOpen(true)}>New list</Button>
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {taskLists.map((tl) => {
             const { idTl } = tl.taskListInfo
             return (
-              <TaskListCard
+              <TaskListSection
                 key={idTl}
                 tl={tl}
-                isExpanded={!!expanded[idTl]}
-                onToggleExpand={() => toggleExpand(idTl)}
                 onAddTask={() => setCreateTaskOpen(idTl)}
+                onQuickAdd={(title) => quickAdd(idTl, title)}
                 onToggleTask={toggleTask}
                 onAssign={assignTask}
                 onScheduleTask={(task, groupsId) => setScheduleTask({ task, groupsId })}
@@ -692,20 +513,55 @@ function TasksTab() {
 export default function TodoPage() {
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') === 'shopping' ? 'shopping' : 'tasks'
-  return (
-    <>
-      <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px) 0', maxWidth: 760, margin: '0 auto' }}>
-        <Segmented
-          options={[{ value: 'tasks', label: 'Tasks' }, { value: 'shopping', label: 'Shopping' }]}
-          value={tab}
-          onChange={(v) => setParams(v === 'shopping' ? { tab: 'shopping' } : {}, { replace: true })}
-        />
-      </div>
-      {tab === 'shopping' ? (
-        <div style={{ padding: 'clamp(16px, 4vw, 28px) clamp(16px, 3vw, 24px)', maxWidth: 760, margin: '0 auto' }}>
-          <ShoppingLists />
+  const phone = useIsPhone()
+  const [createListOpen, setCreateListOpen] = useState(false)
+  const [openCount, setOpenCount] = useState(0)
+
+  if (phone) {
+    return (
+      <div>
+        <div style={{ padding: '12px 16px 8px' }}>
+          <Segmented
+            full
+            size="md"
+            label="Tasks or shopping"
+            options={[{ value: 'tasks', label: 'Tasks' }, { value: 'shopping', label: 'Shopping' }]}
+            value={tab}
+            onChange={(v) => setParams(v === 'shopping' ? { tab: 'shopping' } : {}, { replace: true })}
+          />
         </div>
-      ) : <TasksTab />}
-    </>
+        {tab === 'shopping' ? <ShoppingLists /> : (
+          <div style={{ padding: '4px 8px 32px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '4px 8px 16px' }}>
+              <div>
+                <h1 className="page-title">Tasks</h1>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--text-3)' }}>{openCount} open</p>
+              </div>
+              <Button variant="primary" size="sm" icon="plus" onClick={() => setCreateListOpen(true)}>New list</Button>
+            </div>
+            <TasksTab createListOpen={createListOpen} setCreateListOpen={setCreateListOpen} onCount={setOpenCount} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '12px 16px 12px 24px', borderBottom: '1px solid var(--border)', minHeight: 36 }}>
+        <h1 className="page-title">Tasks &amp; shopping</h1>
+        <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{openCount} open task{openCount === 1 ? '' : 's'}</span>
+        <div style={{ flex: 1 }} />
+        <Button variant="primary" icon="plus" onClick={() => setCreateListOpen(true)}>New list</Button>
+      </header>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 32, padding: 24 }}>
+        <div style={{ flex: '999 1 420px', minWidth: 0, maxWidth: 680 }}>
+          <TasksTab createListOpen={createListOpen} setCreateListOpen={setCreateListOpen} onCount={setOpenCount} />
+        </div>
+        <aside style={{ flex: '1 1 300px', maxWidth: 360, minWidth: 0, background: 'var(--bg-deep)', borderRadius: 14, padding: 16, boxSizing: 'border-box' }}>
+          <ShoppingLists compact />
+        </aside>
+      </div>
+    </div>
   )
 }
