@@ -98,15 +98,20 @@ client/
         Icon.tsx         — SVG <Icon> component with full IconPaths dict
         Avatar.tsx       — Avatar + AvatarStack (hue-based gradient avatars)
         Button.tsx       — Button + IconButton (primary/secondary/ghost/outline/soft/danger)
-        Primitives.tsx   — Tag, Progress, Segmented, RsvpPill, Section, Empty
-        Controls.tsx     — Switch, Checkbox (square tasks / round shopping), InsetGroup + InsetRow
-        Sheet.tsx        — Sheet (bottom sheet on phone, right inspector on desktop), Disclosure
+        Primitives.tsx   — Tag, Progress, Segmented (sm 28px / md 34px, `full`), Pill, RsvpPill, Section, Empty
+        Controls.tsx     — Switch (44×26), Checkbox (square tasks / round shopping), InsetGroup + InsetRow,
+                           fieldStyle / areaStyle / labelStyle, quickFieldWrap + quickFieldInput ("Add …, press Enter")
+        Sheet.tsx        — Sheet (bottom sheet on phone, right inspector on desktop; `confirmLabel` gives the
+                           board's "Cancel · Title · Add" header, `header` replaces it), Disclosure
                            (folded optional section), SheetDialog (Sheet + padded body for small forms)
-      AppShell.tsx       — Desktop sidebar + mobile bottom nav + PWAInstallBanner
+      AppShell.tsx       — Desktop sidebar ("eventli" wordmark, nav, #sidebar-slot that pages portal into —
+                           the calendar filter lives there) + phone bottom nav (no top bar) + PWAInstallBanner
       ProtectedRoute.tsx — Checks auth via fetchMe(), redirects to /login if needed
-      EventModal.tsx     — Event view in a Sheet (details rows, RSVP, attendees, reactions, wishlist, comments)
-      EventFormModal.tsx — Create/edit event in a Sheet: type, title, group, when up front; Invite,
-                           Location & note, Wishlist, Repeat & reminder folded (Disclosure)
+      EventModal.tsx     — Event view in a Sheet (board PhoneWishlist): "‹ Calendar" row, hero, meta rows,
+                           avatars + Going/Maybe/No segmented, 8px bands before wishlist and comments
+      EventFormModal.tsx — Create/edit event in a Sheet (board PhoneEvent): big title, Date/Time/All day/Calendar
+                           rows; Invite (name pills + "Everyone" = social), Location & note, Wishlist,
+                           Repeat & reminder folded in one group. Calendar "Just me" = personal event
       CountdownPill.tsx  — Live countdown badge (Xd Yh)
       HabitHeatmap.tsx   — 16-week completion grid (flex cells, tap-to-log today)
       WeeklyArc.tsx      — SVG ring showing weekly target progress
@@ -235,6 +240,11 @@ All UI components live in `client/src/components/ui/`. Use these everywhere:
 - `<SheetDialog title onClose>` — Sheet with a padded body (small create/edit forms)
 - `<Disclosure label summary open onToggle>` — folded optional form section
 - `<Switch>`, `<Checkbox shape="square|round">`, `<InsetGroup>` + `<InsetRow>` — settings-style rows
+- `<Pill on dot icon>` — round outline chip (people to invite, list switcher, "I'll get this"); on = ink
+- Text inputs use `fieldStyle` (44px, 10px radius; the ink focus ring comes from index.css). Borderless
+  inputs inside a styled wrapper set `data-bare` so they don't get the ring
+- Screens follow the mockup board one-to-one (calendar, tasks/shopping, new event, event view);
+  pages without a mockup (groups, habits, profile) use the same rows: fill groups, 3px colour bars, dots
 - Page titles use `className="page-title"` (22px phone / 19px desktop); labels are sentence case,
   never uppercase small caps; text on `var(--accent)` is always `var(--accent-text)`
 

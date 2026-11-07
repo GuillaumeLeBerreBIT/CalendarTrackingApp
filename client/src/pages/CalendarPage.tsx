@@ -238,7 +238,9 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
             <span style={{
               width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', flexShrink: 0,
               border: active ? 'none' : `1.5px solid ${color}`, background: active ? color : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              // Ink boxes (personal / groups without a colour) invert with the theme
+              color: color.startsWith('var(') ? 'var(--accent-text)' : '#fff',
             }}>
               {active && <Icon name="check" size={10} sw={3.2} />}
             </span>
