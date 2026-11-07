@@ -16,6 +16,11 @@ interface SheetProps {
   actions?: ReactNode
   /** Desktop inspector width */
   width?: number
+  /** Board form header: "Cancel · Title · <confirmLabel>". Submits `confirmForm` when given. */
+  confirmLabel?: string
+  confirmForm?: string
+  onConfirm?: () => void
+  confirmDisabled?: boolean
 }
 
 export function useIsPhone(): boolean {
@@ -28,7 +33,7 @@ export function useIsPhone(): boolean {
   return phone
 }
 
-export default function Sheet({ title, onClose, children, footer, actions, width = 440 }: SheetProps) {
+export default function Sheet({ title, onClose, children, footer, actions, width = 440, confirmLabel, confirmForm, onConfirm, confirmDisabled }: SheetProps) {
   const phone = useIsPhone()
 
   useEffect(() => {
@@ -78,21 +83,55 @@ export default function Sheet({ title, onClose, children, footer, actions, width
       >
         {phone && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}>
-            <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--border-2)' }} />
+            <div style={{ width: 36, height: 5, borderRadius: 3, background: 'var(--border-2)' }} />
           </div>
         )}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: phone ? '8px 12px 8px 18px' : '14px 14px 14px 20px',
-          borderBottom: '1px solid var(--border)',
-          flexShrink: 0,
-        }}>
-          <h2 style={{ flex: 1, fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>{title}</h2>
-          {actions}
-          <IconButton name="close" size={36} isz={16} title="Close" onClick={onClose} />
-        </header>
+        {confirmLabel ? (
+          <header style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            padding: phone ? '4px 8px 8px' : '10px 10px',
+            borderBottom: phone ? 'none' : '1px solid var(--border)',
+            flexShrink: 0,
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center' }}>
+              <button type="button" onClick={onClose} style={{
+                height: 44, padding: '0 10px', border: 'none', background: 'transparent',
+                fontSize: 15, color: 'var(--text-2)', cursor: 'pointer',
+              }}>Cancel</button>
+            </span>
+            <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)', textAlign: 'center' }}>{title}</h2>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+              {actions}
+              <button
+                type={confirmForm ? 'submit' : 'button'}
+                form={confirmForm}
+                onClick={onConfirm}
+                disabled={confirmDisabled}
+                style={{
+                  height: 32, padding: '0 14px', margin: '0 4px', borderRadius: 8, border: 'none',
+                  background: confirmDisabled ? 'var(--surface-hi)' : 'var(--accent)',
+                  color: confirmDisabled ? 'var(--text-3)' : 'var(--accent-text)',
+                  fontSize: 14, fontWeight: 600, cursor: confirmDisabled ? 'default' : 'pointer',
+                }}
+              >{confirmLabel}</button>
+            </span>
+          </header>
+        ) : (
+          <header style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: phone ? '8px 12px 8px 18px' : '14px 14px 14px 20px',
+            borderBottom: '1px solid var(--border)',
+            flexShrink: 0,
+          }}>
+            <h2 style={{ flex: 1, fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>{title}</h2>
+            {actions}
+            <IconButton name="close" size={36} isz={16} title="Close" onClick={onClose} />
+          </header>
+        )}
         <div className="scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {children}
         </div>
