@@ -20,10 +20,10 @@ export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
       disabled={disabled}
       onClick={() => onChange(!checked)}
       style={{
-        width: 51,
-        height: 31,
+        width: 44,
+        height: 26,
         flexShrink: 0,
-        borderRadius: 16,
+        borderRadius: 13,
         border: 'none',
         padding: 2,
         display: 'flex',
@@ -35,9 +35,9 @@ export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
       }}
     >
       <span style={{
-        width: 27,
-        height: 27,
-        borderRadius: 14,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
         background: checked ? 'var(--accent-text)' : 'var(--surface)',
         boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
       }} />
@@ -97,9 +97,10 @@ export function Checkbox({ checked, onChange, label, shape = 'square' }: Checkbo
 }
 
 /* ── Inset group ────────────────────────────────────────── */
-export function InsetGroup({ children }: { children: ReactNode }) {
+export function InsetGroup({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
+      ...style,
       background: 'var(--fill)',
       borderRadius: 'var(--r-lg)',
       overflow: 'hidden',
@@ -128,7 +129,7 @@ export function InsetRow({ label, value, onClick, chevron, children, first }: In
     padding: '0 14px',
     width: '100%',
     border: 'none',
-    borderTop: first ? 'none' : '1px solid var(--border)',
+    borderTop: first ? 'none' : '1px solid var(--divider)',
     background: 'transparent',
     color: 'var(--text-1)',
     fontSize: 15,
@@ -153,4 +154,35 @@ export function InsetRow({ label, value, onClick, chevron, children, first }: In
       {children}
     </>
   )
+}
+
+/* ── Field: the board's text input (44px, 10px radius, hairline, ink focus ring via CSS) ── */
+export const fieldStyle: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  minHeight: 44,
+  borderRadius: 10,
+  border: '1px solid var(--border-2)',
+  background: 'var(--bg)',
+  padding: '10px 12px',
+  lineHeight: 1.35,
+  fontSize: 16,
+  color: 'var(--text-1)',
+  outline: 'none',
+  fontFamily: 'inherit',
+  minWidth: 0,
+}
+/** Multi-line variant of fieldStyle */
+export const areaStyle: React.CSSProperties = { ...fieldStyle, minHeight: 88, lineHeight: 1.45, resize: 'vertical' }
+/** Label above a field */
+export const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 6 }
+
+/* ── QuickField: borderless add-row on --fill ("Add item, press Enter") ── */
+export const quickFieldWrap: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 10, height: 48, borderRadius: 12,
+  background: 'var(--fill)', padding: '0 14px', boxSizing: 'border-box',
+}
+export const quickFieldInput: React.CSSProperties = {
+  flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent',
+  fontSize: 16, color: 'var(--text-1)', fontFamily: 'inherit', boxShadow: 'none',
 }

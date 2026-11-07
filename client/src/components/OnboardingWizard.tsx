@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import { useNavigate } from 'react-router-dom'
 import api from '@/api/client'
 import { useAuthStore } from '@/store/authStore'
@@ -13,17 +14,7 @@ import Icon from '@/components/ui/Icon'
  */
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
-const inputStyle: CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '10px 13px',
-  fontSize: 14,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const labelStyle: CSSProperties = {
   display: 'block',

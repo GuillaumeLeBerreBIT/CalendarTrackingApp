@@ -1,13 +1,9 @@
 import Button from '@/components/ui/Button'
-import { Switch } from '@/components/ui/Controls'
+import { Switch, fieldStyle } from '@/components/ui/Controls'
 
 export type GiftDraft = { title: string; link: string; note: string }
 
-const field: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '9px 12px', fontSize: 16,
-  borderRadius: 'var(--r-sm)', border: '1px solid var(--border-2)',
-  background: 'var(--bg)', color: 'var(--text-1)', minHeight: 44, fontFamily: 'inherit',
-}
+const field: React.CSSProperties = fieldStyle
 
 export default function WishlistDraft({ enabled, onEnabled, items, onChange, disabled }: {
   enabled: boolean; onEnabled: (value: boolean) => void

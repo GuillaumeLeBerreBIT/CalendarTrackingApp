@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/api/client'
 import Button from '@/components/ui/Button'
@@ -465,16 +466,7 @@ export default function PublicEventPage() {
   )
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 'var(--r-sm)',
-  border: '1px solid var(--border-2)',
-  background: 'var(--surface-2)',
-  color: 'var(--text-1)',
-  fontSize: 13.5,
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const linkBtn: React.CSSProperties = {
   background: 'none',

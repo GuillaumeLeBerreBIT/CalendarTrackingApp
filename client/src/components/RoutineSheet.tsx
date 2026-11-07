@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import Sheet from '@/components/ui/Sheet'
 import api from '@/api/client'
 import Button from '@/components/ui/Button'
@@ -18,11 +19,7 @@ const REMINDERS: { value: number | null; label: string }[] = [
   { value: 1440, label: '1 day before' },
 ]
 
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', borderRadius: 'var(--r-sm)',
-  border: '1px solid var(--border-2)', background: 'var(--surface-2)',
-  color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 const labelStyle: React.CSSProperties = {
   fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)',
   marginBottom: 6, display: 'block',

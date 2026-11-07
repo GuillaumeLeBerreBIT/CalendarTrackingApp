@@ -22,9 +22,9 @@ interface ButtonProps {
 }
 
 const SIZES = {
-  sm: { p: '7px 12px', fs: 12.5, h: 32, gap: 6, isz: 15 },
-  md: { p: '9px 16px', fs: 13.5, h: 40, gap: 7, isz: 17 },
-  lg: { p: '13px 20px', fs: 15,   h: 50, gap: 8, isz: 19 },
+  sm: { p: '0 12px', fs: 13, h: 32, gap: 6, isz: 14 },
+  md: { p: '0 14px', fs: 14, h: 36, gap: 8, isz: 16 },
+  lg: { p: '0 18px', fs: 15, h: 44, gap: 8, isz: 18 },
 }
 
 export default function Button({
@@ -49,7 +49,7 @@ export default function Button({
   const VARIANTS: Record<Variant, { bg: string; c: string; b: string; sh: string }> = {
     // Compact Mono: one ink primary per screen; everything else outline or plain text.
     primary:   { bg: active ? 'var(--accent-press)' : (hover ? 'var(--accent-hover)' : 'var(--accent)'), c: 'var(--accent-text)', b: 'transparent',     sh: 'none' },
-    secondary: { bg: hover ? 'var(--surface-2)' : 'var(--surface)',                                     c: 'var(--text-1)',      b: 'var(--border-2)', sh: 'none' },
+    secondary: { bg: hover ? 'var(--surface-2)' : 'var(--bg)',                                     c: 'var(--text-1)',      b: 'var(--border-2)', sh: 'none' },
     ghost:     { bg: hover ? 'var(--surface-2)' : 'transparent',                                        c: 'var(--text-2)',      b: 'transparent',     sh: 'none' },
     outline:   { bg: hover ? 'var(--surface-2)' : 'transparent',                                        c: 'var(--text-1)',      b: 'var(--border-2)', sh: 'none' },
     soft:      { bg: active ? 'var(--accent)' : (hover ? 'var(--surface-hi)' : 'var(--fill)'),          c: active ? 'var(--accent-text)' : 'var(--text-1)', b: 'transparent', sh: 'none' },
@@ -81,13 +81,14 @@ export default function Button({
         background: v.bg,
         color: v.c,
         fontSize: s.fs,
-        fontWeight: variant === 'ghost' || variant === 'danger' ? 500 : 600,
-        letterSpacing: '-0.01em',
+        fontWeight: variant === 'primary' || variant === 'soft' ? 600 : 500,
         boxShadow: v.sh,
         transform: press ? 'scale(0.98)' : 'none',
         transition: 'var(--transition)',
         whiteSpace: 'nowrap',
-        opacity: disabled ? 0.5 : 1,
+        // Board: disabled primary is a grey slab, not a faded black one
+        ...(disabled && variant === 'primary' ? { background: 'var(--surface-hi)', color: 'var(--text-3)', borderColor: 'transparent' } : {}),
+        opacity: disabled && variant !== 'primary' ? 0.5 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
         ...style,
       }}

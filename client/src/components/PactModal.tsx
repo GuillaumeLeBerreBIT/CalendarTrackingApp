@@ -1,21 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import Sheet from '@/components/ui/Sheet'
 import api from '@/api/client'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
 import type { Pact } from '@/types'
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '9px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const labelStyle: React.CSSProperties = {
   display: 'block',

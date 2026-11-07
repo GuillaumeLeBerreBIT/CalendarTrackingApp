@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/api/client'
@@ -30,17 +31,7 @@ const AVAILABILITY_PILLS: { value: Availability; label: string; title: string; c
   { value: 'no',    label: '✕',  title: "Can't make it",   color: 'var(--text-2)',   bg: 'var(--surface-3)' },
 ]
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '9px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 
 // ── Activity feed ─────────────────────────────────────────────────────────────

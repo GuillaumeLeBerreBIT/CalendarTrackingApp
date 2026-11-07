@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useNavigate } from 'react-router-dom'
 import api from '@/api/client'
@@ -241,17 +242,7 @@ function InviteCard({ inv, onAccept, onDecline }: { inv: Invite; onAccept: () =>
 // ── Modal shell ───────────────────────────────────────────────────────────────
 
 // ── Input / label helper styles ───────────────────────────────────────────────
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '9px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const labelStyle: React.CSSProperties = {
   display: 'block',

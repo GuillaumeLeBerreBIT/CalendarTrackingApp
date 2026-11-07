@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
@@ -6,11 +7,7 @@ import QuickAddInput, { errorText } from '@/components/QuickAddInput'
 import { isSafeLink } from '@/lib/lists'
 import type { Wishlist, WishItem } from '@/types'
 
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 10px', borderRadius: 'var(--r-sm)',
-  border: '1px solid var(--border-2)', background: 'var(--bg)',
-  color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 const errStyle: React.CSSProperties = { fontSize: 13, color: 'var(--danger)', margin: 0 }
 const plainBtn: React.CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4,

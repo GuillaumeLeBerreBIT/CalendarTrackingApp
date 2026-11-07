@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import Icon from './Icon'
 
@@ -69,19 +70,23 @@ interface SegmentedProps {
   options: SegmentedOption[]
   value: string
   onChange: (value: string) => void
+  /** sm = 28px toolbar switch, md = 34px tabs / RSVP (board) */
   size?: 'sm' | 'md'
+  /** Stretch to the container width, segments share it equally */
+  full?: boolean
+  label?: string
 }
 
-export function Segmented({ options, value, onChange, size = 'md' }: SegmentedProps) {
-  const pad = size === 'sm' ? '5px 11px' : '7px 14px'
-  const fs  = size === 'sm' ? 12 : 13
+export function Segmented({ options, value, onChange, size = 'sm', full, label }: SegmentedProps) {
+  const big = size === 'md'
   return (
-    <div style={{
-      display: 'inline-flex',
-      gap: 2,
-      padding: 2,
-      background: 'var(--fill)',
-      borderRadius: 'var(--r-sm)',
+    <div role="group" aria-label={label} style={{
+      display: full ? 'flex' : 'inline-flex',
+      width: full ? '100%' : undefined,
+      padding: big ? 3 : 2,
+      background: 'var(--seg-track)',
+      borderRadius: big ? 10 : 8,
+      boxSizing: 'border-box',
     }}>
       {options.map(o => {
         const active = o.value === value
@@ -92,27 +97,78 @@ export function Segmented({ options, value, onChange, size = 'md' }: SegmentedPr
             aria-pressed={active}
             onClick={() => onChange(o.value)}
             style={{
+              flex: full ? 1 : undefined,
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 6,
-              padding: pad,
-              borderRadius: 'var(--r-xs)',
+              height: big ? 34 : 28,
+              padding: '0 12px',
+              borderRadius: big ? 8 : 6,
               border: 'none',
               background: active ? 'var(--seg-on)' : 'transparent',
               color: active ? 'var(--text-1)' : 'var(--text-2)',
-              fontSize: fs,
+              fontSize: big ? 14 : 13,
               fontWeight: active ? 600 : 500,
-              boxShadow: active ? 'var(--shadow-sm)' : 'none',
+              boxShadow: active ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+              whiteSpace: 'nowrap',
               transition: 'var(--transition)',
               cursor: 'pointer',
             }}
           >
-            {o.icon && <Icon name={o.icon} size={fs + 2} />}
+            {o.icon && <Icon name={o.icon} size={big ? 15 : 14} />}
             {o.label}
           </button>
         )
       })}
     </div>
+  )
+}
+
+/* ── Pill: round outline chip (people, lists, claims). Pressed = ink. ── */
+interface PillProps {
+  children: ReactNode
+  on?: boolean
+  onClick?: () => void
+  /** Group colour dot in front of the label */
+  dot?: string
+  icon?: string
+  title?: string
+  disabled?: boolean
+}
+
+export function Pill({ children, on, onClick, dot, icon, title, disabled }: PillProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        height: 36,
+        padding: '0 12px',
+        borderRadius: 999,
+        border: `1px solid ${on ? 'var(--accent)' : 'var(--pill-line)'}`,
+        background: on ? 'var(--accent)' : 'var(--bg)',
+        color: on ? 'var(--accent-text)' : 'var(--text-1)',
+        fontSize: 14,
+        fontWeight: 500,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'var(--transition)',
+      }}
+    >
+      {dot && <span style={{ width: 8, height: 8, borderRadius: 4, background: dot, flexShrink: 0 }} />}
+      {icon && <Icon name={icon} size={14} sw={2} />}
+      {children}
+    </button>
   )
 }
 

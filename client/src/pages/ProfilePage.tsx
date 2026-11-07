@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import { Switch as UISwitch } from '@/components/ui/Controls'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/api/client'
@@ -51,17 +52,7 @@ const PUSH_ERROR_COPY: Record<string, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '9px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ n, label }: { n: number | string; label: string }) {

@@ -37,6 +37,9 @@
   --fill:        #1c1c21;
   --weekend:     #18181d;
   --seg-on:      #3a3a42;
+  --seg-track:   #1f1f25;
+  --divider:     #26262c;
+  --pill-line:   #3a3a42;
   --border:      #23232a;
   --border-2:    #34343c;
   --border-hi:   #55555e;
@@ -82,6 +85,9 @@
   --fill:        #f4f4f6;
   --weekend:     #f1f1f3;
   --seg-on:      #ffffff;
+  --seg-track:   #f0f0f2;
+  --divider:     #e4e4e8;
+  --pill-line:   #d0d0d6;
   --border:      #ececef;
   --border-2:    #d9d9de;
   --border-hi:   #b4b4bc;
@@ -246,6 +252,14 @@ input, textarea, select {
 
 /* ── Focus ────────────────────────────────────────────────── */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Board field focus: ink border + soft ring (wins over inline field styles) */
+input:not([type=checkbox]):not([type=radio]):not([data-bare]):focus,
+select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--text-1) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 
 /* ── Cursor helpers ───────────────────────────────────────── */
 [role="button"], [tabindex] { cursor: pointer; }
