@@ -21,6 +21,8 @@ interface SheetProps {
   confirmForm?: string
   onConfirm?: () => void
   confirmDisabled?: boolean
+  /** Replace the whole header (e.g. the event view's "‹ Calendar" back row) */
+  header?: ReactNode
 }
 
 export function useIsPhone(): boolean {
@@ -33,7 +35,7 @@ export function useIsPhone(): boolean {
   return phone
 }
 
-export default function Sheet({ title, onClose, children, footer, actions, width = 440, confirmLabel, confirmForm, onConfirm, confirmDisabled }: SheetProps) {
+export default function Sheet({ title, onClose, children, footer, actions, width = 440, confirmLabel, confirmForm, onConfirm, confirmDisabled, header }: SheetProps) {
   const phone = useIsPhone()
 
   useEffect(() => {
@@ -86,7 +88,7 @@ export default function Sheet({ title, onClose, children, footer, actions, width
             <div style={{ width: 36, height: 5, borderRadius: 3, background: 'var(--border-2)' }} />
           </div>
         )}
-        {confirmLabel ? (
+        {header ? header : confirmLabel ? (
           <header style={{
             display: 'grid',
             gridTemplateColumns: '1fr auto 1fr',

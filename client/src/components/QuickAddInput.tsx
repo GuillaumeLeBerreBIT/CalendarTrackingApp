@@ -1,4 +1,6 @@
 import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
+import Icon from '@/components/ui/Icon'
+import { quickFieldWrap, quickFieldInput } from '@/components/ui/Controls'
 import { splitPasted, type ListKind } from '@/lib/lists'
 
 export function errorText(err: unknown): string {
@@ -65,21 +67,21 @@ export default function QuickAddInput({ kind, placeholder, onAdd }: {
 
   return (
     <div>
-      <input
-        ref={ref}
-        value={value}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        onChange={(e) => update(e.target.value)}
-        onKeyDown={onKeyDown}
-        onPaste={onPaste}
-        maxLength={200}
-        style={{
-          width: '100%', padding: '9px 12px', borderRadius: 'var(--r-sm)',
-          border: '1px solid var(--border-2)', background: 'var(--surface-2)',
-          color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-        }}
-      />
+      <label style={quickFieldWrap}>
+        <Icon name="plus" size={18} sw={2} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+        <input
+          ref={ref}
+          data-bare
+          value={value}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          onChange={(e) => update(e.target.value)}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          maxLength={200}
+          style={quickFieldInput}
+        />
+      </label>
       {error && <p role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', margin: '6px 0 0' }}>{error}</p>}
     </div>
   )

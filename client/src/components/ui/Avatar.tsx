@@ -27,9 +27,10 @@ export function Avatar({ id, size = 28, ring = false, ringColor, hue, label, nam
   // Resolve hue: explicit prop → stable hash of id → 252
   const resolvedHue = hue ?? (id ? hashHue(id) : 252)
 
+  // Board: soft, barely-tinted discs with ink initials (works in both themes)
   const bg = isYou
     ? 'var(--accent)'
-    : `linear-gradient(140deg, hsl(${resolvedHue} 62% 56%), hsl(${(resolvedHue + 38) % 360} 60% 46%))`
+    : `color-mix(in srgb, hsl(${resolvedHue} 35% 55%) 22%, var(--surface-hi))`
 
   return (
     <div
@@ -40,13 +41,12 @@ export function Avatar({ id, size = 28, ring = false, ringColor, hue, label, nam
         borderRadius: '50%',
         flex: '0 0 auto',
         background: bg,
-        color: '#fff',
+        color: isYou ? 'var(--accent-text)' : 'var(--text-1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: size * 0.36,
-        fontWeight: 700,
-        letterSpacing: '-0.02em',
+        fontWeight: 600,
         boxShadow: ring ? `0 0 0 2px ${ringColor || 'var(--surface)'}` : 'none',
         userSelect: 'none',
       }}

@@ -4,9 +4,9 @@ import Icon from '@/components/ui/Icon'
 import CountdownPill from '@/components/CountdownPill'
 import { IconButton } from '@/components/ui/Button'
 import Sheet from '@/components/ui/Sheet'
-import { Tag } from '@/components/ui/Primitives'
+import { Segmented } from '@/components/ui/Primitives'
 import { InsetGroup, InsetRow } from '@/components/ui/Controls'
-import { Avatar } from '@/components/ui/Avatar'
+import { Avatar, AvatarStack } from '@/components/ui/Avatar'
 import type { CalEvent } from '@/types'
 import api from '@/api/client'
 import RecurringScopePrompt from '@/components/RecurringScopePrompt'
@@ -64,7 +64,6 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
   const calEvent = data
   const isGroupEvent = isCalEvent && !!(calEvent?.extendedProps?.groupsId)
   const participants = calEvent?.extendedProps?.participants ?? []
-  const isMultiPerson = participants.length > 1
   // Color: 1 participant → their avatar hue, 2+ → group color (matches calendar pill logic)
   const groupHex = resolveEventHex(
     participants,
@@ -139,9 +138,6 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
   // Who created this event (group events only). Match the creator's userId against
   // the participant list to get their username; show "You" for the current user.
   const createdById = calEvent?.extendedProps?.createdBy ?? null
-  const creatorName = createdById
-    ? (createdById === currentUserId ? 'You' : (liveParticipants.find(p => p.userId === createdById)?.username ?? null))
-    : null
 
   // Show RSVP for any group event (not just when user appears in participant list)
   const showRsvp = isGroupEvent
@@ -218,11 +214,6 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
   // independent of whether the user is an invited participant.
   const canManage = data.extendedProps?.canManage === true
 
-  const rsvpOptions: { key: RsvpChoice & string; label: string; icon: string; color: string }[] = [
-    { key: 'going', label: 'Going',    icon: 'check', color: 'var(--g-work)' },
-    { key: 'maybe', label: 'Maybe',    icon: 'star',  color: 'var(--g-family)' },
-    { key: 'no',    label: "Can't go", icon: 'close', color: 'var(--text-3)' },
-  ]
 
   // Display metadata per RSVP status — 'pending' means invited but not yet responded
   const RSVP_META: Record<string, { label: string; color: string }> = {
@@ -235,6 +226,8 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
   const groupsId = calEvent?.extendedProps?.groupsId
   const isTentativeEv = calEvent?.extendedProps?.status === 'tentative'
   const isGoogle = calEvent?.extendedProps?.externalSource === 'google'
+  const [showPeople, setShowPeople] = useState(false)
+  const goingCount = liveParticipants.filter(p => p.rsvpStatus === 'going').length
   const reminderMins = calEvent?.extendedProps?.reminderMinutes
   const reminderText = typeof reminderMins === 'number'
     ? (reminderMins >= 1440 ? `${Math.round(reminderMins / 1440)} day before`
@@ -245,164 +238,116 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
   return (
     <>
       <Sheet
-        title={isMultiPerson ? 'Group event' : isGroupEvent ? 'Appointment' : 'Event'}
+        title={title}
         onClose={onClose}
         width={480}
-        actions={
-          <>
-            {calEvent?.extendedProps?.publicToken && (
-              shareCopied
-                ? <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', padding: '0 6px' }}>Copied!</span>
-                : <IconButton name="share" size={36} isz={16} title="Share link" onClick={handleShare} />
-            )}
-            {canManage && <IconButton name="edit" size={36} isz={16} title="Edit event" onClick={onEdit} />}
-            {canManage && <IconButton name="trash" size={36} isz={16} title={deleting ? 'Deleting…' : 'Delete event'} onClick={deleting ? undefined : handleDelete} />}
-          </>
+        header={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 8px 0 4px', flexShrink: 0 }}>
+            <button type="button" onClick={onClose} style={{
+              display: 'flex', alignItems: 'center', gap: 2, height: 44, padding: '0 8px', border: 0,
+              background: 'transparent', fontSize: 15, color: 'var(--text-1)', cursor: 'pointer',
+            }}>
+              <Icon name="chevL" size={18} sw={2.2} />Calendar
+            </button>
+            <span style={{ display: 'flex', alignItems: 'center' }}>
+              {calEvent?.extendedProps?.publicToken && (
+                shareCopied
+                  ? <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)', padding: '0 8px' }}>Link copied</span>
+                  : <IconButton name="share" size={44} isz={18} title="Share link" onClick={handleShare} />
+              )}
+              {canManage && <IconButton name="edit" size={44} isz={18} title="Edit event" onClick={onEdit} />}
+              {canManage && <IconButton name="trash" size={44} isz={18} title={deleting ? 'Deleting…' : 'Delete event'} onClick={deleting ? undefined : handleDelete} />}
+            </span>
+          </div>
         }
       >
-        <div style={{ padding: '16px 18px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
+        <div style={{ padding: '4px 0 32px' }}>
           {imageUrl && (
-            <img
-              src={imageUrl}
-              alt=""
-              style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 'var(--r-lg)', background: 'var(--fill)' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
+            <div style={{ padding: '0 16px 12px' }}>
+              <img src={imageUrl} alt="" style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 12, background: 'var(--fill)' }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            </div>
           )}
 
-          {/* Title block */}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <span style={{ width: 3, borderRadius: 2, background: groupHex, flexShrink: 0, opacity: isTentativeEv ? 0.5 : 1 }} />
-            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <h2 style={{ fontSize: 23, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.25 }}>{title}</h2>
-              <p style={{ fontSize: 14.5, color: 'var(--text-2)' }}>{dateText}</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                {data.start && new Date(data.start) > new Date() && <CountdownPill targetDate={data.start} size="sm" />}
-                {data.extendedProps?.isRecurring && <Tag><Icon name="repeat" size={11} sw={2} /> Repeats</Tag>}
-                {isTentativeEv && <Tag tone="ghost">Voting open</Tag>}
-                {isGoogle && <Tag tone="ghost">From Google Calendar · read-only</Tag>}
-              </div>
+          <div style={{ padding: '0 16px' }}>
+            <button
+              type="button"
+              disabled={!groupsId}
+              onClick={() => { if (groupsId) { navigate(`/groups/${groupsId}`); onClose() } }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: 'var(--text-2)', border: 0, background: 'transparent', padding: 0, cursor: groupsId ? 'pointer' : 'default' }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: groupHex }} />
+              {data.extendedProps?.groupName || 'Just me'}
+              {isTentativeEv && <span style={{ color: 'var(--text-3)' }}>· voting open</span>}
+              {isGoogle && <span style={{ color: 'var(--text-3)' }}>· Google Calendar, read-only</span>}
+            </button>
+            <h1 style={{ margin: '6px 0 12px', fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.15, color: 'var(--text-1)' }}>{title}</h1>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={metaRow}><Icon name="clock" size={18} sw={1.8} style={metaIcon} />{dateText}</div>
+              {location && <div style={metaRow}><Icon name="pin" size={18} sw={1.8} style={metaIcon} />{location}</div>}
+              {data.extendedProps?.isRecurring && <div style={metaRow}><Icon name="repeat" size={18} sw={1.8} style={metaIcon} />Repeats</div>}
+              {reminderText && <div style={metaRow}><Icon name="bell" size={18} sw={1.8} style={metaIcon} />Reminder {reminderText}</div>}
+              {data.start && new Date(data.start) > new Date() && <div style={{ ...metaRow, minHeight: 24 }}><CountdownPill targetDate={data.start} size="sm" /></div>}
             </div>
+            {blurb && <p style={{ margin: '12px 0 0', fontSize: 15, color: 'var(--text-2)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{blurb}</p>}
           </div>
 
-          {/* Details */}
-          <InsetGroup>
-            {data.extendedProps?.groupName && (
-              <InsetRow
-                first
-                label={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 4, background: groupHex }} />
-                  {data.extendedProps.groupName}
-                </span>}
-                chevron={!!groupsId}
-                onClick={groupsId ? () => { navigate(`/groups/${groupsId}`); onClose() } : undefined}
-              />
-            )}
-            {location && (
-              <InsetRow
-                first={!data.extendedProps?.groupName}
-                label={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Icon name="pin" size={15} sw={1.8} style={{ color: 'var(--text-3)' }} />{location}</span>}
-              />
-            )}
-            {creatorName && (
-              <InsetRow
-                first={!data.extendedProps?.groupName && !location}
-                label="Created by"
-                value={creatorName}
-              />
-            )}
-            {reminderText && (
-              <InsetRow
-                first={!data.extendedProps?.groupName && !location && !creatorName}
-                label="Reminder"
-                value={reminderText}
-              />
-            )}
-          </InsetGroup>
-
-          {blurb && (
-            <p style={{ fontSize: 14.5, color: 'var(--text-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{blurb}</p>
+          {/* People + RSVP */}
+          {(liveParticipants.length > 0 || showRsvp) && (
+            <div style={{ margin: '16px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => setShowPeople(v => !v)} aria-expanded={showPeople}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>
+                <AvatarStack ids={liveParticipants.map(p => p.userId)} names={Object.fromEntries(liveParticipants.map(p => [p.userId, p.username]))} size={28} max={3} ringColor="var(--bg)" />
+                <span style={{ fontSize: 14, color: 'var(--text-2)' }}>{goingCount} going</span>
+              </button>
+              {showRsvp && (
+                <Segmented
+                  size="md"
+                  label="Are you going?"
+                  options={[{ value: 'going', label: 'Going' }, { value: 'maybe', label: 'Maybe' }, { value: 'no', label: 'No' }]}
+                  value={rsvp ?? ''}
+                  onChange={(v) => handleRsvp(v as 'going' | 'maybe' | 'no')}
+                />
+              )}
+            </div>
           )}
-
-          {/* RSVP */}
-          {showRsvp && (
-            <section>
-              <h3 style={sectionTitle}>Are you going?</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-                {rsvpOptions.map(({ key, label, icon }) => {
-                  const active = rsvp === key
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => handleRsvp(key)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                        minHeight: 44,
-                        borderRadius: 'var(--r-md)',
-                        border: active ? '1px solid var(--accent)' : '1px solid var(--border-2)',
-                        background: active ? 'var(--accent)' : 'transparent',
-                        color: active ? 'var(--accent-text)' : 'var(--text-1)',
-                        fontSize: 14, fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'var(--transition)',
-                      }}
-                    >
-                      <Icon name={icon} size={15} sw={2.2} />
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Attendees */}
-          {liveParticipants.length > 0 && (
-            <section>
-              <h3 style={sectionTitle}>Attendees · {liveParticipants.length}</h3>
+          {showPeople && liveParticipants.length > 0 && (
+            <div style={{ padding: '12px 16px 0' }}>
               <InsetGroup>
                 {[...liveParticipants]
                   .sort((a, b) => (a.userId === createdById ? -1 : b.userId === createdById ? 1 : 0))
                   .map((p, i) => {
                     const meta = RSVP_META[p.rsvpStatus] ?? RSVP_META.pending
-                    const isMe = p.userId === currentUserId
-                    const isCreator = p.userId === createdById
                     return (
                       <InsetRow
                         key={p.userId}
                         first={i === 0}
-                        label={<span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                          <Avatar id={p.userId} size={28} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {p.username}{isMe ? ' (you)' : ''}
-                          </span>
-                          {isCreator && <Tag tone="ghost">Host</Tag>}
+                        label={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar id={p.userId} size={26} name={p.username} />
+                          {p.username}{p.userId === currentUserId ? ' (you)' : ''}
+                          {p.userId === createdById && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>host</span>}
                         </span>}
-                        value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta.color }} />
-                          {meta.label}
-                        </span>}
+                        value={<span style={{ fontSize: 13 }}>{meta.label}</span>}
                       />
                     )
                   })}
               </InsetGroup>
-            </section>
+            </div>
           )}
 
-          {eventId && reactionsLoaded && (
-            <ReactionBar reactions={reactions} onToggle={handleReactionToggle} />
+          {eventId && <div style={band}><WishlistSection eventId={calEvent?.extendedProps?.recurringEventId ?? eventId} /></div>}
+
+          {eventId && (
+            <div style={band}>
+              <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {reactionsLoaded && <ReactionBar reactions={reactions} onToggle={handleReactionToggle} />}
+                <CommentThread eventId={eventId} currentUserId={currentUserId} />
+              </div>
+            </div>
           )}
-
-          {eventId && <WishlistSection eventId={calEvent?.extendedProps?.recurringEventId ?? eventId} />}
-
-          {eventId && <CommentThread eventId={eventId} currentUserId={currentUserId} />}
         </div>
       </Sheet>
 
-      {/* ── Recurring delete scope chooser ── */}
       {deleteScope === 'prompt' && (
         <RecurringScopePrompt
           mode="delete"
@@ -417,6 +362,11 @@ export default function EventModal({ data, onClose, onEdit, onDeleted, currentUs
     </>
   )
 }
+
+const metaRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, fontSize: 15, color: 'var(--text-1)', minHeight: 28 }
+const metaIcon: React.CSSProperties = { flex: '0 0 18px', color: 'var(--text-2)' }
+/** Board: sections below the hero are split by an 8px --fill band */
+const band: React.CSSProperties = { marginTop: 24, borderTop: '8px solid var(--fill)', paddingTop: 16 }
 
 const sectionTitle: React.CSSProperties = {
   fontSize: 13,
