@@ -28,15 +28,15 @@ export default function DayPanel({ dateKey, events, onEventClick, onAdd, colorOf
 
   return (
     <aside className="scroll" style={{
-      width: 300,
+      width: 320,
       flexShrink: 0,
       borderLeft: '1px solid var(--border)',
-      background: 'var(--bg-deep)',
+      background: 'var(--bg)',
       display: 'flex',
       flexDirection: 'column',
       overflowY: 'auto',
     }}>
-      <div style={{ padding: '18px 18px 8px' }}>
+      <div style={{ padding: '20px 20px 8px' }}>
         <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-3)' }}>{weekday}</p>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)' }}>{dayMonth}</h2>
       </div>
@@ -52,13 +52,13 @@ export default function DayPanel({ dateKey, events, onEventClick, onAdd, colorOf
               onClick={() => onEventClick(ev)}
               style={{
                 textAlign: 'left',
-                background: 'var(--surface)',
+                background: 'var(--bg)',
                 border: '1px solid var(--border)',
-                borderRadius: 'var(--r-lg)',
-                padding: '11px 13px',
+                borderRadius: 12,
+                padding: '12px 14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 5,
+                gap: 6,
                 color: 'var(--text-1)',
                 opacity: isTentative(ev) ? 0.7 : 1,
                 cursor: 'pointer',
@@ -79,7 +79,7 @@ export default function DayPanel({ dateKey, events, onEventClick, onAdd, colorOf
         {events.length === 0 && (
           <div style={{ padding: '20px 8px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
             <p style={{ fontSize: 14, color: 'var(--text-3)' }}>Nothing planned.</p>
-            <Button variant="outline" size="sm" icon="plus" onClick={onAdd}>Add an event</Button>
+            <Button variant="secondary" onClick={onAdd}>Add an event</Button>
           </div>
         )}
       </div>

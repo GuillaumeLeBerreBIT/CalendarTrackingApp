@@ -2,7 +2,7 @@
 import type { CalEvent } from '@/types'
 import { weekKeys, eventsOnDay } from '@/lib/monthGrid'
 import { addDaysStr } from '@/lib/allDayDates'
-import { IconButton } from '@/components/ui/Button'
+import { useRef } from 'react'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -16,16 +16,27 @@ interface Props {
 
 export default function WeekStrip({ selectedKey, todayKey, events, onSelect, colorOf }: Props) {
   const keys = weekKeys(selectedKey)
+  // Swipe left/right moves a week (board: no arrows on the strip)
+  const startX = useRef<number | null>(null)
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 2,
-      padding: '4px 4px 8px',
-      borderBottom: '1px solid var(--border)',
-      flexShrink: 0,
-    }}>
-      <IconButton name="chevL" size={32} isz={14} title="Previous week" onClick={() => onSelect(addDaysStr(selectedKey, -7))} />
+    <div
+      onTouchStart={(e) => { startX.current = e.touches[0].clientX }}
+      onTouchEnd={(e) => {
+        if (startX.current === null) return
+        const dx = e.changedTouches[0].clientX - startX.current
+        startX.current = null
+        if (Math.abs(dx) > 50) onSelect(addDaysStr(selectedKey, dx < 0 ? 7 : -7))
+      }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        padding: '4px 8px 8px',
+        borderBottom: '1px solid var(--border)',
+        flexShrink: 0,
+        touchAction: 'pan-y',
+      }}
+    >
       {keys.map((key, i) => {
         const selected = key === selectedKey
         const dots = eventsOnDay(events, key).slice(0, 3)
@@ -78,7 +89,6 @@ export default function WeekStrip({ selectedKey, todayKey, events, onSelect, col
           </button>
         )
       })}
-      <IconButton name="chevR" size={32} isz={14} title="Next week" onClick={() => onSelect(addDaysStr(selectedKey, 7))} />
     </div>
   )
 }

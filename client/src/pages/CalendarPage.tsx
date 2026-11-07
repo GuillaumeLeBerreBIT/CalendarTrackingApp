@@ -12,7 +12,11 @@ import { addDaysStr } from '@/lib/allDayDates'
 import { normalizeApiEvent, agendaDayKey, eventWindow } from '@/lib/calendarEvents'
 import { buildMonthGrid, eventsOnDay } from '@/lib/monthGrid'
 import Button, { IconButton } from '@/components/ui/Button'
-import { Segmented, RsvpPill } from '@/components/ui/Primitives'
+import { Segmented } from '@/components/ui/Primitives'
+import { createPortal } from 'react-dom'
+import Sheet from '@/components/ui/Sheet'
+import { InsetGroup, InsetRow } from '@/components/ui/Controls'
+import { useNotificationStore } from '@/store/notificationStore'
 import Icon from '@/components/ui/Icon'
 import { useAuthStore } from '@/store/authStore'
 
@@ -106,10 +110,9 @@ function localDateKey(d: Date): string {
 }
 
 function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
-  // Group by date string (YYYY-MM-DD), today and onwards only — the agenda
-  // is a "what's coming" view; past events live in the month grid.
+  // Today and onwards only: the agenda is a "what's coming" view; past events live in the month grid.
+  const todayKey = localDateKey(new Date())
   const byDay = useMemo(() => {
-    const todayKey = localDateKey(new Date())
     const map = new Map<string, CalEvent[]>()
     for (const ev of events) {
       const day = agendaDayKey(ev, todayKey)
@@ -117,220 +120,67 @@ function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(ev)
     }
-    // Sort days ascending
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
-  }, [events])
+  }, [events, todayKey])
 
   if (byDay.length === 0) {
     return (
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 14,
-        padding: 24,
-      }}>
-        <p style={{ fontSize: 14, color: 'var(--text-3)', textAlign: 'center', margin: 0 }}>
-          No upcoming events. Toggle a calendar group above or create one.
-        </p>
-        {onAddEvent && (
-          <button
-            onClick={onAddEvent}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '10px 18px', borderRadius: 'var(--r-sm)',
-              background: 'var(--accent)', color: 'var(--accent-text)',
-              border: 'none', fontSize: 13.5, fontWeight: 650, cursor: 'pointer',
-              boxShadow: '0 4px 14px var(--accent-glow)',
-            }}
-          >
-            <Icon name="plus" size={15} sw={2.2} />
-            New event
-          </button>
-        )}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-3)', textAlign: 'center' }}>Nothing coming up.</p>
+        {onAddEvent && <Button variant="secondary" icon="plus" onClick={onAddEvent}>Add an event</Button>}
       </div>
     )
   }
 
+  const tomorrowKey = localDateKey(new Date(Date.now() + 86400000))
   return (
-    <div className="scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px 24px 24px' }}>
-      {/* New event shortcut at the top of agenda */}
-      {onAddEvent && (
-        <button
-          onClick={onAddEvent}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            width: '100%', padding: '10px 14px', marginBottom: 16,
-            borderRadius: 'var(--r-md)', cursor: 'pointer',
-            background: 'var(--accent-soft)', border: '1px dashed var(--accent-line)',
-            color: 'var(--accent)', fontSize: 13.5, fontWeight: 650,
-            transition: 'var(--transition)',
-          }}
-        >
-          <Icon name="plus" size={15} sw={2.2} />
-          New event
-        </button>
-      )}
+    <div className="scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 140 }}>
       {byDay.map(([dateStr, dayEvents]) => {
-        const date = new Date(dateStr + 'T00:00:00')
-        const dow = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
-        const day = date.getDate()
-        const isToday = dateStr === localDateKey(new Date())
-
+        const nice = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+        const label = dateStr === todayKey ? `Today · ${nice}` : dateStr === tomorrowKey ? `Tomorrow · ${nice}` : nice
         return (
-          <div key={dateStr} style={{
-            display: 'flex',
-            gap: 16,
-            marginBottom: 18,
-          }}>
-            {/* Day column */}
-            <div style={{
-              width: 52,
-              flexShrink: 0,
-              paddingTop: 11,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 2,
-            }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.05em' }}>{dow}</span>
-              <span style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: isToday ? 'var(--accent)' : 'var(--text-2)',
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                background: isToday ? 'var(--accent-softer)' : 'transparent',
-              }}>{day}</span>
-            </div>
-
-            {/* Events */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {dayEvents.map(ev => {
-                const color = eventHex(ev.extendedProps as Record<string, unknown>)
-                const rawRsvp = ev.extendedProps?.participants?.[0]?.rsvpStatus
-                const rsvp = (['going', 'maybe', 'no'] as const).find(v => v === rawRsvp)
-                const timeStr = ev.allDay
-                  ? 'All day'
-                  : ev.start.includes('T')
-                    ? ev.start.split('T')[1].slice(0, 5)
-                    : ''
-
-                const isTentative = ev.extendedProps?.status === 'tentative'
-                const isLocked = ev.extendedProps?.status === 'locked'
-                const pactCount = ev.extendedProps?.pactCompletionsCount as number | undefined
-                const pactTarget = ev.extendedProps?.pactTargetCompletions as number | undefined
-                return (
-                  <button
-                    key={ev.id}
-                    onClick={() => onEventClick(ev)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: isLocked ? 'var(--surface-2)' : 'var(--surface)',
-                      border: isTentative ? '1px dashed var(--border-2)' : isLocked ? '1px dashed var(--border-2)' : '1px solid var(--border)',
-                      borderRadius: 'var(--r-md)',
-                      padding: '11px 13px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'var(--transition)',
-                      width: '100%',
-                      opacity: isTentative ? 0.75 : isLocked ? 0.7 : 1,
-                    }}
-                    onMouseEnter={e => {
-                      ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'
-                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-2)'
-                    }}
-                    onMouseLeave={e => {
-                      ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'
-                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = isTentative ? 'var(--border-2)' : 'var(--border)'
-                    }}
-                  >
-                    {/* Color bar */}
-                    <div style={{
-                      width: 4,
-                      alignSelf: 'stretch',
-                      borderRadius: 99,
-                      background: color,
-                      flexShrink: 0,
-                    }} />
-
-                    {/* Time */}
-                    <span style={{
-                      fontSize: 12.5,
-                      fontVariantNumeric: 'tabular-nums',
-                      color: 'var(--text-3)',
-                      width: 42,
-                      flexShrink: 0,
-                    }}>{timeStr}</span>
-
-                    {/* Title + group */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                        {isLocked && <span style={{ fontSize: 13, flexShrink: 0 }}>🔒</span>}
-                        <span style={{ fontSize: 14, fontWeight: 600, color: isLocked ? 'var(--text-2)' : 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {ev.title}
-                        </span>
-                        {isTentative && (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 3,
-                            padding: '1px 6px', borderRadius: 'var(--r-full)',
-                            background: 'var(--fill)', color: 'var(--text-1)',
-                            fontSize: 10, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            Voting
-                          </span>
-                        )}
-                        {isLocked && (
-                          <span style={{
-                            padding: '1px 6px', borderRadius: 'var(--r-full)',
-                            background: 'var(--surface-3)', color: 'var(--text-3)',
-                            fontSize: 10, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            Locked
-                          </span>
-                        )}
-                      </div>
-                      {ev.extendedProps?.groupName && (
-                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                          {ev.extendedProps.groupName}
-                        </div>
-                      )}
-                      {isLocked && pactTarget != null && (
-                        <div style={{ marginTop: 6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: 'var(--text-3)', marginBottom: 3 }}>
-                            <span>Pact progress</span>
-                            <span>{pactCount ?? 0}/{pactTarget}</span>
-                          </div>
-                          <div style={{ height: 3, background: 'var(--surface-3)', borderRadius: 99, overflow: 'hidden' }}>
-                            <div style={{
-                              height: '100%',
-                              width: `${pactTarget > 0 ? Math.min(100, ((pactCount ?? 0) / pactTarget) * 100) : 0}%`,
-                              background: color,
-                              borderRadius: 99,
-                              transition: 'width 0.4s ease',
-                            }} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* RSVP pill */}
-                    {rsvp && rsvp !== 'no' && (
-                      <RsvpPill status={rsvp} />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <section key={dateStr}>
+            <h2 style={{ margin: 0, padding: '16px 16px 6px', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', letterSpacing: 0 }}>{label}</h2>
+            {dayEvents.map(ev => {
+              const color = eventHex(ev.extendedProps as Record<string, unknown>)
+              const timeStr = ev.allDay ? 'All day' : ev.start.includes('T') ? ev.start.split('T')[1].slice(0, 5) : ''
+              const isTentative = ev.extendedProps?.status === 'tentative'
+              const isLocked = ev.extendedProps?.status === 'locked'
+              const pactCount = ev.extendedProps?.pactCompletionsCount as number | undefined
+              const pactTarget = ev.extendedProps?.pactTargetCompletions as number | undefined
+              const going = (ev.extendedProps?.participants ?? []).filter(p => p.rsvpStatus === 'going').length
+              const meta = [
+                ev.extendedProps?.groupName || 'Just me',
+                isTentative ? 'Voting open' : null,
+                isLocked ? `Locked · ${pactCount ?? 0}/${pactTarget ?? 0}` : null,
+                !isTentative && !isLocked && going > 1 ? `${going} going` : null,
+              ].filter(Boolean).join(' · ')
+              return (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={() => onEventClick(ev)}
+                  className="row-hover"
+                  style={{
+                    display: 'flex', gap: 12, alignItems: 'stretch', width: '100%', minHeight: 44,
+                    padding: '10px 16px', border: 0, background: 'transparent', textAlign: 'left',
+                    color: 'var(--text-1)', cursor: 'pointer', opacity: isLocked ? 0.7 : 1,
+                  }}
+                >
+                  <span style={{ width: 48, flex: '0 0 48px', fontSize: 13, fontWeight: 500, color: 'var(--text-2)', paddingTop: 1, fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
+                  <span style={{
+                    width: 3, flex: '0 0 3px', borderRadius: 2, boxSizing: 'border-box',
+                    background: isTentative ? 'transparent' : color,
+                    borderLeft: isTentative ? `3px dashed ${color}` : 'none',
+                  }} />
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{meta}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </section>
         )
       })}
     </div>
@@ -359,18 +209,6 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
     return map
   }, [groups, events])
 
-  // Stats for "this month"
-  const monthStats = useMemo(() => {
-    const now = new Date()
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const monthEvents = events.filter(ev => ev.start.startsWith(ym))
-    const going = monthEvents.filter(ev => {
-      const rsvp = ev.extendedProps?.participants?.[0]?.rsvpStatus
-      return rsvp === 'going'
-    })
-    return { total: monthEvents.length, going: going.length }
-  }, [events])
-
   const allEntries = [
     { id: 'self', label: 'Personal', tagName: 'self' },
     ...(counts[GOOGLE_SOURCE_ID] > 0 ? [{ id: GOOGLE_SOURCE_ID, label: 'Google', tagName: GOOGLE_SOURCE_ID }] : []),
@@ -379,79 +217,36 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
 
   return (
     <div>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', paddingBottom: 8 }}>
-        Calendars
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {allEntries.map(entry => {
-          const active = activeGroups.has(entry.id)
-          const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
-          const count = counts[entry.id] ?? 0
-
-          return (
-            <button
-              key={entry.id}
-              onClick={() => onToggle(entry.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                padding: '7px 8px',
-                borderRadius: 'var(--r-sm)',
-                border: active ? '1px solid var(--border)' : '1px solid transparent',
-                background: active ? 'var(--surface-3)' : 'transparent',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-                width: '100%',
-                textAlign: 'left',
-              }}
-            >
-              {/* Checkbox square */}
-              <div style={{
-                width: 16,
-                height: 16,
-                borderRadius: 5,
-                border: `2px solid ${color}`,
-                background: active ? color : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'var(--transition)',
-              }}>
-                {active && <Icon name="check" size={10} sw={3} style={{ color: '#fff' }} />}
-              </div>
-
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: active ? 'var(--text-1)' : 'var(--text-2)' }}>
-                {entry.label}
-              </span>
-
-              {count > 0 && (
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Divider + stats */}
-      <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 8 }}>
-        This month
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Group events</span>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{monthStats.total}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>You're going</span>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--g-work)', fontVariantNumeric: 'tabular-nums' }}>{monthStats.going}</span>
-        </div>
-      </div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', padding: '20px 10px 6px' }}>Calendars</div>
+      {allEntries.map(entry => {
+        const active = activeGroups.has(entry.id)
+        const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
+        const count = counts[entry.id] ?? 0
+        return (
+          <button
+            key={entry.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onToggle(entry.id)}
+            className="menu-item"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, height: 32, padding: '0 10px', width: '100%',
+              border: 0, background: 'transparent', borderRadius: 8, fontSize: 14, textAlign: 'left',
+              color: active ? 'var(--text-1)' : 'var(--text-3)', cursor: 'pointer',
+            }}
+          >
+            <span style={{
+              width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', flexShrink: 0,
+              border: active ? 'none' : `1.5px solid ${color}`, background: active ? color : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            }}>
+              {active && <Icon name="check" size={10} sw={3.2} />}
+            </span>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.label}</span>
+            {count > 0 && <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -482,6 +277,11 @@ export default function CalendarPage() {
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['self', GOOGLE_SOURCE_ID]))
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
   const loadSeq = useRef(0) // only the latest loadEvents() call may write state
+  const [moreOpen, setMoreOpen] = useState(false)
+  const unread = useNotificationStore(st => st.unread)
+  // Desktop: the calendar filter lives in the app sidebar (AppShell renders #sidebar-slot)
+  const [sidebarSlot, setSidebarSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => { setSidebarSlot(document.getElementById('sidebar-slot')) }, [isMobile])
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024)
@@ -699,13 +499,6 @@ export default function CalendarPage() {
     setModalMode('create')
   }, [])
 
-  const filterEntries = [
-    { id: 'self', label: 'Personal', tagName: 'self' },
-    ...(events.some(ev => ev.extendedProps?.externalSource === GOOGLE_SOURCE_ID)
-      ? [{ id: GOOGLE_SOURCE_ID, label: 'Google', tagName: GOOGLE_SOURCE_ID }] : []),
-    ...groups.map(g => ({ id: String(g.groups_id), label: g.groups_title, tagName: g.tag_name })),
-  ]
-
   // Phone agenda: events from the selected day onward (AgendaList drops past days itself).
   const agendaFromSelected = useMemo(
     () => filteredEvents.filter(ev => (ev.end ?? ev.start).split('T')[0] >= selectedKey),
@@ -724,38 +517,20 @@ export default function CalendarPage() {
 
         {/* Header */}
         {isMobile ? (
-          <div style={{
-            padding: '8px 12px 8px 16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            flexShrink: 0,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <h1 style={{ flex: 1, fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
-                {monthLabel}{' '}
-                <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>{yearLabel}</span>
-              </h1>
-              {refreshIndicator}
-              <IconButton name="chevL" size={36} isz={16} onClick={navPrev} title="Previous month" />
-              <IconButton name="chevR" size={36} isz={16} onClick={navNext} title="Next month" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Segmented
-                options={[
-                  { value: 'agenda', label: 'Agenda' },
-                  { value: 'month', label: 'Month' },
-                ]}
-                value={calView}
-                onChange={v => setCalView(v as CalView)}
-                size="sm"
-              />
-              <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
-              <div style={{ flex: 1 }} />
-              <IconButton name="repeat" size={36} onClick={() => navigate('/routines')} title="Routines" />
-              <IconButton name="hourglass" size={36} onClick={() => navigate('/countdowns')} title="Countdowns" />
-            </div>
-          </div>
+          <header style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '12px 8px 4px 16px', flexShrink: 0 }}>
+            <h1 style={{ flex: 1, fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
+              {monthLabel} <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>{yearLabel}</span>
+            </h1>
+            {refreshIndicator}
+            <IconButton
+              name={calView === 'agenda' ? 'grid' : 'list'}
+              size={44} isz={20}
+              title={calView === 'agenda' ? 'Month view' : 'Agenda view'}
+              onClick={() => setCalView(calView === 'agenda' ? 'month' : 'agenda')}
+            />
+            <IconButton name="bell" size={44} isz={20} title="Notifications" badge={unread > 0} onClick={() => navigate('/notifications')} />
+            <IconButton name="dots" size={44} isz={20} title="More" onClick={() => setMoreOpen(true)} />
+          </header>
         ) : (
           <div style={{
             padding: '12px 16px 12px 20px',
@@ -769,9 +544,9 @@ export default function CalendarPage() {
             <h1 style={{ fontSize: 19, fontWeight: 700, color: 'var(--text-1)', margin: '0 6px 0 0', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
               {monthLabel} {yearLabel}
             </h1>
-            <IconButton name="chevL" size={34} isz={15} onClick={navPrev} title="Previous month" />
-            <IconButton name="chevR" size={34} isz={15} onClick={navNext} title="Next month" />
-            <Button variant="outline" size="sm" onClick={navToday}>Today</Button>
+            <IconButton name="chevL" size={36} isz={16} onClick={navPrev} title="Previous month" />
+            <IconButton name="chevR" size={36} isz={16} onClick={navNext} title="Next month" />
+            <Button variant="secondary" size="sm" onClick={navToday}>Today</Button>
             {refreshIndicator}
             <div style={{ flex: 1 }} />
             <Segmented
@@ -783,55 +558,9 @@ export default function CalendarPage() {
               onChange={v => setCalView(v as CalView)}
               size="sm"
             />
-            <Button variant="ghost" size="sm" icon="repeat" onClick={() => navigate('/routines')}>Routines</Button>
-            <Button variant="ghost" size="sm" icon="hourglass" onClick={() => navigate('/countdowns')}>Countdowns</Button>
-            <Button variant="primary" size="sm" icon="plus" onClick={() => openCreate(selectedKey)}>New event</Button>
-          </div>
-        )}
-
-        {/* Mobile: calendar filter chips — colour only in the dot */}
-        {isMobile && (
-          <div className="no-scrollbar" style={{
-            display: 'flex',
-            gap: 6,
-            padding: '0 16px 10px',
-            overflowX: 'auto',
-            flexShrink: 0,
-          }}>
-            {filterEntries.map(entry => {
-              const active = activeGroups.has(entry.id)
-              const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
-              return (
-                <button
-                  key={entry.id}
-                  aria-pressed={active}
-                  onClick={() => toggleGroup(entry.id)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    height: 32,
-                    padding: '0 12px',
-                    borderRadius: 'var(--r-full)',
-                    border: '1px solid var(--border-2)',
-                    background: 'transparent',
-                    color: active ? 'var(--text-1)' : 'var(--text-3)',
-                    fontSize: 13,
-                    fontWeight: 500,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    transition: 'var(--transition)',
-                  }}
-                >
-                  <span style={{
-                    width: 8, height: 8, borderRadius: '50%', boxSizing: 'border-box',
-                    background: active ? color : 'transparent',
-                    border: active ? 'none' : `1.5px solid ${color}`,
-                  }} />
-                  {entry.label}
-                </button>
-              )
-            })}
+            <IconButton name="repeat" size={36} isz={17} title="Routines" onClick={() => navigate('/routines')} />
+            <IconButton name="hourglass" size={36} isz={17} title="Countdowns" onClick={() => navigate('/countdowns')} />
+            <Button variant="primary" icon="plus" onClick={() => openCreate(selectedKey)}>New event</Button>
           </div>
         )}
 
@@ -908,17 +637,30 @@ export default function CalendarPage() {
               onEventClick={handleAgendaEventClick}
               onAdd={() => openCreate(selectedKey)}
               colorOf={colorOf}
-              footer={
-                <GroupFilterPanel
-                  groups={groups}
-                  events={events}
-                  activeGroups={activeGroups}
-                  onToggle={toggleGroup}
-                />
-              }
             />
           </div>
         ))}
+
+        {!isMobile && sidebarSlot && createPortal(
+          <GroupFilterPanel groups={groups} events={events} activeGroups={activeGroups} onToggle={toggleGroup} />,
+          sidebarSlot,
+        )}
+
+        {/* Phone: "more" — today, calendars, routines, countdowns */}
+        {isMobile && moreOpen && (
+          <Sheet title="Calendar" onClose={() => setMoreOpen(false)}>
+            <div style={{ padding: '12px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <InsetGroup>
+                <InsetRow first label="Go to today" chevron onClick={() => { navToday(); setMoreOpen(false) }} />
+                <InsetRow label="Routines" chevron onClick={() => navigate('/routines')} />
+                <InsetRow label="Countdowns" chevron onClick={() => navigate('/countdowns')} />
+              </InsetGroup>
+              <InsetGroup style={{ padding: '0 4px 6px' }}>
+                <GroupFilterPanel groups={groups} events={events} activeGroups={activeGroups} onToggle={toggleGroup} />
+              </InsetGroup>
+            </div>
+          </Sheet>
+        )}
 
         {/* Phone: one primary action, bottom-right above the tab bar */}
         {isMobile && (
@@ -929,7 +671,7 @@ export default function CalendarPage() {
             style={{
               position: 'fixed',
               right: 16,
-              bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
+              bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
               width: 56,
               height: 56,
               borderRadius: 18,
@@ -939,7 +681,7 @@ export default function CalendarPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: 'var(--shadow-md)',
+              boxShadow: '0 6px 16px rgba(17,17,20,0.22)',
               zIndex: 20,
               cursor: 'pointer',
             }}
