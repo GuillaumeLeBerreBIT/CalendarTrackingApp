@@ -165,7 +165,7 @@ export function Pill({ children, on, onClick, dot, icon, title, disabled }: Pill
         transition: 'var(--transition)',
       }}
     >
-      {dot && <span style={{ width: 8, height: 8, borderRadius: 4, background: dot, flexShrink: 0 }} />}
+      {dot && <span style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: on && dot.startsWith('var(') ? 'var(--accent-text)' : dot }} />}
       {icon && <Icon name={icon} size={14} sw={2} />}
       {children}
     </button>
