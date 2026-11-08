@@ -43,7 +43,11 @@ export default function MonthGrid({ cells, selectedKey, onSelectDay, onEventClic
         minHeight: 0,
         display: 'grid',
         gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-        gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+        // Phone "Titles": rows grow to fit their chips (nothing clipped) and the grid scrolls
+        // (each row at least an equal share of the screen, or 88px, whichever is taller)
+        gridTemplateRows: compact ? `repeat(${rows}, minmax(max(88px, calc(100% / ${rows})), auto))` : `repeat(${rows}, minmax(0, 1fr))`,
+        overflowY: compact ? 'auto' : undefined,
+        alignContent: compact ? 'start' : undefined,
       }}>
         {cells.map((c, i) => {
           const selected = c.key === selectedKey
@@ -61,7 +65,7 @@ export default function MonthGrid({ cells, selectedKey, onSelectDay, onEventClic
                 alignItems: compact ? 'stretch' : undefined,
                 gap: compact ? 2 : 2,
                 minWidth: 0,
-                overflow: 'hidden',
+                overflow: compact ? 'visible' : 'hidden',
                 cursor: 'pointer',
               }}
             >
@@ -160,7 +164,7 @@ export default function MonthGrid({ cells, selectedKey, onSelectDay, onEventClic
                     fontSize: compact ? 10.5 : 12, fontWeight: 500, color: 'var(--text-2)', cursor: 'pointer',
                   }}
                 >
-                  {compact ? `+${c.more}` : `+${c.more} more`}
+                  {`+${c.more} more`}
                 </button>
               )}
             </div>

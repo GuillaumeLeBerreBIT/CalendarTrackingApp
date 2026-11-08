@@ -288,7 +288,7 @@ export default function CalendarPage() {
       const stored = localStorage.getItem(MOBILE_LAYOUT_KEY)
       if (stored === 'compact' || stored === 'detailed') return stored
     } catch { /* storage blocked */ }
-    return 'compact'
+    return 'detailed'
   })
   useEffect(() => {
     try { localStorage.setItem(MOBILE_LAYOUT_KEY, mobileLayout) } catch { /* storage blocked */ }
@@ -447,9 +447,9 @@ export default function CalendarPage() {
     () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey),
     [currentDate, filteredEvents, todayKey],
   )
-  // Phone "Titles" month: one more chip fits per day than on desktop
+  // Phone "Titles" month: 3 chips, then "+N more" (rows grow to fit)
   const phoneMonthCells = useMemo(
-    () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey, 4),
+    () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey, 3),
     [currentDate, filteredEvents, todayKey],
   )
   const selectedDayEvents = useMemo(() => eventsOnDay(filteredEvents, selectedKey), [filteredEvents, selectedKey])
@@ -612,7 +612,7 @@ export default function CalendarPage() {
             <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
               <Segmented
                 label="Month layout"
-                options={[{ value: 'compact', label: 'Dots' }, { value: 'detailed', label: 'Titles' }]}
+                options={[{ value: 'detailed', label: 'Titles' }, { value: 'compact', label: 'Dots' }]}
                 value={mobileLayout}
                 onChange={(v) => setMobileLayout(v as MobileLayout)}
               />
