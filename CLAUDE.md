@@ -121,7 +121,8 @@ client/
       PWAInstallBanner.tsx — beforeinstallprompt banner (dismissed via localStorage)
       MobileMonthGrid.tsx — Phone month grid (dot per covered day + day list, weekend shading)
       MonthGrid.tsx      — Desktop month grid (own; replaced FullCalendar): chips, +N more, weekends;
-                           `compact` = phone "Titles" month layout (Dots/Titles switch, eventli.mobileMonthLayout)
+                           `compact` = phone "Titles" month layout (default; Dots/Titles switch, eventli.mobileMonthLayout);
+                           tapping a day or "+N more" opens a day sheet with that day's events (past days too)
       DayPanel.tsx       — Desktop right panel: selected day's events + calendar filter
       WeekStrip.tsx      — Phone Mon–Sun strip above the agenda
       OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)

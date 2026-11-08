@@ -102,6 +102,8 @@ interface AgendaListProps {
   events: CalEvent[]
   onEventClick: (ev: CalEvent) => void
   onAddEvent?: () => void
+  /** First day to list (defaults to today); the phone agenda starts at the selected day */
+  fromKey?: string
 }
 
 // Local-time YYYY-MM-DD (toISOString would shift the date around midnight)
@@ -109,19 +111,60 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
-  // Today and onwards only: the agenda is a "what's coming" view; past events live in the month grid.
+/** One agenda line (board): time · 3px group bar · title + meta */
+function AgendaRow({ ev, onClick }: { ev: CalEvent; onClick: () => void }) {
+  const color = eventHex(ev.extendedProps as Record<string, unknown>)
+  const timeStr = ev.allDay ? 'All day' : ev.start.includes('T') ? ev.start.split('T')[1].slice(0, 5) : ''
+  const isTentative = ev.extendedProps?.status === 'tentative'
+  const isLocked = ev.extendedProps?.status === 'locked'
+  const pactCount = ev.extendedProps?.pactCompletionsCount as number | undefined
+  const pactTarget = ev.extendedProps?.pactTargetCompletions as number | undefined
+  const going = (ev.extendedProps?.participants ?? []).filter(p => p.rsvpStatus === 'going').length
+  const meta = [
+    ev.extendedProps?.groupName || 'Just me',
+    isTentative ? 'Voting open' : null,
+    isLocked ? `Locked · ${pactCount ?? 0}/${pactTarget ?? 0}` : null,
+    !isTentative && !isLocked && going > 1 ? `${going} going` : null,
+  ].filter(Boolean).join(' · ')
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="row-hover"
+      style={{
+        display: 'flex', gap: 12, alignItems: 'stretch', width: '100%', minHeight: 44,
+        padding: '10px 16px', border: 0, background: 'transparent', textAlign: 'left',
+        color: 'var(--text-1)', cursor: 'pointer', opacity: isLocked ? 0.7 : 1,
+      }}
+    >
+      <span style={{ width: 48, flex: '0 0 48px', fontSize: 13, fontWeight: 500, color: 'var(--text-2)', paddingTop: 1, fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
+      <span style={{
+        width: 3, flex: '0 0 3px', borderRadius: 2, boxSizing: 'border-box',
+        background: isTentative ? 'transparent' : color,
+        borderLeft: isTentative ? `3px dashed ${color}` : 'none',
+      }} />
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
+        <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{meta}</span>
+      </span>
+    </button>
+  )
+}
+
+function AgendaList({ events, onEventClick, onAddEvent, fromKey }: AgendaListProps) {
+  // From `fromKey` (default today) onwards: a "what's coming" view starting at the chosen day.
   const todayKey = localDateKey(new Date())
+  const floorKey = fromKey ?? todayKey
   const byDay = useMemo(() => {
     const map = new Map<string, CalEvent[]>()
     for (const ev of events) {
-      const day = agendaDayKey(ev, todayKey)
+      const day = agendaDayKey(ev, floorKey)
       if (!day) continue
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(ev)
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
-  }, [events, todayKey])
+  }, [events, floorKey])
 
   if (byDay.length === 0) {
     return (
@@ -141,45 +184,7 @@ function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
         return (
           <section key={dateStr}>
             <h2 style={{ margin: 0, padding: '16px 16px 6px', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', letterSpacing: 0 }}>{label}</h2>
-            {dayEvents.map(ev => {
-              const color = eventHex(ev.extendedProps as Record<string, unknown>)
-              const timeStr = ev.allDay ? 'All day' : ev.start.includes('T') ? ev.start.split('T')[1].slice(0, 5) : ''
-              const isTentative = ev.extendedProps?.status === 'tentative'
-              const isLocked = ev.extendedProps?.status === 'locked'
-              const pactCount = ev.extendedProps?.pactCompletionsCount as number | undefined
-              const pactTarget = ev.extendedProps?.pactTargetCompletions as number | undefined
-              const going = (ev.extendedProps?.participants ?? []).filter(p => p.rsvpStatus === 'going').length
-              const meta = [
-                ev.extendedProps?.groupName || 'Just me',
-                isTentative ? 'Voting open' : null,
-                isLocked ? `Locked · ${pactCount ?? 0}/${pactTarget ?? 0}` : null,
-                !isTentative && !isLocked && going > 1 ? `${going} going` : null,
-              ].filter(Boolean).join(' · ')
-              return (
-                <button
-                  key={ev.id}
-                  type="button"
-                  onClick={() => onEventClick(ev)}
-                  className="row-hover"
-                  style={{
-                    display: 'flex', gap: 12, alignItems: 'stretch', width: '100%', minHeight: 44,
-                    padding: '10px 16px', border: 0, background: 'transparent', textAlign: 'left',
-                    color: 'var(--text-1)', cursor: 'pointer', opacity: isLocked ? 0.7 : 1,
-                  }}
-                >
-                  <span style={{ width: 48, flex: '0 0 48px', fontSize: 13, fontWeight: 500, color: 'var(--text-2)', paddingTop: 1, fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
-                  <span style={{
-                    width: 3, flex: '0 0 3px', borderRadius: 2, boxSizing: 'border-box',
-                    background: isTentative ? 'transparent' : color,
-                    borderLeft: isTentative ? `3px dashed ${color}` : 'none',
-                  }} />
-                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{meta}</span>
-                  </span>
-                </button>
-              )
-            })}
+            {dayEvents.map(ev => <AgendaRow key={ev.id} ev={ev} onClick={() => onEventClick(ev)} />)}
           </section>
         )
       })}
@@ -283,6 +288,8 @@ export default function CalendarPage() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
   const loadSeq = useRef(0) // only the latest loadEvents() call may write state
   const [moreOpen, setMoreOpen] = useState(false)
+  // Phone month: tapping a day (or "+N more") lists that day's events in a sheet
+  const [daySheetKey, setDaySheetKey] = useState<string | null>(null)
   const [mobileLayout, setMobileLayout] = useState<MobileLayout>(() => {
     try {
       const stored = localStorage.getItem(MOBILE_LAYOUT_KEY)
@@ -632,7 +639,7 @@ export default function CalendarPage() {
                   compact
                   cells={phoneMonthCells}
                   selectedKey={selectedKey}
-                  onSelectDay={(key) => { selectDay(key); setCalView('agenda') }}
+                  onSelectDay={(key) => { selectDay(key); setDaySheetKey(key) }}
                   onEventClick={handleAgendaEventClick}
                   colorOf={colorOf}
                 />
@@ -658,6 +665,7 @@ export default function CalendarPage() {
               />
               <AgendaList
                 events={agendaFromSelected}
+                fromKey={selectedKey}
                 onEventClick={handleAgendaEventClick}
                 onAddEvent={() => openCreate(selectedKey)}
               />
@@ -696,6 +704,25 @@ export default function CalendarPage() {
           <GroupFilterPanel groups={groups} events={events} activeGroups={activeGroups} onToggle={toggleGroup} />,
           sidebarSlot,
         )}
+
+        {/* Phone: one day's events (works for past days too) */}
+        {isMobile && daySheetKey && (() => {
+          const dayEvents = eventsOnDay(filteredEvents, daySheetKey)
+          const title = new Date(`${daySheetKey}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+          return (
+            <Sheet
+              title={title}
+              onClose={() => setDaySheetKey(null)}
+              footer={<Button variant="primary" full icon="plus" onClick={() => { const k = daySheetKey; setDaySheetKey(null); openCreate(k) }}>Add event</Button>}
+            >
+              <div style={{ padding: '6px 0 12px' }}>
+                {dayEvents.length === 0
+                  ? <p style={{ padding: '24px 16px', textAlign: 'center', fontSize: 14, color: 'var(--text-3)' }}>Nothing planned.</p>
+                  : dayEvents.map(ev => <AgendaRow key={ev.id} ev={ev} onClick={() => handleAgendaEventClick(ev)} />)}
+              </div>
+            </Sheet>
+          )
+        })()}
 
         {/* Phone: "more" — today, calendars, routines, countdowns */}
         {isMobile && moreOpen && (
