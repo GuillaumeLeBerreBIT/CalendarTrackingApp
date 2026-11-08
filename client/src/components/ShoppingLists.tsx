@@ -352,13 +352,12 @@ export default function ShoppingLists({ compact = false }: { compact?: boolean }
         </div>
       ) : compact ? (
         <>
-          {lists.length > 1 && (
-            <div className="no-scrollbar" style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12 }}>
-              {lists.map((l) => (
-                <Pill key={l.listId} on={l.listId === current?.listId} dot={colorOf(l)} onClick={() => setSelectedId(l.listId)}>{l.title}</Pill>
-              ))}
-            </div>
-          )}
+          <div className="no-scrollbar" style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12 }}>
+            {lists.length > 1 && lists.map((l) => (
+              <Pill key={l.listId} on={l.listId === current?.listId} dot={colorOf(l)} onClick={() => setSelectedId(l.listId)}>{l.title}</Pill>
+            ))}
+            <Pill icon="plus" title="New shopping list" onClick={() => setSheet(true)}>{lists.length > 1 ? '' : 'New list'}</Pill>
+          </div>
           {view}
           <Link to="/todo?tab=shopping" style={{ display: 'block', marginTop: 10, fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>All shopping lists →</Link>
         </>
@@ -368,7 +367,7 @@ export default function ShoppingLists({ compact = false }: { compact?: boolean }
             {lists.map((l) => (
               <Pill key={l.listId} on={l.listId === current?.listId} dot={colorOf(l)} onClick={() => setSelectedId(l.listId)}>{l.title}</Pill>
             ))}
-            <Pill icon="plus" title="New list" onClick={() => setSheet(true)}>{''}</Pill>
+            <Pill icon="plus" title="New shopping list" onClick={() => setSheet(true)}>{''}</Pill>
           </div>
           {view}
         </>

@@ -537,11 +537,35 @@ export default function TodoPage() {
                 <h1 className="page-title">Tasks</h1>
                 <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--text-3)' }}>{openCount} open</p>
               </div>
-              <Button variant="primary" size="sm" icon="plus" onClick={() => setCreateListOpen(true)}>New list</Button>
+              <Button variant="primary" size="sm" icon="plus" onClick={() => setCreateListOpen(true)}>New task list</Button>
             </div>
             <TasksTab createListOpen={createListOpen} setCreateListOpen={setCreateListOpen} onCount={setOpenCount} />
           </div>
         )}
+      </div>
+    )
+  }
+
+  const switcher = (
+    <Segmented
+      label="Tasks or shopping"
+      options={[{ value: 'tasks', label: 'Tasks' }, { value: 'shopping', label: 'Shopping' }]}
+      value={tab}
+      onChange={(v) => setParams(v === 'shopping' ? { tab: 'shopping' } : {}, { replace: true })}
+    />
+  )
+
+  if (tab === 'shopping') {
+    return (
+      <div>
+        <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '12px 16px 12px 24px', borderBottom: '1px solid var(--border)', minHeight: 36 }}>
+          <h1 className="page-title">Tasks &amp; shopping</h1>
+          <div style={{ flex: 1 }} />
+          {switcher}
+        </header>
+        <div style={{ maxWidth: 680, padding: '16px 8px 40px' }}>
+          <ShoppingLists />
+        </div>
       </div>
     )
   }
@@ -552,7 +576,8 @@ export default function TodoPage() {
         <h1 className="page-title">Tasks &amp; shopping</h1>
         <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{openCount} open task{openCount === 1 ? '' : 's'}</span>
         <div style={{ flex: 1 }} />
-        <Button variant="primary" icon="plus" onClick={() => setCreateListOpen(true)}>New list</Button>
+        {switcher}
+        <Button variant="primary" icon="plus" onClick={() => setCreateListOpen(true)}>New task list</Button>
       </header>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 32, padding: 24 }}>
         <div style={{ flex: '999 1 420px', minWidth: 0, maxWidth: 680 }}>
