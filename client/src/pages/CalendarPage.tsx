@@ -274,8 +274,8 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null)
   const [editEvent, setEditEvent] = useState<CalEvent | null>(null)
   const [selectInfo, setSelectInfo] = useState<DateSelection | null>(null)
-  // Phones open on the week strip + agenda; desktop on the month grid.
-  const [calView, setCalView] = useState<CalView>(() => (window.innerWidth < 1024 ? 'agenda' : 'month'))
+  // Phone and desktop both open on the month (phone: Titles layout by default)
+  const [calView, setCalView] = useState<CalView>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
   const todayKey = localDateKey(new Date())
   const [selectedKey, setSelectedKey] = useState(todayKey)
