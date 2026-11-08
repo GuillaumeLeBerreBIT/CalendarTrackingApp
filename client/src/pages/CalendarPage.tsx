@@ -255,6 +255,9 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
 
 /* ─── CalendarPage ───────────────────────────────────────── */
 type CalView = 'month' | 'agenda'
+/** Phone month layout: dots (compact) or titles in each day (detailed). Same key as before the revamp. */
+type MobileLayout = 'compact' | 'detailed'
+const MOBILE_LAYOUT_KEY = 'eventli.mobileMonthLayout'
 type ModalMode = 'none' | 'create' | 'view' | 'edit'
 
 export default function CalendarPage() {
@@ -280,6 +283,17 @@ export default function CalendarPage() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
   const loadSeq = useRef(0) // only the latest loadEvents() call may write state
   const [moreOpen, setMoreOpen] = useState(false)
+  const [mobileLayout, setMobileLayout] = useState<MobileLayout>(() => {
+    try {
+      const stored = localStorage.getItem(MOBILE_LAYOUT_KEY)
+      if (stored === 'compact' || stored === 'detailed') return stored
+    } catch { /* storage blocked */ }
+    return 'compact'
+  })
+  useEffect(() => {
+    try { localStorage.setItem(MOBILE_LAYOUT_KEY, mobileLayout) } catch { /* storage blocked */ }
+  }, [mobileLayout])
+  const touchX = useRef<number | null>(null)
   const unread = useNotificationStore(st => st.unread)
   // Desktop: the calendar filter lives in the app sidebar (AppShell renders #sidebar-slot)
   const [sidebarSlot, setSidebarSlot] = useState<HTMLElement | null>(null)
@@ -431,6 +445,11 @@ export default function CalendarPage() {
 
   const monthCells = useMemo(
     () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey),
+    [currentDate, filteredEvents, todayKey],
+  )
+  // Phone "Titles" month: one more chip fits per day than on desktop
+  const phoneMonthCells = useMemo(
+    () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey, 4),
     [currentDate, filteredEvents, todayKey],
   )
   const selectedDayEvents = useMemo(() => eventsOnDay(filteredEvents, selectedKey), [filteredEvents, selectedKey])
@@ -589,7 +608,36 @@ export default function CalendarPage() {
 
         {/* Calendar area */}
         {!loading && (isMobile ? (
-          calView === 'month' ? (
+          calView === 'month' ? (<>
+            <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
+              <Segmented
+                label="Month layout"
+                options={[{ value: 'compact', label: 'Dots' }, { value: 'detailed', label: 'Titles' }]}
+                value={mobileLayout}
+                onChange={(v) => setMobileLayout(v as MobileLayout)}
+              />
+            </div>
+            {mobileLayout === 'detailed' ? (
+              <div
+                style={{ flex: 1, minHeight: 0, display: 'flex', touchAction: 'pan-y' }}
+                onTouchStart={(e) => { touchX.current = e.touches[0].clientX }}
+                onTouchEnd={(e) => {
+                  if (touchX.current === null) return
+                  const dx = e.changedTouches[0].clientX - touchX.current
+                  touchX.current = null
+                  if (Math.abs(dx) > 60) { if (dx < 0) navNext(); else navPrev() }
+                }}
+              >
+                <MonthGrid
+                  compact
+                  cells={phoneMonthCells}
+                  selectedKey={selectedKey}
+                  onSelectDay={(key) => { selectDay(key); setCalView('agenda') }}
+                  onEventClick={handleAgendaEventClick}
+                  colorOf={colorOf}
+                />
+              </div>
+            ) : (
             <MobileMonthGrid
               currentDate={currentDate}
               events={filteredEvents}
@@ -598,7 +646,8 @@ export default function CalendarPage() {
               currentUserId={currentUserId}
               eventHex={eventHex}
             />
-          ) : (
+            )}
+          </>) : (
             <>
               <WeekStrip
                 selectedKey={selectedKey}
