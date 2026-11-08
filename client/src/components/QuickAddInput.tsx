@@ -1,4 +1,6 @@
 import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
+import Icon from '@/components/ui/Icon'
+import { quickFieldWrap, quickFieldInput } from '@/components/ui/Controls'
 import { splitPasted, type ListKind } from '@/lib/lists'
 
 export function errorText(err: unknown): string {
@@ -11,10 +13,12 @@ export function errorText(err: unknown): string {
  * The box clears at once; submits are queued and sent one after another, in order. A failed submit
  * puts its text back (in the box if empty, else in front of what was typed since).
  */
-export default function QuickAddInput({ kind, placeholder, onAdd }: {
+export default function QuickAddInput({ kind, placeholder, onAdd, small }: {
   kind: ListKind
   placeholder: string
   onAdd: (titles: string[]) => Promise<void>
+  /** Desktop side-panel variant: 38px, white with a hairline */
+  small?: boolean
 }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
@@ -65,22 +69,22 @@ export default function QuickAddInput({ kind, placeholder, onAdd }: {
 
   return (
     <div>
-      <input
-        ref={ref}
-        value={value}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        onChange={(e) => update(e.target.value)}
-        onKeyDown={onKeyDown}
-        onPaste={onPaste}
-        maxLength={200}
-        style={{
-          width: '100%', padding: '9px 12px', borderRadius: 'var(--r-sm)',
-          border: '1px solid var(--border-2)', background: 'var(--surface-2)',
-          color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-        }}
-      />
-      {error && <p role="alert" style={{ fontSize: 12.5, color: 'var(--danger, #ef4444)', margin: '6px 0 0' }}>{error}</p>}
+      <label style={small ? { ...quickFieldWrap, height: 38, borderRadius: 9, gap: 8, padding: '0 10px', background: 'var(--bg)', border: '1px solid var(--border-2)' } : quickFieldWrap}>
+        <Icon name="plus" size={small ? 15 : 18} sw={2} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+        <input
+          ref={ref}
+          data-bare
+          value={value}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          onChange={(e) => update(e.target.value)}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          maxLength={200}
+          style={small ? { ...quickFieldInput, fontSize: 14 } : quickFieldInput}
+        />
+      </label>
+      {error && <p role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', margin: '6px 0 0' }}>{error}</p>}
     </div>
   )
 }

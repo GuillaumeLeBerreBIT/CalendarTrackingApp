@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
+import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/api/client'
 import CountdownPill from '@/components/CountdownPill'
@@ -29,66 +31,8 @@ const AVAILABILITY_PILLS: { value: Availability; label: string; title: string; c
   { value: 'no',    label: '✕',  title: "Can't make it",   color: 'var(--text-2)',   bg: 'var(--surface-3)' },
 ]
 
-function ImgPh({ opacity = 0.22 }: { opacity?: number }) {
-  return (
-    <svg
-      aria-hidden="true"
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity }}
-      preserveAspectRatio="xMidYMid slice"
-    >
-      <defs>
-        <pattern id="dp-stripes" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-          <rect width="10" height="20" fill="rgba(255,255,255,0.18)" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#dp-stripes)" />
-    </svg>
-  )
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '9px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-      padding: 16,
-    }}>
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-xl)',
-        border: '1px solid var(--border-2)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%',
-        maxWidth: 420,
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <div style={{ padding: 20 }}>{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
 interface GroupHabit {
@@ -601,72 +545,40 @@ export default function GroupDetailPage() {
   // ── Cover + hero ────────────────────────────────────────────────────────────
   const coverSection = (
     <div style={{ position: 'relative' }}>
-      {/* Cover band */}
-      <div style={{
-        height: 190,
-        background: `linear-gradient(120deg, color-mix(in srgb, ${groupColor} 55%, transparent), color-mix(in srgb, ${groupColor} 18%, var(--bg)))`,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <ImgPh />
-        {/* Gradient overlay to bg */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
-          background: 'linear-gradient(to bottom, transparent, var(--bg))',
-        }} />
-        {/* Back button */}
-        <button
-          onClick={() => navigate('/groups')}
-          style={{
-            position: 'absolute', top: 16, left: 16,
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '7px 13px',
-            borderRadius: 'var(--r-full)',
-            background: 'rgba(0,0,0,0.4)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.14)',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          <Icon name="chevL" size={14} sw={2.2} />
-          Groups
-        </button>
+      {/* Back link */}
+      <div style={{ padding: '12px clamp(8px, 3vw, 16px) 0' }}>
+        <Button variant="ghost" size="sm" icon="chevL" onClick={() => navigate('/groups')}>Groups</Button>
       </div>
 
       {/* Hero row */}
       <div style={{
-        padding: `16px clamp(16px, 4vw, 24px) 20px`,
+        padding: `8px clamp(16px, 4vw, 24px) 18px`,
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: 16,
       }}>
         {/* Left: avatar + info */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
-            width: 80,
-            height: 80,
+            width: 52,
+            height: 52,
             borderRadius: 'var(--r-lg)',
             background: groupColor,
-            border: '3px solid var(--bg)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#fff',
-            fontSize: 32,
-            fontWeight: 800,
+            fontSize: 22,
+            fontWeight: 700,
             flexShrink: 0,
-            boxShadow: 'var(--shadow-md)',
           }}>
             {letter}
           </div>
-          <div style={{ paddingBottom: 4 }}>
+          <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.03em' }}>
+              <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
                 {groupName}
               </h1>
               {groupTag && <Tag tone="neutral">#{groupTag}</Tag>}
@@ -694,8 +606,8 @@ export default function GroupDetailPage() {
         </div>
 
         {/* Right: action buttons */}
-        <div style={{ display: 'flex', gap: 8, paddingBottom: 4 }}>
-          <Button variant="ghost" icon="share" size="sm" onClick={handleShareLink} disabled={shareLink}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button variant="outline" icon="share" size="sm" onClick={handleShareLink} disabled={shareLink}>
             {shareCopied ? 'Copied!' : 'Share'}
           </Button>
           <Button variant="primary" icon="plus" size="sm" onClick={() => setShowEventModal(true)}>
@@ -735,9 +647,8 @@ export default function GroupDetailPage() {
   const membersSection = (
     <Section title="Members" count={members.length}>
       <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-lg)',
-        border: '1px solid var(--border)',
+        background: 'var(--fill)',
+        borderRadius: 12,
         overflow: 'hidden',
       }}>
         {members.length === 0 ? (
@@ -752,35 +663,24 @@ export default function GroupDetailPage() {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '13px 16px',
-                  borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                  borderTop: i === 0 ? 'none' : '1px solid var(--divider)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Avatar id={m.user_id} size={36} ring ringColor="var(--surface)" label={m.username} name={m.username} />
+                  <Avatar id={m.user_id} size={32} label={m.username} name={m.username} />
                   <div>
                     <p style={{
-                      fontSize: 14, margin: 0,
-                      fontWeight: isAdmin ? 700 : 500,
+                      fontSize: 15, margin: 0,
+                      fontWeight: 500,
                       color: 'var(--text-1)',
                     }}>
                       {m.username}{isYou && <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 400, marginLeft: 6 }}>you</span>}
-                    </p>
-                    <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>
-                      {isAdmin ? 'Organiser' : 'Member'}
                     </p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {isAdmin && (
-                    <span style={{
-                      fontSize: 11.5, fontWeight: 650, padding: '3px 9px',
-                      borderRadius: 'var(--r-full)',
-                      background: `color-mix(in srgb, ${groupColor} 15%, transparent)`,
-                      color: groupColor,
-                      border: `1px solid color-mix(in srgb, ${groupColor} 30%, transparent)`,
-                    }}>
-                      Organiser
-                    </span>
+                    <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Organiser</span>
                   )}
                   {isCurrentUserAdmin && !isYou && (
                     kickConfirmId === m.user_id ? (
@@ -878,7 +778,7 @@ export default function GroupDetailPage() {
           {/* ── Tentative events (voting open) ── */}
           {tentativeEvents.length > 0 && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#f59e0b', marginBottom: 10 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10 }}>
                 Voting open
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -924,10 +824,10 @@ export default function GroupDetailPage() {
                           width: 46, flexShrink: 0, textAlign: 'center',
                           padding: '5px 0',
                           borderRadius: 'var(--r-sm)',
-                          background: 'rgba(245,158,11,0.10)',
+                          background: 'var(--fill)',
                         }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: '#f59e0b' }}>TBD</div>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b', lineHeight: 1.2 }}>?</div>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-1)' }}>TBD</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.2 }}>?</div>
                         </div>
                         {/* Info */}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -939,10 +839,10 @@ export default function GroupDetailPage() {
                             <span style={{
                               display: 'inline-flex', alignItems: 'center', gap: 4,
                               padding: '2px 8px', borderRadius: 'var(--r-full)',
-                              background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                              background: 'var(--fill)', color: 'var(--text-1)',
                               fontSize: 11, fontWeight: 700, flexShrink: 0,
                             }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-2)', display: 'inline-block' }} />
                               Voting open
                             </span>
                           </div>
@@ -1130,7 +1030,7 @@ export default function GroupDetailPage() {
 
           {allUpcoming.length > 0 && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 10 }}>Upcoming</p>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10 }}>Upcoming</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {upcomingEvents.map(ev => {
                   const dateStr = ev.start.split('T')[0]
@@ -1141,20 +1041,19 @@ export default function GroupDetailPage() {
                       display: 'flex', alignItems: 'center', gap: 13,
                       padding: '12px 14px',
                       borderRadius: 'var(--r-md)',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
+                      background: 'var(--fill)',
                     }}>
                       {/* Date block */}
                       <div style={{
                         width: 46, flexShrink: 0, textAlign: 'center',
                         padding: '5px 0',
                         borderRadius: 'var(--r-sm)',
-                        background: `color-mix(in srgb, ${groupColor} 14%, var(--surface-2))`,
+                        background: 'var(--bg)',
                       }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: groupColor }}>
+                        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)' }}>
                           {date.toLocaleDateString('en-US', { month: 'short' })}
                         </div>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.1 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.1 }}>
                           {date.getDate()}
                         </div>
                       </div>
@@ -1218,7 +1117,7 @@ export default function GroupDetailPage() {
           )}
           {pastEvents.length > 0 && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 10 }}>Past</p>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10 }}>Past</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {pastEvents.map(ev => (
                   <div key={ev.id} style={{
@@ -1258,9 +1157,8 @@ export default function GroupDetailPage() {
             const total = tl.taskItems.length
             return (
               <div key={tl.taskListInfo.idTl} style={{
-                background: 'var(--surface)',
-                borderRadius: 'var(--r-lg)',
-                border: '1px solid var(--border)',
+                background: 'var(--fill)',
+                borderRadius: 12,
                 overflow: 'hidden',
               }}>
                 {/* List header */}
@@ -1303,7 +1201,6 @@ export default function GroupDetailPage() {
                           background: done ? groupColor : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           transition: 'var(--transition)',
-                          boxShadow: done ? `0 2px 8px color-mix(in srgb, ${groupColor} 40%, transparent)` : 'none',
                         }}>
                           {done && <Icon name="check" size={11} sw={2.8} style={{ color: '#fff' }} />}
                         </div>
@@ -1334,9 +1231,8 @@ export default function GroupDetailPage() {
         <Empty text="No activity yet." />
       ) : (
         <div style={{
-          background: 'var(--surface)',
-          borderRadius: 'var(--r-lg)',
-          border: '1px solid var(--border)',
+          background: 'var(--fill)',
+          borderRadius: 12,
           padding: '4px 16px',
         }}>
           {activity.map((item, i) => (
@@ -1354,7 +1250,7 @@ export default function GroupDetailPage() {
     <div style={{ marginBottom: 24 }}>
       {/* Section label */}
       <div style={{ marginBottom: 10 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Group Pact</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Group pact</p>
         <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
           Bet a real calendar event on the group's habit completions — hit the target and it unlocks for everyone.
         </p>
@@ -1373,7 +1269,7 @@ export default function GroupDetailPage() {
           <div style={{ paddingLeft: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Icon name="trophy" size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Group Pact</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Group pact</span>
               <span style={{
                 marginLeft: 'auto', fontSize: 11, fontWeight: 650,
                 color: 'var(--text-3)',
@@ -1411,38 +1307,38 @@ export default function GroupDetailPage() {
         </div>
       ) : activePact && activePact.status === 'failed' ? (
         <div style={{
-          background: 'color-mix(in srgb, #ef4444 6%, var(--surface))',
-          border: '1px solid color-mix(in srgb, #ef4444 18%, transparent)',
+          background: 'color-mix(in srgb, var(--danger) 6%, var(--surface))',
+          border: '1px solid color-mix(in srgb, var(--danger) 18%, transparent)',
           borderRadius: 'var(--r-lg)',
           padding: '13px 16px',
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <Icon name="close" size={15} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <Icon name="close" size={15} style={{ color: 'var(--danger)', flexShrink: 0 }} />
           <div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: '#fb7185', margin: 0 }}>Pact Failed</p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', margin: 0 }}>Pact Failed</p>
             <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>The group didn't hit the target in time.</p>
           </div>
         </div>
       ) : null}
 
       {isCurrentUserAdmin && (!activePact || activePact.status !== 'active') && (
-        <button
+        <button type="button"
           onClick={() => setShowPactModal(true)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginTop: activePact ? 10 : 0,
-            width: '100%',
-            padding: '11px 14px',
-            background: 'var(--accent-soft)',
-            border: '1px dashed color-mix(in srgb, var(--accent) 40%, transparent)',
-            borderRadius: 'var(--r-lg)',
-            color: 'var(--accent)',
-            fontSize: 13.5, fontWeight: 650,
+            display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: activePact ? 10 : 0,
+            height: 36,
+            padding: '0 14px',
+            background: 'var(--bg)',
+            border: '1px solid var(--border-2)',
+            borderRadius: 8,
+            color: 'var(--text-1)',
+            fontSize: 14, fontWeight: 500,
             cursor: 'pointer',
             transition: 'var(--transition)',
           }}
         >
           <Icon name="trophy" size={15} />
-          Start a Group Pact
+          Start a group pact
         </button>
       )}
 
@@ -1721,8 +1617,8 @@ export default function GroupDetailPage() {
   // ── Danger zone + leave ──────────────────────────────────────────────────────
   const dangerZone = (
     <div style={{
-      background: 'color-mix(in srgb, #ef4444 6%, var(--surface))',
-      border: '1px solid color-mix(in srgb, #ef4444 20%, transparent)',
+      background: 'color-mix(in srgb, var(--danger) 6%, var(--surface))',
+      border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)',
       borderRadius: 'var(--r-lg)',
       padding: 16,
       marginTop: 32,
@@ -1730,7 +1626,7 @@ export default function GroupDetailPage() {
       flexDirection: 'column',
       gap: 16,
     }}>
-      <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#fb7185', margin: 0 }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--danger)', margin: 0 }}>
         Danger zone
       </p>
 
@@ -1745,7 +1641,7 @@ export default function GroupDetailPage() {
               Leave this group? You will lose access to all its events and tasks.
             </p>
             {leaveError && (
-              <p style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{leaveError}</p>
+              <p style={{ fontSize: 12.5, color: 'var(--danger)', margin: 0 }}>{leaveError}</p>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Button variant="danger" size="sm" disabled={leaving} onClick={leaveGroup}>
@@ -1776,7 +1672,7 @@ export default function GroupDetailPage() {
 
       {/* Delete group (admin only) */}
       {isCurrentUserAdmin && (
-        <div style={{ borderTop: '1px solid color-mix(in srgb, #ef4444 20%, transparent)', paddingTop: 16 }}>
+        <div style={{ borderTop: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', paddingTop: 16 }}>
           {showDeleteConfirm ? (
             <div style={{
               background: 'var(--surface-2)', borderRadius: 'var(--r-md)',
@@ -1787,7 +1683,7 @@ export default function GroupDetailPage() {
               </p>
               <GroupDeletePreview groupId={groupId!} />
               {deleteError && (
-                <p role="alert" style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{deleteError}</p>
+                <p role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', margin: 0 }}>{deleteError}</p>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Button variant="danger" size="sm" disabled={deleting} onClick={deleteGroup}>

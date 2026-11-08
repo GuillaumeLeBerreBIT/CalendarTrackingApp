@@ -11,7 +11,7 @@ const TYPE_META: Record<string, { icon: string; color: string }> = {
   event_invite:    { icon: 'cal',    color: 'var(--accent)' },
   rsvp_reply:      { icon: 'check',  color: 'var(--g-work)' },
   event_changed:   { icon: 'cal',    color: 'var(--g-family)' },
-  event_cancelled: { icon: 'close',  color: '#fb7185' },
+  event_cancelled: { icon: 'close',  color: 'var(--danger)' },
 }
 
 function relativeTime(iso: string): string {
@@ -42,7 +42,7 @@ export default function NotificationsPage() {
     <div style={{ padding: '28px 24px', maxWidth: 640, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.02em', margin: 0 }}>
+        <h1 className="page-title">
           Notifications
           {unread > 0 && (
             <span style={{

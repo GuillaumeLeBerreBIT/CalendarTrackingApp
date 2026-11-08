@@ -74,7 +74,7 @@ export default function HabitHeatmap({ completionHistory, color, onLogToday, com
                 ? 'transparent'
                 : cell.filled
                   ? color
-                  : 'var(--surface-3)'
+                  : 'var(--bg)'
 
               return (
                 <div

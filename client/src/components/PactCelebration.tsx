@@ -77,7 +77,7 @@ export default function PactCelebration({ pactId, onDone }: PactCelebrationProps
         animation: 'pact-toast-in 0.4s cubic-bezier(.34,1.56,.64,1)',
       }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>🎉</div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', marginBottom: 4 }}>Pact Complete!</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>Pact Complete!</div>
         <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Your reward event is now unlocked.</div>
       </div>
 

@@ -1,27 +1,24 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import FullCalendar from '@fullcalendar/react'
-import dayGridPlugin from '@fullcalendar/daygrid'
-import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin from '@fullcalendar/interaction'
-import listPlugin from '@fullcalendar/list'
-import type { DateSelectArg, EventClickArg, EventDropArg } from '@fullcalendar/core'
-import type { EventResizeDoneArg, DateClickArg } from '@fullcalendar/interaction'
 import api from '@/api/client'
-import type { CalEvent, Group } from '@/types'
+import type { CalEvent, DateSelection, Group } from '@/types'
 import EventModal from '@/components/EventModal'
 import EventFormModal from '@/components/EventFormModal'
 import MobileMonthGrid from '@/components/MobileMonthGrid'
-import { parseNL, type ParsedEvent } from '@/lib/nlParser'
-import { addDaysStr, fromCalendarAllDayEnd } from '@/lib/allDayDates'
-import { normalizeApiEvent, toFullCalendarEvents, agendaDayKey, eventWindow } from '@/lib/calendarEvents'
+import MonthGrid from '@/components/MonthGrid'
+import DayPanel from '@/components/DayPanel'
+import WeekStrip from '@/components/WeekStrip'
+import { addDaysStr } from '@/lib/allDayDates'
+import { normalizeApiEvent, agendaDayKey, eventWindow } from '@/lib/calendarEvents'
+import { buildMonthGrid, eventsOnDay } from '@/lib/monthGrid'
 import Button, { IconButton } from '@/components/ui/Button'
-import { Segmented, RsvpPill } from '@/components/ui/Primitives'
+import { Segmented } from '@/components/ui/Primitives'
+import { createPortal } from 'react-dom'
+import Sheet from '@/components/ui/Sheet'
+import { InsetGroup, InsetRow } from '@/components/ui/Controls'
+import { useNotificationStore } from '@/store/notificationStore'
 import Icon from '@/components/ui/Icon'
 import { useAuthStore } from '@/store/authStore'
-
-const MOBILE_LAYOUT_KEY = 'eventli.mobileMonthLayout'
-type MobileLayout = 'compact' | 'detailed'
 
 /* ─── Group color resolution ─────────────────────────────── */
 const GROUP_COLORS: Record<string, string> = {
@@ -105,6 +102,8 @@ interface AgendaListProps {
   events: CalEvent[]
   onEventClick: (ev: CalEvent) => void
   onAddEvent?: () => void
+  /** First day to list (defaults to today); the phone agenda starts at the selected day */
+  fromKey?: string
 }
 
 // Local-time YYYY-MM-DD (toISOString would shift the date around midnight)
@@ -112,232 +111,81 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function AgendaList({ events, onEventClick, onAddEvent }: AgendaListProps) {
-  // Group by date string (YYYY-MM-DD), today and onwards only — the agenda
-  // is a "what's coming" view; past events live in the month grid.
+/** One agenda line (board): time · 3px group bar · title + meta */
+function AgendaRow({ ev, onClick }: { ev: CalEvent; onClick: () => void }) {
+  const color = eventHex(ev.extendedProps as Record<string, unknown>)
+  const timeStr = ev.allDay ? 'All day' : ev.start.includes('T') ? ev.start.split('T')[1].slice(0, 5) : ''
+  const isTentative = ev.extendedProps?.status === 'tentative'
+  const isLocked = ev.extendedProps?.status === 'locked'
+  const pactCount = ev.extendedProps?.pactCompletionsCount as number | undefined
+  const pactTarget = ev.extendedProps?.pactTargetCompletions as number | undefined
+  const going = (ev.extendedProps?.participants ?? []).filter(p => p.rsvpStatus === 'going').length
+  const meta = [
+    ev.extendedProps?.groupName || 'Just me',
+    isTentative ? 'Voting open' : null,
+    isLocked ? `Locked · ${pactCount ?? 0}/${pactTarget ?? 0}` : null,
+    !isTentative && !isLocked && going > 1 ? `${going} going` : null,
+  ].filter(Boolean).join(' · ')
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="row-hover"
+      style={{
+        display: 'flex', gap: 12, alignItems: 'stretch', width: '100%', minHeight: 44,
+        padding: '10px 16px', border: 0, background: 'transparent', textAlign: 'left',
+        color: 'var(--text-1)', cursor: 'pointer', opacity: isLocked ? 0.7 : 1,
+      }}
+    >
+      <span style={{ width: 48, flex: '0 0 48px', fontSize: 13, fontWeight: 500, color: 'var(--text-2)', paddingTop: 1, fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
+      <span style={{
+        width: 3, flex: '0 0 3px', borderRadius: 2, boxSizing: 'border-box',
+        background: isTentative ? 'transparent' : color,
+        borderLeft: isTentative ? `3px dashed ${color}` : 'none',
+      }} />
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
+        <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{meta}</span>
+      </span>
+    </button>
+  )
+}
+
+function AgendaList({ events, onEventClick, onAddEvent, fromKey }: AgendaListProps) {
+  // From `fromKey` (default today) onwards: a "what's coming" view starting at the chosen day.
+  const todayKey = localDateKey(new Date())
+  const floorKey = fromKey ?? todayKey
   const byDay = useMemo(() => {
-    const todayKey = localDateKey(new Date())
     const map = new Map<string, CalEvent[]>()
     for (const ev of events) {
-      const day = agendaDayKey(ev, todayKey)
+      const day = agendaDayKey(ev, floorKey)
       if (!day) continue
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(ev)
     }
-    // Sort days ascending
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
-  }, [events])
+  }, [events, floorKey])
 
   if (byDay.length === 0) {
     return (
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 14,
-        padding: 24,
-      }}>
-        <p style={{ fontSize: 14, color: 'var(--text-3)', textAlign: 'center', margin: 0 }}>
-          No upcoming events. Toggle a calendar group above or create one.
-        </p>
-        {onAddEvent && (
-          <button
-            onClick={onAddEvent}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '10px 18px', borderRadius: 'var(--r-sm)',
-              background: 'var(--accent)', color: 'var(--accent-text)',
-              border: 'none', fontSize: 13.5, fontWeight: 650, cursor: 'pointer',
-              boxShadow: '0 4px 14px var(--accent-glow)',
-            }}
-          >
-            <Icon name="plus" size={15} sw={2.2} />
-            New event
-          </button>
-        )}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-3)', textAlign: 'center' }}>Nothing coming up.</p>
+        {onAddEvent && <Button variant="secondary" icon="plus" onClick={onAddEvent}>Add an event</Button>}
       </div>
     )
   }
 
+  const tomorrowKey = localDateKey(new Date(Date.now() + 86400000))
   return (
-    <div className="scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px 24px 24px' }}>
-      {/* New event shortcut at the top of agenda */}
-      {onAddEvent && (
-        <button
-          onClick={onAddEvent}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            width: '100%', padding: '10px 14px', marginBottom: 16,
-            borderRadius: 'var(--r-md)', cursor: 'pointer',
-            background: 'var(--accent-soft)', border: '1px dashed var(--accent-line)',
-            color: 'var(--accent)', fontSize: 13.5, fontWeight: 650,
-            transition: 'var(--transition)',
-          }}
-        >
-          <Icon name="plus" size={15} sw={2.2} />
-          New event
-        </button>
-      )}
+    <div className="scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 140 }}>
       {byDay.map(([dateStr, dayEvents]) => {
-        const date = new Date(dateStr + 'T00:00:00')
-        const dow = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
-        const day = date.getDate()
-        const isToday = dateStr === localDateKey(new Date())
-
+        const nice = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+        const label = dateStr === todayKey ? `Today · ${nice}` : dateStr === tomorrowKey ? `Tomorrow · ${nice}` : nice
         return (
-          <div key={dateStr} style={{
-            display: 'flex',
-            gap: 16,
-            marginBottom: 18,
-          }}>
-            {/* Day column */}
-            <div style={{
-              width: 52,
-              flexShrink: 0,
-              paddingTop: 11,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 2,
-            }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.05em' }}>{dow}</span>
-              <span style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: isToday ? 'var(--accent)' : 'var(--text-2)',
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                background: isToday ? 'var(--accent-softer)' : 'transparent',
-              }}>{day}</span>
-            </div>
-
-            {/* Events */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {dayEvents.map(ev => {
-                const color = eventHex(ev.extendedProps as Record<string, unknown>)
-                const rawRsvp = ev.extendedProps?.participants?.[0]?.rsvpStatus
-                const rsvp = (['going', 'maybe', 'no'] as const).find(v => v === rawRsvp)
-                const timeStr = ev.allDay
-                  ? 'All day'
-                  : ev.start.includes('T')
-                    ? ev.start.split('T')[1].slice(0, 5)
-                    : ''
-
-                const isTentative = ev.extendedProps?.status === 'tentative'
-                const isLocked = ev.extendedProps?.status === 'locked'
-                const pactCount = ev.extendedProps?.pactCompletionsCount as number | undefined
-                const pactTarget = ev.extendedProps?.pactTargetCompletions as number | undefined
-                return (
-                  <button
-                    key={ev.id}
-                    onClick={() => onEventClick(ev)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: isLocked ? 'var(--surface-2)' : 'var(--surface)',
-                      border: isTentative ? '1px dashed var(--border-2)' : isLocked ? '1px dashed var(--border-2)' : '1px solid var(--border)',
-                      borderRadius: 'var(--r-md)',
-                      padding: '11px 13px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'var(--transition)',
-                      width: '100%',
-                      opacity: isTentative ? 0.75 : isLocked ? 0.7 : 1,
-                    }}
-                    onMouseEnter={e => {
-                      ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'
-                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-2)'
-                    }}
-                    onMouseLeave={e => {
-                      ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'
-                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = isTentative ? 'var(--border-2)' : 'var(--border)'
-                    }}
-                  >
-                    {/* Color bar */}
-                    <div style={{
-                      width: 4,
-                      alignSelf: 'stretch',
-                      borderRadius: 99,
-                      background: color,
-                      flexShrink: 0,
-                    }} />
-
-                    {/* Time */}
-                    <span style={{
-                      fontSize: 12.5,
-                      fontVariantNumeric: 'tabular-nums',
-                      color: 'var(--text-3)',
-                      width: 42,
-                      flexShrink: 0,
-                    }}>{timeStr}</span>
-
-                    {/* Title + group */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                        {isLocked && <span style={{ fontSize: 13, flexShrink: 0 }}>🔒</span>}
-                        <span style={{ fontSize: 14, fontWeight: 600, color: isLocked ? 'var(--text-2)' : 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {ev.title}
-                        </span>
-                        {isTentative && (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 3,
-                            padding: '1px 6px', borderRadius: 'var(--r-full)',
-                            background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
-                            fontSize: 10, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            Voting
-                          </span>
-                        )}
-                        {isLocked && (
-                          <span style={{
-                            padding: '1px 6px', borderRadius: 'var(--r-full)',
-                            background: 'var(--surface-3)', color: 'var(--text-3)',
-                            fontSize: 10, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            Locked
-                          </span>
-                        )}
-                      </div>
-                      {ev.extendedProps?.groupName && (
-                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                          {ev.extendedProps.groupName}
-                        </div>
-                      )}
-                      {isLocked && pactTarget != null && (
-                        <div style={{ marginTop: 6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: 'var(--text-3)', marginBottom: 3 }}>
-                            <span>Pact progress</span>
-                            <span>{pactCount ?? 0}/{pactTarget}</span>
-                          </div>
-                          <div style={{ height: 3, background: 'var(--surface-3)', borderRadius: 99, overflow: 'hidden' }}>
-                            <div style={{
-                              height: '100%',
-                              width: `${pactTarget > 0 ? Math.min(100, ((pactCount ?? 0) / pactTarget) * 100) : 0}%`,
-                              background: color,
-                              borderRadius: 99,
-                              transition: 'width 0.4s ease',
-                            }} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* RSVP pill */}
-                    {rsvp && rsvp !== 'no' && (
-                      <RsvpPill status={rsvp} />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <section key={dateStr}>
+            <h2 style={{ margin: 0, padding: '16px 16px 6px', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', letterSpacing: 0 }}>{label}</h2>
+            {dayEvents.map(ev => <AgendaRow key={ev.id} ev={ev} onClick={() => onEventClick(ev)} />)}
+          </section>
         )
       })}
     </div>
@@ -366,18 +214,6 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
     return map
   }, [groups, events])
 
-  // Stats for "this month"
-  const monthStats = useMemo(() => {
-    const now = new Date()
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const monthEvents = events.filter(ev => ev.start.startsWith(ym))
-    const going = monthEvents.filter(ev => {
-      const rsvp = ev.extendedProps?.participants?.[0]?.rsvpStatus
-      return rsvp === 'going'
-    })
-    return { total: monthEvents.length, going: going.length }
-  }, [events])
-
   const allEntries = [
     { id: 'self', label: 'Personal', tagName: 'self' },
     ...(counts[GOOGLE_SOURCE_ID] > 0 ? [{ id: GOOGLE_SOURCE_ID, label: 'Google', tagName: GOOGLE_SOURCE_ID }] : []),
@@ -386,85 +222,47 @@ function GroupFilterPanel({ groups, events, activeGroups, onToggle }: GroupFilte
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', paddingBottom: 8 }}>
-        Calendars
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {allEntries.map(entry => {
-          const active = activeGroups.has(entry.id)
-          const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
-          const count = counts[entry.id] ?? 0
-
-          return (
-            <button
-              key={entry.id}
-              onClick={() => onToggle(entry.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                padding: '7px 8px',
-                borderRadius: 'var(--r-sm)',
-                border: active ? '1px solid var(--border)' : '1px solid transparent',
-                background: active ? 'var(--surface-3)' : 'transparent',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-                width: '100%',
-                textAlign: 'left',
-              }}
-            >
-              {/* Checkbox square */}
-              <div style={{
-                width: 16,
-                height: 16,
-                borderRadius: 5,
-                border: `2px solid ${color}`,
-                background: active ? color : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'var(--transition)',
-              }}>
-                {active && <Icon name="check" size={10} sw={3} style={{ color: '#fff' }} />}
-              </div>
-
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: active ? 'var(--text-1)' : 'var(--text-2)' }}>
-                {entry.label}
-              </span>
-
-              {count > 0 && (
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Divider + stats */}
-      <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 8 }}>
-        This month
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Group events</span>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{monthStats.total}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>You're going</span>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--g-work)', fontVariantNumeric: 'tabular-nums' }}>{monthStats.going}</span>
-        </div>
-      </div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', padding: '20px 10px 6px' }}>Calendars</div>
+      {allEntries.map(entry => {
+        const active = activeGroups.has(entry.id)
+        const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
+        const count = counts[entry.id] ?? 0
+        return (
+          <button
+            key={entry.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onToggle(entry.id)}
+            className="menu-item"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, height: 32, padding: '0 10px', width: '100%',
+              border: 0, background: 'transparent', borderRadius: 8, fontSize: 14, textAlign: 'left',
+              color: active ? 'var(--text-1)' : 'var(--text-3)', cursor: 'pointer',
+            }}
+          >
+            <span style={{
+              width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', flexShrink: 0,
+              border: active ? 'none' : `1.5px solid ${color}`, background: active ? color : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              // Ink boxes (personal / groups without a colour) invert with the theme
+              color: color.startsWith('var(') ? 'var(--accent-text)' : '#fff',
+            }}>
+              {active && <Icon name="check" size={10} sw={3.2} />}
+            </span>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.label}</span>
+            {count > 0 && <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }
 
 /* ─── CalendarPage ───────────────────────────────────────── */
 type CalView = 'month' | 'agenda'
+/** Phone month layout: dots (compact) or titles in each day (detailed). Same key as before the revamp. */
+type MobileLayout = 'compact' | 'detailed'
+const MOBILE_LAYOUT_KEY = 'eventli.mobileMonthLayout'
 type ModalMode = 'none' | 'create' | 'view' | 'edit'
 
 export default function CalendarPage() {
@@ -480,22 +278,33 @@ export default function CalendarPage() {
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null)
   const [editEvent, setEditEvent] = useState<CalEvent | null>(null)
-  const [selectInfo, setSelectInfo] = useState<DateSelectArg | null>(null)
-  const [nlPrefill, setNlPrefill] = useState<ParsedEvent | null>(null)
-  const [quickAddText, setQuickAddText] = useState('')
+  const [selectInfo, setSelectInfo] = useState<DateSelection | null>(null)
+  // Phone and desktop both open on the month (phone: Titles layout by default)
   const [calView, setCalView] = useState<CalView>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
+  const todayKey = localDateKey(new Date())
+  const [selectedKey, setSelectedKey] = useState(todayKey)
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['self', GOOGLE_SOURCE_ID]))
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
+  const loadSeq = useRef(0) // only the latest loadEvents() call may write state
+  const [moreOpen, setMoreOpen] = useState(false)
+  // Phone month: tapping a day (or "+N more") lists that day's events in a sheet
+  const [daySheetKey, setDaySheetKey] = useState<string | null>(null)
   const [mobileLayout, setMobileLayout] = useState<MobileLayout>(() => {
     try {
       const stored = localStorage.getItem(MOBILE_LAYOUT_KEY)
       if (stored === 'compact' || stored === 'detailed') return stored
-    } catch { /* ignore */ }
-    return 'compact'
+    } catch { /* storage blocked */ }
+    return 'detailed'
   })
-  const calRef = useRef<FullCalendar>(null)
-  const loadSeq = useRef(0) // only the latest loadEvents() call may write state
+  useEffect(() => {
+    try { localStorage.setItem(MOBILE_LAYOUT_KEY, mobileLayout) } catch { /* storage blocked */ }
+  }, [mobileLayout])
+  const touchX = useRef<number | null>(null)
+  const unread = useNotificationStore(st => st.unread)
+  // Desktop: the calendar filter lives in the app sidebar (AppShell renders #sidebar-slot)
+  const [sidebarSlot, setSidebarSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => { setSidebarSlot(document.getElementById('sidebar-slot')) }, [isMobile])
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024)
@@ -503,11 +312,6 @@ export default function CalendarPage() {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-
-  // Persist mobileLayout to localStorage
-  useEffect(() => {
-    try { localStorage.setItem(MOBILE_LAYOUT_KEY, mobileLayout) } catch { /* ignore */ }
-  }, [mobileLayout])
 
   // Listen for swipe events from MobileMonthGrid
   useEffect(() => {
@@ -612,29 +416,6 @@ export default function CalendarPage() {
     }).catch(() => { setGroupsLoaded(true) })
   }, [])
 
-  function handleDateSelect(info: DateSelectArg) {
-    setSelectedEvent(null)
-    setSelectInfo(info)
-    setModalMode('create')
-  }
-
-  // Single tap/click on a day cell → create modal with that date prefilled.
-  // `select` only fires after a long-press on touch, so `dateClick` is what
-  // makes tap-to-create work on mobile (detailed layout) as well as desktop.
-  function handleDateClick(info: DateClickArg) {
-    setNlPrefill(null)
-    handleGridAddEvent(info.dateStr.split('T')[0])
-  }
-
-  function handleEventClick(info: EventClickArg) {
-    const ev = events.find((e) => String(e.id) === String(info.event.id))
-    if (ev) {
-      setSelectedEvent(ev)
-      setSelectInfo(null)
-      setModalMode('view')
-    }
-  }
-
   function handleAgendaEventClick(ev: CalEvent) {
     setSelectedEvent(ev)
     setSelectInfo(null)
@@ -646,42 +427,6 @@ export default function CalendarPage() {
     setSelectedEvent(null)
     setEditEvent(null)
     setSelectInfo(null)
-  }
-
-  async function handleEventDrop(info: EventDropArg) {
-    const { event } = info
-    try {
-      await api.patch(`/parseEvent/${event.id}`, {
-        startDate: event.startStr.split('T')[0],
-        endDate: event.allDay
-          ? fromCalendarAllDayEnd(event.startStr, event.endStr)
-          : event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
-        startTime: event.allDay ? null : event.startStr.split('T')[1]?.slice(0, 5),
-        endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
-        allDay: event.allDay,
-      })
-      loadEvents({ silent: true })
-    } catch {
-      info.revert()
-    }
-  }
-
-  async function handleEventResize(info: EventResizeDoneArg) {
-    const { event } = info
-    try {
-      await api.patch(`/parseEvent/${event.id}`, {
-        startDate: event.startStr.split('T')[0],
-        endDate: event.allDay
-          ? fromCalendarAllDayEnd(event.startStr, event.endStr)
-          : event.endStr ? event.endStr.split('T')[0] : event.startStr.split('T')[0],
-        startTime: event.allDay ? null : event.startStr.split('T')[1]?.slice(0, 5),
-        endTime: event.allDay ? null : event.endStr?.split('T')[1]?.slice(0, 5),
-        allDay: event.allDay,
-      })
-      loadEvents({ silent: true })
-    } catch {
-      info.revert()
-    }
   }
 
   function toggleGroup(id: string) {
@@ -705,8 +450,26 @@ export default function CalendarPage() {
     })
   }, [events, activeGroups, groupsLoaded])
 
-  // FullCalendar alone gets exclusive all-day ends. Never store or pass this elsewhere.
-  const fullCalendarEvents = useMemo(() => toFullCalendarEvents(filteredEvents), [filteredEvents])
+  const monthCells = useMemo(
+    () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey),
+    [currentDate, filteredEvents, todayKey],
+  )
+  // Phone "Titles" month: 3 chips, then "+N more" (rows grow to fit)
+  const phoneMonthCells = useMemo(
+    () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey, 3),
+    [currentDate, filteredEvents, todayKey],
+  )
+  const selectedDayEvents = useMemo(() => eventsOnDay(filteredEvents, selectedKey), [filteredEvents, selectedKey])
+  const colorOf = useCallback((ev: CalEvent) => eventHex(ev.extendedProps as Record<string, unknown>), [])
+
+  // Selecting a day in another month moves the month (and the fetch window) with it.
+  function selectDay(key: string) {
+    setSelectedKey(key)
+    const d = new Date(`${key}T00:00:00`)
+    if (d.getFullYear() !== currentDate.getFullYear() || d.getMonth() !== currentDate.getMonth()) {
+      setCurrentDate(d)
+    }
+  }
 
   // Month label
   const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long' })
@@ -732,45 +495,24 @@ export default function CalendarPage() {
     </>
   )
 
-  // Whether the compact grid is mounted (no calRef available)
-  const isCompactGridActive = isMobile && calView === 'month' && mobileLayout === 'compact'
-
-  function navPrev() {
-    if (calView === 'month' && !isCompactGridActive) {
-      calRef.current?.getApi().prev()
-      setCurrentDate(calRef.current?.getApi().getDate() ?? currentDate)
-    } else {
-      setCurrentDate(d => {
-        const n = new Date(d)
-        n.setMonth(n.getMonth() - 1)
-        return n
-      })
-    }
+  function shiftMonth(delta: number) {
+    setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() + delta, 1))
   }
-
-  function navNext() {
-    if (calView === 'month' && !isCompactGridActive) {
-      calRef.current?.getApi().next()
-      setCurrentDate(calRef.current?.getApi().getDate() ?? currentDate)
-    } else {
-      setCurrentDate(d => {
-        const n = new Date(d)
-        n.setMonth(n.getMonth() + 1)
-        return n
-      })
-    }
-  }
+  const navPrev = () => shiftMonth(-1)
+  const navNext = () => shiftMonth(1)
 
   function navToday() {
-    if (calView === 'month' && !isCompactGridActive) {
-      calRef.current?.getApi().today()
-    }
     setCurrentDate(new Date())
+    setSelectedKey(todayKey)
   }
 
-  // Stable callback for MobileMonthGrid "add event" — creates a synthetic DateSelectArg-like object
+  function openCreate(dateKey?: string) {
+    if (dateKey) handleGridAddEvent(dateKey)
+    else { setSelectedEvent(null); setSelectInfo(null); setModalMode('create') }
+  }
+
+  // New event prefilled with one all-day date (endStr exclusive, see DateSelection)
   const handleGridAddEvent = useCallback((dateStr: string) => {
-    // Build a minimal synthetic selectInfo that EventFormModal understands
     const start = new Date(dateStr + 'T00:00:00')
     const end = new Date(dateStr + 'T00:00:00')
     end.setDate(end.getDate() + 1)
@@ -781,18 +523,15 @@ export default function CalendarPage() {
       startStr: dateStr,
       endStr: addDaysStr(dateStr, 1),
       allDay: true,
-      jsEvent: null as never,
-      view: null as never,
     })
     setModalMode('create')
   }, [])
 
-  // Sync currentDate when FullCalendar nav fires internally
-  function handleDatesSet() {
-    if (calRef.current) {
-      setCurrentDate(calRef.current.getApi().getDate())
-    }
-  }
+  // Phone agenda: events from the selected day onward (AgendaList drops past days itself).
+  const agendaFromSelected = useMemo(
+    () => filteredEvents.filter(ev => (ev.end ?? ev.start).split('T')[0] >= selectedKey),
+    [filteredEvents, selectedKey],
+  )
 
   return (
     <div style={{
@@ -801,309 +540,55 @@ export default function CalendarPage() {
       overflow: 'hidden',
       background: 'var(--bg)',
     }}>
-      <style>{`
-        .fc-event-tentative {
-          opacity: 0.6 !important;
-          border-style: dashed !important;
-          background: transparent !important;
-          border-width: 2px !important;
-        }
-      `}</style>
-      {/* ── Left panel (desktop only) ─────────────────────── */}
-      {!isMobile && (
-        <aside style={{
-          width: 248,
-          flexShrink: 0,
-          background: 'var(--surface)',
-          borderRight: '1px solid var(--border)',
-          padding: '20px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-          gap: 0,
-        }} className="scroll">
-          <Button
-            variant="primary"
-            full
-            icon="plus"
-            size="md"
-            style={{ marginBottom: 18 }}
-            onClick={() => { setSelectedEvent(null); setSelectInfo(null); setModalMode('create') }}
-          >
-            New event
-          </Button>
-
-          <GroupFilterPanel
-            groups={groups}
-            events={events}
-            activeGroups={activeGroups}
-            onToggle={toggleGroup}
-          />
-        </aside>
-      )}
-
       {/* ── Main area ────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
         {/* Header */}
         {isMobile ? (
-          /* ── Mobile: 2-row layout so controls aren't clipped ── */
-          <div style={{
-            padding: '10px 16px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            flexShrink: 0,
-          }}>
-            {/* Row 1: Today · Month Year · ‹ ›
-                Today lives up here (balanced against the chevron group) so the
-                view controls below fit on a single tidy row. */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Button variant="ghost" size="sm" onClick={navToday} style={{ flexShrink: 0 }}>Today</Button>
-              <h1 style={{
-                flex: 1, textAlign: 'center',
-                fontSize: 17, fontWeight: 700, color: 'var(--text-1)',
-                margin: 0, letterSpacing: '-0.02em',
-              }}>
-                {monthLabel}{' '}
-                <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>{yearLabel}</span>
-              </h1>
-              <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                <IconButton name="chevL" size={36} isz={16} onClick={navPrev} title="Previous" />
-                <IconButton name="chevR" size={36} isz={16} onClick={navNext} title="Next" />
-              </div>
-            </div>
-            {/* Row 2: [Month|Agenda] · · · [layout toggle] [countdowns] [+]
-                With Today moved to Row 1 these controls fit on one row without
-                wrapping, so the "+" primary action is never clipped. */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Segmented
-                options={[
-                  { value: 'month', label: 'Month', icon: 'grid' },
-                  { value: 'agenda', label: 'Agenda', icon: 'list' },
-                ]}
-                value={calView}
-                onChange={v => setCalView(v as CalView)}
-                size="sm"
-              />
-              {refreshIndicator}
-              <div style={{ flex: 1 }} />
-              {/* Layout toggle — only visible when showing month on mobile */}
-              {calView === 'month' && (
-                <div
-                  role="group"
-                  aria-label="Calendar layout"
-                  style={{
-                    display: 'inline-flex',
-                    gap: 2,
-                    padding: 3,
-                    background: 'var(--surface-3)',
-                    borderRadius: 'var(--r-sm)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  {/* Compact: dot-grid icon */}
-                  <button
-                    aria-label="Compact layout"
-                    aria-pressed={mobileLayout === 'compact'}
-                    onClick={() => setMobileLayout('compact')}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 32,
-                      height: 32,
-                      borderRadius: 'calc(var(--r-sm) - 3px)',
-                      border: 'none',
-                      background: mobileLayout === 'compact' ? 'var(--surface-hi)' : 'transparent',
-                      color: mobileLayout === 'compact' ? 'var(--accent)' : 'var(--text-3)',
-                      cursor: 'pointer',
-                      transition: 'var(--transition)',
-                    }}
-                  >
-                    <Icon name="grid" size={14} />
-                  </button>
-                  {/* Detailed: pills / list icon */}
-                  <button
-                    aria-label="Detailed layout"
-                    aria-pressed={mobileLayout === 'detailed'}
-                    onClick={() => setMobileLayout('detailed')}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 32,
-                      height: 32,
-                      borderRadius: 'calc(var(--r-sm) - 3px)',
-                      border: 'none',
-                      background: mobileLayout === 'detailed' ? 'var(--surface-hi)' : 'transparent',
-                      color: mobileLayout === 'detailed' ? 'var(--accent)' : 'var(--text-3)',
-                      cursor: 'pointer',
-                      transition: 'var(--transition)',
-                    }}
-                  >
-                    <Icon name="list" size={14} />
-                  </button>
-                </div>
-              )}
-              <IconButton
-                name="repeat"
-                size={36}
-                onClick={() => navigate('/routines')}
-                title="Routines"
-              />
-              <IconButton
-                name="hourglass"
-                size={36}
-                onClick={() => navigate('/countdowns')}
-                title="Countdowns"
-              />
-              <IconButton
-                name="plus"
-                size={36}
-                onClick={() => { setSelectedEvent(null); setSelectInfo(null); setModalMode('create') }}
-                title="New event"
-              />
-            </div>
-          </div>
-        ) : (
-          /* ── Desktop: original single-row layout ── */
-          <div style={{
-            padding: '18px 24px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexShrink: 0,
-            gap: 12,
-          }}>
-            {/* Left: title + nav */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
-                {monthLabel}{' '}
-                <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>{yearLabel}</span>
-              </h1>
-              <div style={{ display: 'flex', gap: 2, marginLeft: 6 }}>
-                <IconButton name="chevL" size={34} isz={15} onClick={navPrev} title="Previous" />
-                <IconButton name="chevR" size={34} isz={15} onClick={navNext} title="Next" />
-              </div>
-              <Button variant="ghost" size="sm" onClick={navToday}>Today</Button>
-              {refreshIndicator}
-            </div>
-
-            {/* Right: view toggle + countdowns */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Segmented
-                options={[
-                  { value: 'month', label: 'Month', icon: 'grid' },
-                  { value: 'agenda', label: 'Agenda', icon: 'list' },
-                ]}
-                value={calView}
-                onChange={v => setCalView(v as CalView)}
-                size="sm"
-              />
-              <Button variant="secondary" size="sm" icon="repeat" onClick={() => navigate('/routines')}>Routines</Button>
-              <Button variant="secondary" size="sm" icon="hourglass" onClick={() => navigate('/countdowns')}>Countdowns</Button>
-            </div>
-          </div>
-        )}
-
-        {/* Quick-add bar */}
-        {!isMobile && (
-          <form
-            onSubmit={e => {
-              e.preventDefault()
-              if (!quickAddText.trim()) return
-              const parsed = parseNL(quickAddText)
-              setNlPrefill(parsed)
-              setSelectInfo(null)
-              setModalMode('create')
-              setQuickAddText('')
-            }}
-            style={{
-              padding: '10px 24px',
-              borderBottom: '1px solid var(--border)',
-              display: 'flex',
-              gap: 8,
-              flexShrink: 0,
-            }}
-          >
-            <input
-              value={quickAddText}
-              onChange={e => setQuickAddText(e.target.value)}
-              placeholder="Quick add: &quot;Lunch Friday 1pm at Marco's&quot;"
-              style={{
-                flex: 1,
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border-2)',
-                borderRadius: 'var(--r-sm)',
-                padding: '9px 14px',
-                fontSize: 13.5,
-                color: 'var(--text-1)',
-                outline: 'none',
-                minHeight: 40,
-              }}
+          <header style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '12px 8px 4px 16px', flexShrink: 0 }}>
+            <h1 style={{ flex: 1, fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>
+              {monthLabel} <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>{yearLabel}</span>
+            </h1>
+            {refreshIndicator}
+            <IconButton
+              name={calView === 'agenda' ? 'grid' : 'list'}
+              size={44} isz={20}
+              title={calView === 'agenda' ? 'Month view' : 'Agenda view'}
+              onClick={() => setCalView(calView === 'agenda' ? 'month' : 'agenda')}
             />
-            <button type="submit" style={{
-              padding: '0 16px',
-              borderRadius: 'var(--r-sm)',
-              background: 'var(--accent)',
-              color: '#fff',
-              fontWeight: 600,
-              fontSize: 13.5,
-              border: 'none',
-              cursor: 'pointer',
-              minHeight: 40,
-            }}>
-              Add
-            </button>
-          </form>
-        )}
-
-        {/* Mobile: group filter pills */}
-        {isMobile && (
-          <div className="no-scrollbar" style={{
-            display: 'flex',
-            gap: 6,
-            padding: '10px 16px',
-            overflowX: 'auto',
+            <IconButton name="bell" size={44} isz={20} title="Notifications" badge={unread > 0} onClick={() => navigate('/notifications')} />
+            <IconButton name="dots" size={44} isz={20} title="More" onClick={() => setMoreOpen(true)} />
+          </header>
+        ) : (
+          <div style={{
+            padding: '12px 16px 12px 20px',
             borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
             flexShrink: 0,
+            gap: 8,
           }}>
-            {[
-              { id: 'self', label: 'Personal', tagName: 'self' },
-              ...(events.some(ev => ev.extendedProps?.externalSource === GOOGLE_SOURCE_ID)
-                ? [{ id: GOOGLE_SOURCE_ID, label: 'Google', tagName: GOOGLE_SOURCE_ID }] : []),
-              ...groups.map(g => ({ id: String(g.groups_id), label: g.groups_title, tagName: g.tag_name })),
-            ].map(entry => {
-              const active = activeGroups.has(entry.id)
-              const color = entry.id === GOOGLE_SOURCE_ID ? GOOGLE_COLOR : groupColor(entry.tagName)
-              return (
-                <button
-                  key={entry.id}
-                  onClick={() => toggleGroup(entry.id)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '5px 11px',
-                    borderRadius: 'var(--r-full)',
-                    border: `1px solid ${active ? color : 'var(--border)'}`,
-                    background: active ? `${color}18` : 'var(--surface)',
-                    color: active ? color : 'var(--text-3)',
-                    fontSize: 12,
-                    fontWeight: 650,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    transition: 'var(--transition)',
-                  }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-                  {entry.label}
-                </button>
-              )
-            })}
+            <h1 style={{ fontSize: 19, fontWeight: 700, color: 'var(--text-1)', margin: '0 6px 0 0', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+              {monthLabel} {yearLabel}
+            </h1>
+            <IconButton name="chevL" size={36} isz={16} onClick={navPrev} title="Previous month" />
+            <IconButton name="chevR" size={36} isz={16} onClick={navNext} title="Next month" />
+            <Button variant="secondary" size="sm" onClick={navToday}>Today</Button>
+            {refreshIndicator}
+            <div style={{ flex: 1 }} />
+            <Segmented
+              options={[
+                { value: 'month', label: 'Month' },
+                { value: 'agenda', label: 'Agenda' },
+              ]}
+              value={calView}
+              onChange={v => setCalView(v as CalView)}
+              size="sm"
+            />
+            <IconButton name="repeat" size={36} isz={17} title="Routines" onClick={() => navigate('/routines')} />
+            <IconButton name="hourglass" size={36} isz={17} title="Countdowns" onClick={() => navigate('/countdowns')} />
+            <Button variant="primary" icon="plus" onClick={() => openCreate(selectedKey)}>New event</Button>
           </div>
         )}
 
@@ -1112,17 +597,16 @@ export default function CalendarPage() {
             role="alert"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-              margin: '8px 24px', padding: '10px 14px', borderRadius: 'var(--r-sm)',
-              background: 'var(--surface-2)', border: '1px solid var(--border-2)',
+              margin: '8px 16px', padding: '10px 14px', borderRadius: 'var(--r-md)',
+              background: 'var(--fill)',
               color: 'var(--text-2)', fontSize: 13.5,
             }}
           >
             Couldn't load your events.
-            <Button variant="soft" size="sm" onClick={() => loadEvents()}>Retry</Button>
+            <Button variant="outline" size="sm" onClick={() => loadEvents()}>Retry</Button>
           </div>
         )}
 
-        {/* Loading indicator */}
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-3)', fontSize: 14 }}>
             Loading events…
@@ -1130,9 +614,37 @@ export default function CalendarPage() {
         )}
 
         {/* Calendar area */}
-        {!loading && (calView === 'month' ? (
-          isCompactGridActive ? (
-            /* ── Compact dot-grid layout ── */
+        {!loading && (isMobile ? (
+          calView === 'month' ? (<>
+            <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
+              <Segmented
+                label="Month layout"
+                options={[{ value: 'detailed', label: 'Titles' }, { value: 'compact', label: 'Dots' }]}
+                value={mobileLayout}
+                onChange={(v) => setMobileLayout(v as MobileLayout)}
+              />
+            </div>
+            {mobileLayout === 'detailed' ? (
+              <div
+                style={{ flex: 1, minHeight: 0, display: 'flex', touchAction: 'pan-y' }}
+                onTouchStart={(e) => { touchX.current = e.touches[0].clientX }}
+                onTouchEnd={(e) => {
+                  if (touchX.current === null) return
+                  const dx = e.changedTouches[0].clientX - touchX.current
+                  touchX.current = null
+                  if (Math.abs(dx) > 60) { if (dx < 0) navNext(); else navPrev() }
+                }}
+              >
+                <MonthGrid
+                  compact
+                  cells={phoneMonthCells}
+                  selectedKey={selectedKey}
+                  onSelectDay={(key) => { selectDay(key); setDaySheetKey(key) }}
+                  onEventClick={handleAgendaEventClick}
+                  colorOf={colorOf}
+                />
+              </div>
+            ) : (
             <MobileMonthGrid
               currentDate={currentDate}
               events={filteredEvents}
@@ -1141,67 +653,120 @@ export default function CalendarPage() {
               currentUserId={currentUserId}
               eventHex={eventHex}
             />
-          ) : (
-            /* ── FullCalendar month view (desktop + mobile-detailed) ── */
-            <div
-              className={isMobile && mobileLayout === 'detailed' ? 'mobile-detailed' : undefined}
-              style={{ flex: 1, overflow: 'hidden', padding: '0 0 16px' }}
-            >
-              <FullCalendar
-                ref={calRef}
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-                initialView="dayGridMonth"
-                headerToolbar={false}
-                firstDay={1}
-                events={fullCalendarEvents}
-                // On mobile, range-select needs a long-press that also triggers the
-                // native text magnifier ("weirdly zoomed" view). Disable it so a clean
-                // single tap fires dateClick → prefilled form, just like the + button.
-                selectable={!isMobile}
-                editable
-                droppable
-                select={handleDateSelect}
-                dateClick={handleDateClick}
-                eventClick={handleEventClick}
-                eventDrop={handleEventDrop}
-                eventResize={handleEventResize}
-                datesSet={handleDatesSet}
-                height="100%"
-                dayMaxEvents={isMobile ? 4 : false}
-                eventContent={makeRenderEventContent(isMobile, mobileLayout)}
-                eventClassNames={(arg) => {
-                  if (arg.event.extendedProps?.status === 'tentative') return ['fc-event-tentative']
-                  return []
-                }}
-                eventDidMount={(info) => {
-                  const hex = eventHex(info.event.extendedProps as Record<string, unknown>)
-                  const isTentative = info.event.extendedProps?.status === 'tentative'
-                  // Compute transparent bg — handle both #rrggbb and hsl(...) formats.
-                  // Tentative events get a fainter fill so they read as unconfirmed.
-                  const alpha = isTentative ? 0.07 : 0.12
-                  const bgAlpha = hex.startsWith('hsl(') && hex.endsWith(')')
-                    ? hex.slice(0, -1) + ` / ${alpha})`
-                    : hex + (isTentative ? '12' : '1e')
-                  // Feed CSS custom properties — index.css reads these on .fc-daygrid-event
-                  info.el.style.setProperty('--fc-event-bg-color', bgAlpha)
-                  info.el.style.setProperty('--fc-event-border-color', hex)
-                  if (isTentative) {
-                    // Dashed outline + reduced opacity (opacity comes from the
-                    // .fc-event-tentative rule in index.css)
-                    info.el.classList.add('fc-event-tentative')
-                    info.el.style.borderStyle = 'dashed'
-                  }
-                }}
+            )}
+          </>) : (
+            <>
+              <WeekStrip
+                selectedKey={selectedKey}
+                todayKey={todayKey}
+                events={filteredEvents}
+                onSelect={selectDay}
+                colorOf={colorOf}
               />
-            </div>
+              <AgendaList
+                events={agendaFromSelected}
+                fromKey={selectedKey}
+                onEventClick={handleAgendaEventClick}
+                onAddEvent={() => openCreate(selectedKey)}
+              />
+            </>
           )
         ) : (
-          <AgendaList
-            events={filteredEvents}
-            onEventClick={handleAgendaEventClick}
-            onAddEvent={() => { setSelectedEvent(null); setSelectInfo(null); setModalMode('create') }}
-          />
+          <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+            {calView === 'month' ? (
+              <MonthGrid
+                cells={monthCells}
+                selectedKey={selectedKey}
+                onSelectDay={setSelectedKey}
+                onEventClick={handleAgendaEventClick}
+                colorOf={colorOf}
+              />
+            ) : (
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                <AgendaList
+                  events={filteredEvents}
+                  onEventClick={handleAgendaEventClick}
+                  onAddEvent={() => openCreate()}
+                />
+              </div>
+            )}
+            <DayPanel
+              dateKey={selectedKey}
+              events={selectedDayEvents}
+              onEventClick={handleAgendaEventClick}
+              onAdd={() => openCreate(selectedKey)}
+              colorOf={colorOf}
+            />
+          </div>
         ))}
+
+        {!isMobile && sidebarSlot && createPortal(
+          <GroupFilterPanel groups={groups} events={events} activeGroups={activeGroups} onToggle={toggleGroup} />,
+          sidebarSlot,
+        )}
+
+        {/* Phone: one day's events (works for past days too) */}
+        {isMobile && daySheetKey && (() => {
+          const dayEvents = eventsOnDay(filteredEvents, daySheetKey)
+          const title = new Date(`${daySheetKey}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+          return (
+            <Sheet
+              title={title}
+              onClose={() => setDaySheetKey(null)}
+              footer={<Button variant="primary" full icon="plus" onClick={() => { const k = daySheetKey; setDaySheetKey(null); openCreate(k) }}>Add event</Button>}
+            >
+              <div style={{ padding: '6px 0 12px' }}>
+                {dayEvents.length === 0
+                  ? <p style={{ padding: '24px 16px', textAlign: 'center', fontSize: 14, color: 'var(--text-3)' }}>Nothing planned.</p>
+                  : dayEvents.map(ev => <AgendaRow key={ev.id} ev={ev} onClick={() => handleAgendaEventClick(ev)} />)}
+              </div>
+            </Sheet>
+          )
+        })()}
+
+        {/* Phone: "more" — today, calendars, routines, countdowns */}
+        {isMobile && moreOpen && (
+          <Sheet title="Calendar" onClose={() => setMoreOpen(false)}>
+            <div style={{ padding: '12px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <InsetGroup>
+                <InsetRow first label="Go to today" chevron onClick={() => { navToday(); setMoreOpen(false) }} />
+                <InsetRow label="Routines" chevron onClick={() => navigate('/routines')} />
+                <InsetRow label="Countdowns" chevron onClick={() => navigate('/countdowns')} />
+              </InsetGroup>
+              <InsetGroup style={{ padding: '0 4px 6px' }}>
+                <GroupFilterPanel groups={groups} events={events} activeGroups={activeGroups} onToggle={toggleGroup} />
+              </InsetGroup>
+            </div>
+          </Sheet>
+        )}
+
+        {/* Phone: one primary action, bottom-right above the tab bar */}
+        {isMobile && (
+          <button
+            type="button"
+            aria-label="New event"
+            onClick={() => openCreate(calView === 'agenda' ? selectedKey : undefined)}
+            style={{
+              position: 'fixed',
+              right: 16,
+              bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
+              width: 56,
+              height: 56,
+              borderRadius: 18,
+              border: 'none',
+              background: 'var(--accent)',
+              color: 'var(--accent-text)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 6px 16px rgba(17,17,20,0.22)',
+              zIndex: 20,
+              cursor: 'pointer',
+            }}
+          >
+            <Icon name="plus" size={24} sw={2.2} />
+          </button>
+        )}
       </div>
 
       {modalMode === 'create' && (
@@ -1210,9 +775,8 @@ export default function CalendarPage() {
           selectInfo={selectInfo}
           groups={groups}
           currentUserId={currentUserId}
-          prefill={nlPrefill ?? undefined}
-          onClose={() => { setNlPrefill(null); closeModal() }}
-          onSaved={() => { setNlPrefill(null); closeModal(); loadEvents({ silent: true }) }}
+          onClose={closeModal}
+          onSaved={() => { closeModal(); loadEvents({ silent: true }) }}
         />
       )}
 
@@ -1239,63 +803,4 @@ export default function CalendarPage() {
       )}
     </div>
   )
-}
-
-/* ─── Custom FullCalendar event renderer factory ─────────── */
-export function makeRenderEventContent(
-  isMobile = false,
-  mobileLayout: MobileLayout = 'compact',
-) {
-  return function renderEventContent(info: { event: { id: string; title: string; allDay: boolean; startStr: string; extendedProps: Record<string, unknown> } }) {
-    const { event } = info
-    // On phones the cell is too narrow for time + title — the title is the
-    // information that matters, the time lives in the event modal/agenda.
-    // In detailed mode on mobile we also skip the time prefix.
-    const timeStr = (!isMobile && !event.allDay && event.startStr.includes('T'))
-      ? event.startStr.split('T')[1].slice(0, 5)
-      : ''
-    const isRecurring = !!event.extendedProps?.isRecurring
-
-    // No leading type indicator on any size: the colored left border on
-    // .fc-daygrid-event conveys the event color, and tentative events keep
-    // their dashed border styling via CSS.
-    const isDetailedMobile = isMobile && mobileLayout === 'detailed'
-
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: isDetailedMobile ? 0 : isMobile ? 3 : 4,
-        padding: isDetailedMobile ? '1px 0 1px 2px' : isMobile ? '1px 3px' : '1px 5px',
-        overflow: 'hidden',
-        width: '100%',
-      }}>
-        {/* Time */}
-        {timeStr && (
-          <span style={{
-            fontSize: 10, fontVariantNumeric: 'tabular-nums',
-            color: 'var(--text-3)', flexShrink: 0,
-          }}>{timeStr}</span>
-        )}
-
-        {/* Title — detailed mobile mimics Klender: fine regular-weight type
-            that clips at the cell edge (no ellipsis stealing characters) */}
-        <span style={{
-          fontSize: isDetailedMobile ? 9.5 : isMobile ? 10.5 : 11.5,
-          fontWeight: isDetailedMobile ? 500 : 600,
-          lineHeight: isDetailedMobile ? 1.5 : undefined,
-          color: 'var(--text-1)',
-          overflow: 'hidden',
-          textOverflow: 'clip',
-          whiteSpace: 'nowrap',
-          flex: 1,
-        }}>{event.title}</span>
-
-        {/* Recurring indicator — 'refresh' not in IconPaths, use a dot */}
-        {isRecurring && !isMobile && (
-          <span style={{ color: 'var(--text-3)', flexShrink: 0, opacity: 0.7, fontSize: 9 }}>↻</span>
-        )}
-      </div>
-    )
-  }
 }

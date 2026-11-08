@@ -1,29 +1,19 @@
 import { useState, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
+import Sheet from '@/components/ui/Sheet'
 import api from '@/api/client'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
 import type { Pact } from '@/types'
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '9px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 11.5,
-  fontWeight: 650,
-  color: 'var(--text-3)',
+  fontSize: 12.5,
+  fontWeight: 600,
+  color: 'var(--text-2)',
   marginBottom: 6,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
 }
 
 interface PactModalProps {
@@ -73,37 +63,8 @@ export default function PactModal({ groupId, onClose, onCreated }: PactModalProp
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: 16,
-    }}>
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-xl)',
-        border: '1px solid var(--border-2)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%', maxWidth: 440,
-      }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 20px 16px', borderBottom: '1px solid var(--border)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8, background: 'var(--accent-soft)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Icon name="trophy" size={16} style={{ color: 'var(--accent)' }} />
-            </div>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>New Group Pact</h2>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-
+    <Sheet title="New group pact" onClose={onClose} width={440}>
+      <div>
         {/* Body */}
         <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.6 }}>
@@ -167,6 +128,6 @@ export default function PactModal({ groupId, onClose, onCreated }: PactModalProp
           </div>
         </form>
       </div>
-    </div>
+    </Sheet>
   )
 }

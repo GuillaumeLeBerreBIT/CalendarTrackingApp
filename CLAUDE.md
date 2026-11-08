@@ -80,14 +80,14 @@ tests/                   — Vitest, one file per module (route tests use a loca
 
 ```
 client/
-  index.html             — Vite entry (has data-theme="dark" on <html>)
+  index.html             — Vite entry; loads public/theme-init.js (theme before first paint)
   vite.config.ts         — Vite config: /api proxy to :3000, @ alias, VitePWA plugin
   public/
     manifest.webmanifest — PWA manifest (name, icons, display: standalone)
     icons/               — App icons (192px, 512px)
   src/
     index.css            — Eventli design system (CSS variables, dark/light tokens,
-                           animations, nav-item classes, FullCalendar overrides)
+                           animations, nav-item classes)
     main.tsx             — React entry point
     sw.ts                — Service worker: Workbox precache, push event handler
     App.tsx              — BrowserRouter + route tree + subscribeToPush() on login
@@ -98,11 +98,20 @@ client/
         Icon.tsx         — SVG <Icon> component with full IconPaths dict
         Avatar.tsx       — Avatar + AvatarStack (hue-based gradient avatars)
         Button.tsx       — Button + IconButton (primary/secondary/ghost/outline/soft/danger)
-        Primitives.tsx   — Tag, Progress, Segmented, RsvpPill, Section, Empty
-      AppShell.tsx       — Desktop sidebar + mobile bottom nav + PWAInstallBanner
+        Primitives.tsx   — Tag, Progress, Segmented (sm 28px / md 34px, `full`), Pill, RsvpPill, Section, Empty
+        Controls.tsx     — Switch (44×26), Checkbox (square tasks / round shopping), InsetGroup + InsetRow,
+                           fieldStyle / areaStyle / labelStyle, quickFieldWrap + quickFieldInput ("Add …, press Enter")
+        Sheet.tsx        — Sheet (bottom sheet on phone, right inspector on desktop; `confirmLabel` gives the
+                           board's "Cancel · Title · Add" header, `header` replaces it), Disclosure
+                           (folded optional section), SheetDialog (Sheet + padded body for small forms)
+      AppShell.tsx       — Desktop sidebar ("eventli" wordmark, nav, #sidebar-slot that pages portal into —
+                           the calendar filter lives there) + phone bottom nav (no top bar) + PWAInstallBanner
       ProtectedRoute.tsx — Checks auth via fetchMe(), redirects to /login if needed
-      EventModal.tsx     — Full event detail modal (RSVP, attendees, map preview)
-      EventFormModal.tsx — Create/edit event form (NL parse, recurrence, reminders)
+      EventModal.tsx     — Event view in a Sheet (board PhoneWishlist): "‹ Calendar" row, hero, meta rows,
+                           avatars + Going/Maybe/No segmented, 8px bands before wishlist and comments
+      EventFormModal.tsx — Create/edit event in a Sheet (board PhoneEvent): big title, Date/Time/All day/Calendar
+                           rows; Invite (name pills + "Everyone" = social), Location & note, Wishlist,
+                           Repeat & reminder folded in one group. Calendar "Just me" = personal event
       CountdownPill.tsx  — Live countdown badge (Xd Yh)
       HabitHeatmap.tsx   — 16-week completion grid (flex cells, tap-to-log today)
       WeeklyArc.tsx      — SVG ring showing weekly target progress
@@ -110,7 +119,12 @@ client/
       PactModal.tsx      — Create group pact form (reward event + target)
       PactCelebration.tsx — CSS confetti on pact success
       PWAInstallBanner.tsx — beforeinstallprompt banner (dismissed via localStorage)
-      MobileMonthGrid.tsx — Compact mobile month grid (dot per covered day + day list)
+      MobileMonthGrid.tsx — Phone month grid (dot per covered day + day list, weekend shading)
+      MonthGrid.tsx      — Desktop month grid (own; replaced FullCalendar): chips, +N more, weekends;
+                           `compact` = phone "Titles" month layout (default; Dots/Titles switch, eventli.mobileMonthLayout);
+                           tapping a day or "+N more" opens a day sheet with that day's events (past days too)
+      DayPanel.tsx       — Desktop right panel: selected day's events + calendar filter
+      WeekStrip.tsx      — Phone Mon–Sun strip above the agenda
       OnboardingWizard.tsx — First-run wizard (hasCompletedOnboarding)
       CommentThread.tsx  — Self-contained event comment thread
       RoutineSheet.tsx   — Quick create/edit sheet for a routine ("Where": just me or a group, day chips, time, end preset)
@@ -121,8 +135,10 @@ client/
     lib/
       design.ts          — Group color map, design constants
       lists.ts           — splitPasted() (paste → items), isSafeLink(), splitDone()
-      allDayDates.ts     — Inclusive ↔ FullCalendar-exclusive all-day end conversion
-      calendarEvents.ts  — Calendar event normalisation, FullCalendar conversion,
+      allDayDates.ts     — addDaysStr + inclusive ↔ exclusive all-day end helpers
+      monthGrid.ts       — buildMonthGrid(), weekKeys(), eventsOnDay(), isWeekendKey()
+      theme.ts           — per-device theme preference (light/dark/system)
+      calendarEvents.ts  — Calendar event normalisation,
                            day coverage, agenda bucketing, fetch window
       recurrence.ts      — RRULE ⇄ recurrence editor state
       routines.ts        — Routine draft → /parseEvent payload, end presets, next-weekday helpers
@@ -130,7 +146,7 @@ client/
       countdown.ts       — Countdown utility helpers
       pushNotifications.ts — subscribeToPush() — VAPID key fetch + browser subscribe
     pages/
-      CalendarPage.tsx   — FullCalendar month/agenda, Monday start, group filter,
+      CalendarPage.tsx   — Own month grid + day panel (desktop), week strip + agenda (phone), group filter,
                            event color theming, mobile 2-row header, locked events
       GroupsPage.tsx     — Group cards grid + create group modal
       GroupDetailPage.tsx— Group detail: members, events, tasks, pacts, challenges
@@ -163,7 +179,7 @@ client/
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Auth (login/register/logout) | ✅ Done | Supabase cookies |
-| Calendar (month + agenda) | ✅ Done | FullCalendar, Monday start, mobile layout |
+| Calendar (month + agenda) | ✅ Done | Own month grid (FullCalendar removed 2026-11), Monday start, weekend shading; no drag-to-move |
 | Events (CRUD, RSVP, recurring) | ✅ Done | NL parse, reminders, recurrence |
 | Date availability voting | ✅ Done | Tentative events; multi-slot yes/maybe/no per date, overlap meter, creator confirms (upgraded 2026-06-15) |
 | Groups + invites | ✅ Done | Role-based, invite tokens |
@@ -182,47 +198,30 @@ client/
 
 ## Eventli Design System
 
-The frontend uses a **custom CSS variable system** defined in `client/src/index.css`. **No shadcn/ui.** Dark mode is the default (`data-theme="dark"` on `<html>`).
+The frontend uses a **custom CSS variable system** defined in `client/src/index.css`. **No shadcn/ui, no Tremor.** Look: **Compact Mono** (2026-11 revamp) — ink on white / light ink on near-black; colour only for groups (dots, 3px bars, checkboxes); one ink primary button per screen. Spec: `docs/superpowers/specs/2026-11-07-ui-revamp-design.md`; mockup board: https://claude.ai/artifact/A9RBbt9H4sEtPy473KvPZo
 
-### Key design tokens
+Theme is per device: `lib/theme.ts` (`eventli-theme` in localStorage: light | dark | system, default dark), applied before React mounts by `client/public/theme-init.js` (a file, not inline — the CSP blocks inline scripts). Profile page has the Appearance switch.
+
+### Key design tokens (light / dark)
 
 ```css
-/* Accent — deep violet/indigo */
---accent:        hsl(252 88% 66%)
---accent-hover:  hsl(252 88% 72%)
---accent-soft:   hsl(252 88% 66% / 0.14)
---accent-glow:   hsl(252 88% 66% / 0.40)
-
-/* Dark surfaces */
---bg:          #0b0b12
---surface:     #14141f
---surface-2:   #1b1b29
---surface-3:   #232334
---surface-hi:  #2a2a3d
-
-/* Text */
---text-1:  #f3f3f8   /* primary */
---text-2:  #a9a9be   /* secondary */
---text-3:  #6f6f87   /* muted */
-
-/* Border */
---border:    hsl(250 18% 100% / 0.08)
---border-2:  hsl(250 18% 100% / 0.13)
+--bg #ffffff / #0e0e11        --bg-deep (sidebar, side panel) #f6f6f7 / #121215
+--surface #ffffff / #16161a   --surface-2 (hover) #f6f6f7 / #18181c
+--fill / --surface-3 (inset groups, inputs, segmented track) #f4f4f6 / #1c1c21
+--surface-hi (active nav) #ececef / #26262c   --seg-on (selected segment) #ffffff / #3a3a42
+--border #ececef / #23232a    --border-2 #d9d9de / #34343c   --border-hi #b4b4bc / #55555e
+--text-1 #111114 / #f2f2f5    --text-2 #55555f / #a9a9b4     --text-3 #6b6b75 / #8e8e99
+--accent = ink (#111114 / #f2f2f5), --accent-text = inverse
+--weekend #f1f1f3 / #18181d   --danger #b42318 / #f97066
 ```
+
+**Weekends (Sat/Sun) always get `var(--weekend)` in every calendar view** (owner rule).
 
 ### Group color coding
 
-```ts
-// lib/design.ts
-export const GROUP_COLORS = {
-  family:  '#f59e0b',
-  friends: '#ec4899',
-  work:    '#22d3aa',
-  climb:   '#38bdf8',
-  book:    '#c084fc',
-  self:    'var(--accent)',  // personal events
-}
-```
+Event colours come from the member's chosen group colour (`resolvedHex`, per membership,
+`eventHex()` in CalendarPage). `--g-family/friends/work/climb/book` exist per theme for
+places that use CSS variables; `--g-self` = `--text-1`.
 
 ### Component primitives
 
@@ -237,8 +236,19 @@ All UI components live in `client/src/components/ui/`. Use these everywhere:
 - `<Progress value={3} total={10} color="var(--g-work)" />` — thin progress bar
 - `<Segmented options={[...]} value={v} onChange={fn} />` — toggle switcher
 - `<RsvpPill status="going|maybe|no" />` — RSVP status chip
-- `<Section title="...">` — page section wrapper
+- `<Section title="...">` — page section wrapper (small 13px heading above an inset group)
 - `<Empty text="..." />` — empty state placeholder
+- `<Sheet title onClose footer? actions?>` — every dialog/form; never hand-roll a fixed overlay
+- `<SheetDialog title onClose>` — Sheet with a padded body (small create/edit forms)
+- `<Disclosure label summary open onToggle>` — folded optional form section
+- `<Switch>`, `<Checkbox shape="square|round">`, `<InsetGroup>` + `<InsetRow>` — settings-style rows
+- `<Pill on dot icon>` — round outline chip (people to invite, list switcher, "I'll get this"); on = ink
+- Text inputs use `fieldStyle` (44px, 10px radius; the ink focus ring comes from index.css). Borderless
+  inputs inside a styled wrapper set `data-bare` so they don't get the ring
+- Screens follow the mockup board one-to-one (calendar, tasks/shopping, new event, event view);
+  pages without a mockup (groups, habits, profile) use the same rows: fill groups, 3px colour bars, dots
+- Page titles use `className="page-title"` (22px phone / 19px desktop); labels are sentence case,
+  never uppercase small caps; text on `var(--accent)` is always `var(--accent-text)`
 
 ---
 
@@ -379,10 +389,9 @@ RESEND_API_KEY=
 - **Supabase time fields**: `start_time`/`end_time` come back as `HH:MM:SS` strings from Postgres — slice to `HH:MM` with `.slice(0, -3)` before sending to the client.
 - **CSS variables not Tailwind utilities**: For anything touching the design system (colors, surfaces, radii, shadows), use CSS variables (`var(--accent)`, `var(--surface-2)`, etc.) in inline styles or CSS. Tailwind is used for layout only.
 - **Icon component**: Never use lucide-react — use `<Icon name="..." />` from `@/components/ui/Icon`.
-- **FullCalendar event colors**: Use `--fc-event-bg-color` and `--fc-event-border-color` CSS custom properties set in `eventDidMount` via `setProperty`. The global override in `index.css` reads these — never use `!important` background on `.fc-daygrid-event`.
 - **supabaseAdmin**: Required for cross-user operations (scheduler crons, pact resolution). The regular `req.supabase` client is scoped to the logged-in user via RLS.
 - **Server-side Supabase clients must keep `persistSession: false, autoRefreshToken: false`** (see `db/supabase.js`). With defaults on, the shared client stores the last user's session and auto-rotates its refresh token in the background — invalidating the token in the browser's cookie and force-logging users out at JWT expiry (~1h). Never create a server client without these options.
-- **All-day `end_date` is inclusive** (10 → 15 Oct covers both days). Only `toFullCalendarEvents()` (FullCalendar), `utils/google.js` and `utils/ical.js` convert to exclusive ends; app state, agenda, mobile grid and the edit form stay inclusive.
+- **All-day `end_date` is inclusive** (10 → 15 Oct covers both days). Only `utils/google.js` and `utils/ical.js` convert to exclusive ends; the whole client stays inclusive (exception: `DateSelection.endStr` handed to EventFormModal for all-day picks is exclusive, converted back by `fromCalendarAllDayEnd`).
 - **Deleting a group goes through `delete_group()`** (`db/migrations/2026-10-15_delete_group_rpc.sql`), one transaction via `supabaseAdmin.rpc` after the route's admin check. Never delete group data piecemeal from a route: a mid-way failure leaves the group half-deleted. Test the SQL with `db/tests/run_delete_group_test.sh` (needs Docker).
 - **Event times are naive wall clocks, read in `EVENT_TZ`** (`utils/wallClock.js`). Server code that needs a real instant (reminders, countdowns, cron times, "today") must use `wallClockToInstant()` / `todayIn()` — never `new Date(y, m, d, hh, mm)`, `getHours()` or `toISOString().slice(0,10)`, which read the host's zone (UTC in production) and made reminders fire ~2h late.
 - **Supabase query builders have no `.catch()`**: they are lazy thenables. Always `const { error } = await …`; a bare `.catch()` throws a TypeError and never sends the query.

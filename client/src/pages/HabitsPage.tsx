@@ -1,4 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
+import { Checkbox } from '@/components/ui/Controls'
+import { SheetDialog as Modal } from '@/components/ui/Sheet'
 import { useHabitStore } from '@/store/habitStore'
 import api from '@/api/client'
 import Button from '@/components/ui/Button'
@@ -9,26 +12,14 @@ import WeeklyArc from '@/components/WeeklyArc'
 import type { GroupChallenge } from '@/types'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--surface-2)',
-  border: '1px solid var(--border-2)',
-  borderRadius: 'var(--r-sm)',
-  padding: '9px 12px',
-  fontSize: 13.5,
-  color: 'var(--text-1)',
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 12,
-  fontWeight: 650,
-  color: 'var(--text-3)',
+  fontSize: 12.5,
+  fontWeight: 600,
+  color: 'var(--text-2)',
   marginBottom: 6,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
 }
 
 // ── Preset pickers ────────────────────────────────────────────────────────────
@@ -43,36 +34,6 @@ const PRESET_COLORS = [
 ]
 
 // ── Modal wrapper ─────────────────────────────────────────────────────────────
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', padding: 16,
-    }}>
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-xl)',
-        border: '1px solid var(--border-2)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%',
-        maxWidth: 420,
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <div style={{ padding: 20 }}>{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // ── Log confirmation toast ────────────────────────────────────────────────────
 function LogToast({ weeklyHit }: { weeklyHit?: boolean }) {
@@ -86,7 +47,7 @@ function LogToast({ weeklyHit }: { weeklyHit?: boolean }) {
       padding: '10px 18px',
       borderRadius: 'var(--r-full)',
       background: 'var(--accent)',
-      color: '#fff',
+      color: 'var(--accent-text)',
       fontSize: 14,
       fontWeight: 700,
       boxShadow: '0 4px 20px var(--accent-glow)',
@@ -129,10 +90,9 @@ function HabitCard({
 
   return (
     <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--r-lg)',
-      padding: '18px 20px',
+      background: 'var(--fill)',
+      borderRadius: 12,
+      padding: '14px 16px',
       marginBottom: 12,
     }}>
       {/* Header row */}
@@ -145,17 +105,19 @@ function HabitCard({
           {title}
         </span>
         <Tag tone="neutral">{frequency === 'daily' ? 'Daily' : 'Weekly'}</Tag>
+        <Checkbox shape="round" checked={completedToday} onChange={() => onLog(habit_id)} label={completedToday ? `Undo today's log for ${title}` : `Log ${title} for today`} />
+        <span style={{ width: 4 }} />
         {confirmingDelete ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button
               onClick={() => onDelete(habit_id)}
               style={{
-                background: 'hsl(0 70% 50% / 0.15)',
-                border: '1px solid hsl(0 70% 50% / 0.35)',
+                background: 'transparent',
+                border: '1px solid var(--border-2)',
                 borderRadius: 'var(--r-sm)',
-                color: 'hsl(0 70% 65%)',
-                fontSize: 12, fontWeight: 650,
-                padding: '4px 10px', cursor: 'pointer',
+                color: 'var(--danger)',
+                fontSize: 12.5, fontWeight: 600,
+                padding: '0 10px', minHeight: 32, cursor: 'pointer',
               }}
             >
               Delete
@@ -186,8 +148,8 @@ function HabitCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{showFlame ? '🔥' : '⚡'}</span>
         <span style={{
-          fontSize: 26, fontWeight: 800, color,
-          letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+          fontSize: 24, fontWeight: 700, color: 'var(--text-1)',
+          letterSpacing: '-0.02em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0,
         }}>
           {streak}
         </span>
@@ -196,19 +158,19 @@ function HabitCard({
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <WeeklyArc completions={currentWeekCompletions ?? 0} target={currentWeekTarget!} color={color} size={40} />
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>this week</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 500 }}>This week</div>
               <div style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500 }}>{currentWeekCompletions ?? 0}/{currentWeekTarget}×</div>
             </div>
           </div>
         ) : (
           <span style={{ marginLeft: 'auto', fontSize: 11, color: completedToday ? color : 'var(--text-3)', fontWeight: completedToday ? 700 : 400 }}>
-            {completedToday ? '✓ logged today — tap grid to undo' : 'tap today\'s cell to log'}
+            {completedToday ? 'Logged today' : 'Not logged today'}
           </span>
         )}
       </div>
       {hasWeeklyTarget && (
         <div style={{ fontSize: 10.5, color: completedToday ? color : 'var(--text-3)', fontWeight: completedToday ? 600 : 400, marginBottom: 2, textAlign: 'right' }}>
-          {completedToday ? '✓ logged today — tap grid to undo' : 'tap today\'s cell to log'}
+          {completedToday ? 'Logged today' : 'Not logged today'}
         </div>
       )}
 
@@ -291,7 +253,7 @@ function CreateHabitModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="New Habit" onClose={onClose}>
+    <Modal title="New habit" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div>
           <label style={labelStyle}>Title</label>
@@ -483,15 +445,11 @@ export default function HabitsPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: 24, gap: 12,
         }}>
-          <h1 style={{
-            fontSize: 'clamp(22px,4vw,28px)', fontWeight: 800,
-            color: 'var(--text-1)', letterSpacing: '-0.03em', margin: 0,
-          }}>
+          <h1 className="page-title">
             Habits
           </h1>
-          <Button variant="primary" size="md" onClick={() => setShowCreateModal(true)}>
-            <Icon name="plus" size={16} />
-            New Habit
+          <Button variant="primary" size="sm" icon="plus" onClick={() => setShowCreateModal(true)}>
+            New habit
           </Button>
         </header>
 

@@ -1,17 +1,20 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { createPortal } from 'react-dom'
+import Sheet from '@/components/ui/Sheet'
+import { groupColorFor } from '@/pages/GroupsPage'
+import { IconButton } from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
-import WishlistDraft, { type GiftDraft } from '@/components/WishlistDraft'
+import { Segmented, Pill } from '@/components/ui/Primitives'
+import { Switch, fieldStyle } from '@/components/ui/Controls'
+type GiftDraft = { title: string; link: string; note: string }
 import { errorText } from '@/components/QuickAddInput'
-import type { DateSelectArg } from '@fullcalendar/core'
 import api from '@/api/client'
-import type { CalEvent, Group, Member } from '@/types'
+import type { CalEvent, DateSelection, Group, Member } from '@/types'
 import RecurringScopePrompt from '@/components/RecurringScopePrompt'
 import {
   type RecurrenceState, type RepeatFreq, type EndMode,
   WEEKDAYS, WEEKDAY_LABEL, parseRRule, summarize, ruleToSave, isFullyEditable,
 } from '@/lib/recurrence'
-import { parseNL, type ParsedEvent } from '@/lib/nlParser'
+import type { ParsedEvent } from '@/lib/nlParser'
 import { fromCalendarAllDayEnd } from '@/lib/allDayDates'
 
 // Max candidate date slots per tentative event (mirrors MAX_DATE_OPTIONS on the backend).
@@ -19,7 +22,7 @@ const MAX_DATE_OPTIONS = 6
 
 interface Props {
   event: CalEvent | null
-  selectInfo: DateSelectArg | null
+  selectInfo: DateSelection | null
   groups: Group[]
   currentUserId?: string | null
   prefill?: ParsedEvent
@@ -45,15 +48,9 @@ const REMINDER_OPTIONS: { value: number | null; label: string }[] = [
 const DEFAULT_REMINDER_MINUTES = 15
 
 
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 11.5,
-  fontWeight: 700,
-  color: 'var(--text-3)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.07em',
-  marginBottom: 7,
-}
+
+
+type SectionKey = 'invite' | 'place' | 'wishlist' | 'repeat'
 
 function resolveInitialEventType(event: CalEvent | null): EventType {
   if (!event) return 'appointment'
@@ -67,7 +64,7 @@ function resolveInitialEventType(event: CalEvent | null): EventType {
 export default function EventFormModal({ event, selectInfo, groups, currentUserId, prefill, onClose, onSaved }: Props) {
   const isEdit = !!event
 
-  const [eventType, setEventType] = useState<EventType>(resolveInitialEventType(event))
+  const [eventType, setEventType] = useState<EventType>(() => (!event && groups.length === 0) ? 'personal' : resolveInitialEventType(event))
 
   const [form, setForm] = useState({
     title: event?.title ?? prefill?.title ?? '',
@@ -89,8 +86,8 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
             ? fromCalendarAllDayEnd(selectInfo.startStr, selectInfo.endStr)
             : selectInfo.endStr.split('T')[0])
         : (prefill?.date ?? ''),
-    startTime: event?.start?.includes('T') ? event.start.split('T')[1].slice(0, 5) : (prefill?.time ?? ''),
-    endTime: event?.end?.includes('T') ? event.end.split('T')[1].slice(0, 5) : '',
+    startTime: event?.start?.includes('T') ? event.start.split('T')[1].slice(0, 5) : (prefill?.time ?? (event ? '' : nextHourSlot()[0])),
+    endTime: event?.end?.includes('T') ? event.end.split('T')[1].slice(0, 5) : (event || prefill?.time ? '' : nextHourSlot()[1]),
     groupsId: String(event?.extendedProps?.groupsId ?? ''),
   })
 
@@ -103,25 +100,6 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
-
-  // NL quick-fill (create mode): "Lunch Friday 1pm at Marco's" → fills the form
-  const [nlText, setNlText] = useState('')
-
-  function applyNL() {
-    const text = nlText.trim()
-    if (!text) return
-    const parsed = parseNL(text)
-    setForm(f => ({
-      ...f,
-      title: parsed.title || f.title,
-      location: parsed.location ?? f.location,
-      startDate: parsed.date ?? f.startDate,
-      endDate: parsed.date ?? f.endDate,
-      startTime: parsed.time ?? f.startTime,
-      allDay: !parsed.time,
-    }))
-    setNlText('')
-  }
 
   // Tentative mode — group votes on the date
   const [isTentative, setIsTentative] = useState(false)
@@ -167,6 +145,17 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
   // When editing/deleting a recurring event, ask the user the scope first
   const [scopePrompt, setScopePrompt] = useState<null | 'save' | 'delete'>(null)
 
+  // Optional sections start folded; a section with saved content starts open when editing.
+  const [openSection, setOpenSection] = useState<Record<SectionKey, boolean>>(() => ({
+    invite: false,
+    place: !!(event && (event.extendedProps?.location || event.extendedProps?.description || event.extendedProps?.imageUrl)),
+    wishlist: false,
+    repeat: false,
+  }))
+  function toggleSection(key: SectionKey) {
+    setOpenSection(s => ({ ...s, [key]: !s[key] }))
+  }
+
   // Recurrence identity of the event being edited
   const isRecurring = !!event?.extendedProps?.isRecurring
   const masterId = event?.extendedProps?.recurringEventId ?? event?.id
@@ -174,7 +163,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
 
   // Load group members when group changes (appointment type only)
   useEffect(() => {
-    if (eventType === 'appointment' && form.groupsId) {
+    if (eventType !== 'personal' && form.groupsId) {
       api.get(`/retrieveUsersSelectedGroup?groupId=${form.groupsId}`)
         .then(({ data }) => {
           if (data.success) {
@@ -198,7 +187,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
       setGroupMembers([])
       if (!isEdit) setSelectedParticipants([])
     }
-  }, [form.groupsId, eventType, currentUserId])
+  }, [form.groupsId, eventType === 'personal', currentUserId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle type switching side-effects
   useEffect(() => {
@@ -256,7 +245,7 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
       payload.tagNames = form.groupsId
       payload.participants = []
     }
-    if (!isEdit && wishlistEnabled) payload.wishlist = giftDrafts
+    if (!isEdit && wishlistEnabled) payload.wishlist = giftDrafts.filter(g => g.title.trim())
     return payload
   }
 
@@ -333,780 +322,321 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
     }
   }
 
-  const typeOptions: { value: EventType; icon: string; label: string; hint: string }[] = [
-    {
-      value: 'appointment',
-      icon: 'cal',
-      label: 'Appointment',
-      hint: 'Linked to a group — all members see it. You choose who attends (you\'re selected by default). Selected members get an RSVP prompt.',
-    },
-    {
-      value: 'social',
-      icon: 'groups',
-      label: 'Social event',
-      hint: 'Everyone in the group is automatically invited and gets an RSVP prompt.',
-    },
-  ]
-
-  const submitLabel = saving
-    ? 'Saving…'
-    : isEdit
-    ? 'Save changes'
-    : eventType === 'appointment'
-    ? 'Save & invite selected'
-    : 'Create & invite everyone'
-
   const isGroupType = eventType === 'appointment' || eventType === 'social'
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
-  // On iOS, inputs with font-size < 16px trigger viewport auto-zoom when focused.
-  // Use 16px on mobile to prevent that; keep 13.5px on desktop for visual density.
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    background: 'var(--surface-3)',
-    border: '1px solid var(--border-2)',
-    borderRadius: 'var(--r-sm)',
-    padding: '10px 12px',
-    fontSize: isMobile ? 16 : 13.5,
-    color: 'var(--text-1)',
-    outline: 'none',
-    transition: 'var(--transition)',
-    fontFamily: 'inherit',
-    minHeight: 44,
-    boxSizing: 'border-box',
-    // iOS native date/time inputs have a wide intrinsic min-width; without this
-    // they refuse to shrink inside a 2-col grid and overflow the modal edge.
-    minWidth: 0,
+  // ── Board layout helpers ─────────────────────────────────────────────
+  const groupList = groups.filter(g => g.groups_id != null)
+  const selectedGroup = groupList.find(g => String(g.groups_id) === form.groupsId)
+  const groupName = selectedGroup ? (selectedGroup.groups_title || selectedGroup.tag_name) : 'Just me'
+  const groupDot = selectedGroup ? groupColorFor(selectedGroup) : 'var(--text-1)'
+  const everyone = eventType === 'social'
+
+  function pickCalendar(value: string) {
+    if (!value) {
+      setEventType('personal')
+      set('groupsId', '')
+    } else {
+      if (eventType === 'personal') setEventType('appointment')
+      set('groupsId', value)
+    }
   }
 
-  // Date/time inputs only: reset the native WebKit appearance so the control
-  // honours its box width exactly (iOS/Chrome-iOS otherwise let the internal
-  // value text bleed to the box edge, making the two columns look like they
-  // overlap at the seam). Kept separate from inputStyle so the <select> fields
-  // keep their native dropdown chevron.
-  const dateTimeStyle: React.CSSProperties = {
-    ...inputStyle,
-    WebkitAppearance: 'none',
-    appearance: 'none',
-    textAlign: 'left',
+  function setStartDate(v: string) {
+    setForm(f => ({ ...f, startDate: v, endDate: !f.endDate || f.endDate < v || f.endDate === f.startDate ? v : f.endDate }))
   }
 
-  // Portal to <body> so the fixed overlay escapes the .app-viewport
-  // (overflow:hidden + 100dvh) wrapper. On iOS Safari a position:fixed
-  // descendant of an overflow:hidden ancestor gets clipped and renders
-  // *behind* the bottom nav — portalling lifts it above everything.
-  return createPortal(
-    <div
-      // Close on pointerdown, not click: on touch, FullCalendar's dateClick fires
-      // on touchend and the browser's compatibility click for that same tap is then
-      // hit-tested against the freshly mounted backdrop — closing the modal it just
-      // opened. pointerdown only fires for a *new* touch, so the ghost can't reach it.
-      onPointerDown={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 500,
-        background: 'var(--scrim)',
-        backdropFilter: 'blur(6px)',
-        display: 'flex',
-        alignItems: isMobile ? 'flex-end' : 'center',
-        justifyContent: isMobile ? 'stretch' : 'center',
-        padding: isMobile ? 0 : 16,
-        animation: 'fadeIn 0.2s ease',
-      }}
-    >
-      <div
-        onPointerDown={e => e.stopPropagation()}
-        className="scroll"
-        style={isMobile ? {
-          width: '100%',
-          maxHeight: '92dvh',
-          overflowY: 'auto',
-          background: 'var(--surface)',
-          borderRadius: 'var(--r-xl) var(--r-xl) 0 0',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'slideUp 0.28s cubic-bezier(0.2,0.7,0.2,1) both',
-        } : {
-          width: 'min(480px, 100%)',
-          maxHeight: '92vh',
-          overflowY: 'auto',
-          background: 'var(--surface)',
-          borderRadius: 'var(--r-xl)',
-          border: '1px solid var(--border-2)',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'scaleIn 0.24s cubic-bezier(0.2,0.7,0.2,1) both',
-        }}
+  const fmtDay = (key: string) => key
+    ? new Date(`${key}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+    : 'Pick a date'
+
+  const invitedOthers = selectedParticipants.filter(id => id !== currentUserId).length
+  const inviteSummary = everyone ? 'Everyone'
+    : selectedParticipants.length === 0 ? 'Nobody yet'
+    : invitedOthers === 0 ? 'Just you'
+    : `You + ${invitedOthers}`
+  const placeSummary = form.location || (form.description ? 'Note' : '') || 'None'
+  const giftCount = giftDrafts.filter(g => g.title.trim()).length
+  const wishlistSummary = giftCount ? `${giftCount} gift${giftCount === 1 ? '' : 's'}` : 'None'
+  const reminderLabel = REMINDER_OPTIONS.find(o => o.value === reminderMinutes)?.label ?? 'None'
+  const repeatSummary = rec.repeat === 'none' ? 'Never' : rec.repeat[0].toUpperCase() + rec.repeat.slice(1)
+  const repeatLine = `${repeatSummary} · ${reminderMinutes === null ? 'no reminder' : reminderLabel.replace(' before', '')}`
+
+  const showEnds = form.allDay || (form.endDate !== '' && form.endDate !== form.startDate)
+  const [gift, setGift] = useState('')
+  function addGift() {
+    const t = gift.trim()
+    if (!t) return
+    setGiftDrafts(g => [...g, { title: t, link: '', note: '' }])
+    setWishlistEnabled(true)
+    setGift('')
+  }
+
+  const hint = !selectedGroup
+    ? 'Only you can see it.'
+    : everyone
+      ? `Everyone in ${groupName} is invited and can RSVP.`
+      : `Everyone in ${groupName} can see it. Only the people you invite get an RSVP.`
+
+  return (
+    <>
+      <Sheet
+        title={isEdit ? 'Edit event' : 'New event'}
+        onClose={onClose}
+        confirmLabel={saving ? 'Saving…' : isEdit ? 'Save' : 'Add'}
+        confirmForm="event-form"
+        confirmDisabled={saving || !form.title.trim()}
+        width={440}
       >
-        {/* Mobile drag handle */}
-        {isMobile && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-            <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--border-2)' }} />
-          </div>
-        )}
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '18px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
-            {isEdit ? 'Edit event' : 'New event'}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isEdit && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                title="Delete event"
-                style={{
-                  width: 34, height: 34,
-                  borderRadius: 'var(--r-sm)',
-                  border: '1px solid rgba(244,63,94,0.3)',
-                  background: 'transparent',
-                  color: '#fb7185',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: deleting ? 'not-allowed' : 'pointer',
-                  opacity: deleting ? 0.5 : 1,
-                  transition: 'var(--transition)',
-                }}
-              >
-                <Icon name="trash" size={15} sw={2.2} />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                width: 34, height: 34,
-                borderRadius: 'var(--r-sm)',
-                border: '1px solid var(--border-2)',
-                background: 'transparent',
-                color: 'var(--text-3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-              }}
-            >
-              <Icon name="close" size={15} sw={2} />
-            </button>
-          </div>
-        </div>
+        <form id="event-form" onSubmit={handleSubmit} style={{ padding: '4px 16px 32px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
-
-          {/* ── NL quick-fill (new events only) ── */}
-          {!isEdit && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                value={nlText}
-                onChange={e => setNlText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { e.preventDefault(); applyNL() }
-                }}
-                placeholder="Quick fill: &quot;Lunch Friday 1pm at Marco's&quot;"
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={applyNL}
-                disabled={!nlText.trim()}
-                title="Fill form from text"
-                style={{
-                  padding: '0 14px',
-                  borderRadius: 'var(--r-sm)',
-                  border: 'none',
-                  background: nlText.trim() ? 'var(--accent-soft)' : 'var(--surface-3)',
-                  color: nlText.trim() ? 'var(--accent)' : 'var(--text-3)',
-                  fontWeight: 650,
-                  fontSize: 13,
-                  cursor: nlText.trim() ? 'pointer' : 'default',
-                  minHeight: 44,
-                  flexShrink: 0,
-                  transition: 'var(--transition)',
-                }}
-              >
-                Fill
-              </button>
-            </div>
-          )}
-
-          {/* ── Event type selector (new events only) ── */}
-          {!isEdit && (
-            <>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 5,
-                padding: 4,
-                background: 'var(--surface-3)',
-                borderRadius: 'var(--r-md)',
-                border: '1px solid var(--border)',
-              }}>
-                {typeOptions.map(({ value, icon, label }) => {
-                  const active = eventType === value
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setEventType(value)}
-                      style={{
-                        padding: '8px 4px',
-                        borderRadius: 'calc(var(--r-md) - 4px)',
-                        border: active ? '1px solid var(--border-2)' : '1px solid transparent',
-                        background: active ? 'var(--surface)' : 'transparent',
-                        color: active ? 'var(--text-1)' : 'var(--text-3)',
-                        fontSize: 12,
-                        fontWeight: 650,
-                        cursor: 'pointer',
-                        transition: 'var(--transition)',
-                        boxShadow: active ? 'var(--shadow-sm)' : 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 5,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <Icon name={icon} size={13} sw={1.8} />
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-                {typeOptions.find(o => o.value === eventType)?.hint}
-              </p>
-            </>
-          )}
-
-          {/* ── Tentative toggle (group events only, new events only) ── */}
-          {!isEdit && isGroupType && (
-            <button
-              type="button"
-              aria-pressed={isTentative}
-              onClick={toggleTentative}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '10px 14px',
-                borderRadius: 'var(--r-md)',
-                border: isTentative ? '1px solid rgba(245,158,11,0.4)' : '1px solid var(--border)',
-                background: isTentative ? 'rgba(245,158,11,0.07)' : 'var(--surface-2)',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-                width: '100%',
-                textAlign: 'left',
-              }}
-            >
-              {/* Custom checkbox */}
-              <div style={{
-                width: 18,
-                height: 18,
-                borderRadius: 5,
-                border: isTentative ? '2px solid #f59e0b' : '2px solid var(--border-2)',
-                background: isTentative ? '#f59e0b' : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'var(--transition)',
-              }}>
-                {isTentative && <Icon name="check" size={11} sw={3} style={{ color: '#0b0b12' }} />}
-              </div>
-              <div>
-                <span style={{ fontSize: 13.5, fontWeight: 650, color: isTentative ? '#f59e0b' : 'var(--text-2)' }}>
-                  Tentative
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 6 }}>
-                  — let the group vote on the date
-                </span>
-              </div>
-            </button>
-          )}
-
-          {/* ── Title ── */}
-          <div>
-            <label style={labelStyle}>Title</label>
+          <label style={{ display: 'block' }}>
+            <span className="sr-only">Event name</span>
             <input
+              data-bare
               required
               autoFocus={!isMobile}
               value={form.title}
               onChange={e => set('title', e.target.value)}
-              placeholder={
-                eventType === 'personal' ? 'e.g. Doctor appointment' :
-                eventType === 'social' ? 'e.g. Family dinner' :
-                'e.g. School pickup'
-              }
-              style={inputStyle}
+              placeholder="Event name"
+              style={{
+                width: '100%', boxSizing: 'border-box', border: 0, outline: 'none', background: 'transparent',
+                fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', padding: '8px 0', color: 'var(--text-1)',
+                fontFamily: 'inherit',
+              }}
             />
-          </div>
+          </label>
 
-          {/* ── Description ── */}
-          <div>
-            <label style={labelStyle}>
-              Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <textarea
-              value={form.description}
-              onChange={e => set('description', e.target.value)}
-              placeholder="Any extra details…"
-              rows={2}
-              style={{ ...inputStyle, resize: 'none', minHeight: 'unset' }}
-            />
-          </div>
-
-          {/* ── Location ── */}
-          <div>
-            <label style={labelStyle}>
-              Location <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <span style={{ position: 'absolute', left: 12, color: 'var(--text-3)', pointerEvents: 'none', display: 'flex' }}>
-                <Icon name="pin" size={15} sw={1.8} />
-              </span>
-              <input
-                type="text"
-                value={form.location}
-                onChange={e => set('location', e.target.value)}
-                placeholder="Add location or address"
-                style={{ ...inputStyle, paddingLeft: 36 }}
-              />
-            </div>
-          </div>
-
-          {/* ── Cover image ── */}
-          <div>
-            <label style={labelStyle}>
-              Cover image <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <span style={{ position: 'absolute', left: 12, color: 'var(--text-3)', pointerEvents: 'none', display: 'flex' }}>
-                <Icon name="share" size={15} sw={1.8} />
-              </span>
-              <input
-                type="url"
-                value={form.imageUrl}
-                onChange={e => set('imageUrl', e.target.value)}
-                placeholder="Paste an image URL"
-                style={{ ...inputStyle, paddingLeft: 36 }}
-              />
-            </div>
-            {form.imageUrl && (
-              <img
-                src={form.imageUrl}
-                alt="Cover preview"
-                style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 'var(--r-sm)', marginTop: 6 }}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
-            )}
-          </div>
-
-          {/* ── All day (hidden when tentative) ── */}
-          {!isTentative && (
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 9,
-              cursor: 'pointer', fontSize: 13.5, color: 'var(--text-2)', userSelect: 'none',
-            }}>
-              <input
-                type="checkbox"
-                checked={form.allDay}
-                onChange={e => set('allDay', e.target.checked)}
-                style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
-              />
-              All day
-            </label>
-          )}
-
-          {/* ── Normal dates (hidden when tentative) ── */}
-          {!isTentative && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Start date</label>
-                <input type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} style={dateTimeStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>End date</label>
-                <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={dateTimeStyle} />
-              </div>
-            </div>
-          )}
-
-          {/* ── Normal times (hidden when tentative) ── */}
-          {!isTentative && !form.allDay && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Start time</label>
-                <input type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} style={dateTimeStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>End time</label>
-                <input type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} style={dateTimeStyle} />
-              </div>
-            </div>
-          )}
-
-          {/* ── Tentative date options ── */}
-          {isTentative && (
-            <div>
-              <label style={labelStyle}>Date options</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* ── When + calendar ── */}
+          <div style={grp}>
+            {isTentative ? (
+              <div style={{ ...panel, paddingTop: 12 }}>
                 {dateOptions.map((opt, idx) => (
-                  <div key={idx} style={{
-                    padding: '10px 12px',
-                    borderRadius: 'var(--r-sm)',
-                    border: '1px dashed var(--border-2)',
-                    background: 'var(--surface-2)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-3)' }}>
-                        Option {idx + 1}
-                      </span>
-                      {dateOptions.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => removeDateOption(idx)}
-                          title="Remove option"
-                          style={{
-                            width: 22, height: 22,
-                            borderRadius: 'var(--r-sm)',
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--text-3)',
-                            cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            padding: 0,
-                          }}
-                        >
-                          <Icon name="close" size={13} sw={2} />
-                        </button>
-                      )}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
-                      <div>
-                        <label style={{ ...labelStyle, marginBottom: 4 }}>Date</label>
-                        <input
-                          type="date"
-                          value={opt.startDate}
-                          onChange={e => setDateOption(idx, 'startDate', e.target.value)}
-                          style={{ ...dateTimeStyle, minHeight: 38 }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ ...labelStyle, marginBottom: 4 }}>Start time</label>
-                        <input
-                          type="time"
-                          value={opt.startTime}
-                          onChange={e => setDateOption(idx, 'startTime', e.target.value)}
-                          style={{ ...dateTimeStyle, minHeight: 38 }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ ...labelStyle, marginBottom: 4 }}>
-                        End time <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={opt.endTime}
-                        onChange={e => setDateOption(idx, 'endTime', e.target.value)}
-                        style={{ ...dateTimeStyle, minHeight: 38 }}
-                      />
-                    </div>
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="date" aria-label={`Option ${idx + 1} date`} value={opt.startDate} onChange={e => setDateOption(idx, 'startDate', e.target.value)} style={{ ...fieldStyle, flex: 1.4 }} />
+                    <input type="time" aria-label={`Option ${idx + 1} start time`} value={opt.startTime} onChange={e => setDateOption(idx, 'startTime', e.target.value)} style={{ ...fieldStyle, flex: 1 }} />
+                    {dateOptions.length > 2
+                      ? <IconButton name="close" size={36} isz={14} title={`Remove option ${idx + 1}`} onClick={() => removeDateOption(idx)} />
+                      : <span style={{ width: 36, flexShrink: 0 }} />}
                   </div>
                 ))}
+                {dateOptions.length < MAX_DATE_OPTIONS && (
+                  <button type="button" onClick={addDateOption} style={textBtn}><Icon name="plus" size={14} sw={2.2} /> Add a date</button>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={addDateOption}
-                disabled={dateOptions.length >= MAX_DATE_OPTIONS}
-                style={{
-                  marginTop: 8,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '7px 12px',
-                  borderRadius: 'var(--r-sm)',
-                  border: '1px solid var(--border-2)',
-                  background: 'transparent',
-                  color: dateOptions.length >= MAX_DATE_OPTIONS ? 'var(--text-3)' : 'var(--accent)',
-                  fontSize: 12.5,
-                  fontWeight: 650,
-                  cursor: dateOptions.length >= MAX_DATE_OPTIONS ? 'not-allowed' : 'pointer',
-                  opacity: dateOptions.length >= MAX_DATE_OPTIONS ? 0.5 : 1,
-                  transition: 'var(--transition)',
-                }}
-              >
-                <Icon name="plus" size={13} sw={2.2} />
-                Add option
-              </button>
-            </div>
-          )}
-
-          {/* ── Repeat / recurrence ── */}
-          <div>
-            <label style={labelStyle}>Repeat</label>
-            <select
-              value={rec.repeat}
-              onChange={e => setRec(r => ({ ...r, repeat: e.target.value as RepeatFreq }))}
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            >
-              <option value="none">Does not repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-            {customRuleKept && (
-              <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '8px 0 0' }}>
-                Custom repeat from another calendar ({originalRule}). It is kept unless you change these settings.
-              </p>
-            )}
-
-            {rec.repeat !== 'none' && (
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
-                {/* Interval */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Every</span>
-                  <input
-                    type="number" min={1} max={99} value={rec.interval}
-                    onChange={e => setRec(r => ({ ...r, interval: Math.max(1, parseInt(e.target.value) || 1) }))}
-                    style={{ ...inputStyle, width: 72, minHeight: 38 }}
-                  />
-                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
-                    {rec.repeat === 'daily' ? 'day(s)' : rec.repeat === 'weekly' ? 'week(s)' : rec.repeat === 'monthly' ? 'month(s)' : 'year(s)'}
+            ) : (
+              <>
+                <label style={{ ...cell, borderTop: 'none' }}>
+                  <span>{showEnds ? 'Starts' : 'Date'}</span>
+                  <span style={val}>
+                    {fmtDay(form.startDate)}
+                    <input type="date" required aria-label="Start date" value={form.startDate} onChange={e => setStartDate(e.target.value)} onClick={openPicker} style={overlayInput} />
                   </span>
-                </div>
-
-                {/* Weekdays (weekly only) */}
-                {rec.repeat === 'weekly' && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {WEEKDAYS.map(d => {
-                      const on = rec.weekdays.includes(d)
-                      return (
-                        <button
-                          key={d} type="button"
-                          onClick={() => setRec(r => ({ ...r, weekdays: on ? r.weekdays.filter(x => x !== d) : [...r.weekdays, d] }))}
-                          style={{
-                            width: 34, height: 34, borderRadius: '50%', cursor: 'pointer',
-                            border: `1px solid ${on ? 'var(--accent)' : 'var(--border-2)'}`,
-                            background: on ? 'var(--accent)' : 'var(--surface-3)',
-                            color: on ? 'var(--accent-text)' : 'var(--text-2)',
-                            fontSize: 12, fontWeight: 700,
-                          }}
-                        >{WEEKDAY_LABEL[d]}</button>
-                      )
-                    })}
+                </label>
+                {showEnds && (
+                  <label style={cell}>
+                    <span>Ends</span>
+                    <span style={val}>
+                      {fmtDay(form.endDate || form.startDate)}
+                      <input type="date" aria-label="End date" min={form.startDate} value={form.endDate} onChange={e => set('endDate', e.target.value)} onClick={openPicker} style={overlayInput} />
+                    </span>
+                  </label>
+                )}
+                {!form.allDay && (
+                  <div style={cell}>
+                    <span>Time</span>
+                    <span style={{ ...val, fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ position: 'relative', padding: '4px 2px' }}>
+                        {form.startTime || 'Start'}
+                        <input type="time" aria-label="Start time" value={form.startTime} onChange={e => set('startTime', e.target.value)} onClick={openPicker} style={overlayInput} />
+                      </span>
+                      –
+                      <span style={{ position: 'relative', padding: '4px 2px' }}>
+                        {form.endTime || 'End'}
+                        <input type="time" aria-label="End time" value={form.endTime} onChange={e => set('endTime', e.target.value)} onClick={openPicker} style={overlayInput} />
+                      </span>
+                    </span>
                   </div>
                 )}
-
-                {/* End condition */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
-                    <input type="radio" name="endmode" checked={rec.endMode === 'never'} onChange={() => setRec(r => ({ ...r, endMode: 'never' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
-                    Never ends
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
-                    <input type="radio" name="endmode" checked={rec.endMode === 'on'} onChange={() => setRec(r => ({ ...r, endMode: 'on' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
-                    On
-                    <input type="date" value={rec.endDate} onChange={e => setRec(r => ({ ...r, endDate: e.target.value, endMode: 'on' as EndMode }))} style={{ ...dateTimeStyle, width: 160, minHeight: 36 }} />
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
-                    <input type="radio" name="endmode" checked={rec.endMode === 'after'} onChange={() => setRec(r => ({ ...r, endMode: 'after' as EndMode }))} style={{ accentColor: 'var(--accent)' }} />
-                    After
-                    <input type="number" min={1} value={rec.count} onChange={e => setRec(r => ({ ...r, count: Math.max(1, parseInt(e.target.value) || 1), endMode: 'after' as EndMode }))} style={{ ...inputStyle, width: 72, minHeight: 36 }} />
-                    times
-                  </label>
+                <div style={{ ...cell, cursor: 'default' }}>
+                  <span>All day</span>
+                  <span style={val}><Switch checked={form.allDay} onChange={(v) => set('allDay', v)} label="All day" /></span>
                 </div>
+              </>
+            )}
+            <label style={{ ...cell, position: 'relative', cursor: isEdit && !isGroupType ? 'default' : 'pointer' }}>
+              <span>Calendar</span>
+              <span style={val}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: groupDot }} />
+                {groupName}
+                {!(isEdit && !isGroupType) && <Icon name="chevR" size={12} sw={2.2} />}
+              </span>
+              {!(isEdit && !isGroupType) && (
+                <select aria-label="Calendar" value={form.groupsId} onChange={e => pickCalendar(e.target.value)} style={overlayInput}>
+                  {!isEdit && <option value="">Just me</option>}
+                  {groupList.map(g => (
+                    <option key={String(g.groups_id)} value={String(g.groups_id)}>{g.groups_title || g.tag_name}</option>
+                  ))}
+                </select>
+              )}
+            </label>
+            {!isEdit && selectedGroup && (
+              <div style={{ ...cell, cursor: 'default' }}>
+                <span>Let the group vote on a date</span>
+                <span style={val}><Switch checked={isTentative} onChange={toggleTentative} label="Let the group vote on a date" /></span>
+              </div>
+            )}
+          </div>
+          <p style={{ margin: '-4px 4px 0', fontSize: 13, color: 'var(--text-3)', lineHeight: 1.4 }}>{hint}</p>
 
-                <p style={{ fontSize: 12.5, color: 'var(--accent)', margin: 0, fontWeight: 600 }}>{summarize(rec)}</p>
+          {/* ── Optional sections, folded ── */}
+          <div style={{ ...grp, marginTop: 8 }}>
+            {selectedGroup && (
+              <>
+                <SectionCell first icon="users" label="Invite" summary={inviteSummary} open={openSection.invite} onToggle={() => toggleSection('invite')} />
+                {openSection.invite && (
+                  <div style={{ ...panel, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <Pill on={everyone} onClick={() => setEventType(everyone ? 'appointment' : 'social')}>Everyone</Pill>
+                    {groupMembers.map(m => (
+                      <Pill
+                        key={m.user_id}
+                        on={everyone || selectedParticipants.includes(m.user_id)}
+                        disabled={everyone}
+                        onClick={() => toggleParticipant(m.user_id)}
+                      >
+                        {m.user_id === currentUserId ? 'You' : m.username}
+                      </Pill>
+                    ))}
+                    {groupMembers.length === 0 && <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading people…</span>}
+                  </div>
+                )}
+              </>
+            )}
+
+            <SectionCell first={!selectedGroup} icon="pin" label="Location & note" summary={placeSummary} open={openSection.place} onToggle={() => toggleSection('place')} />
+            {openSection.place && (
+              <div style={panel}>
+                <input aria-label="Location" placeholder="Location" value={form.location} onChange={e => set('location', e.target.value)} style={fieldStyle} />
+                <textarea aria-label="Note for guests" placeholder="Note for guests" rows={2} value={form.description} onChange={e => set('description', e.target.value)} style={{ ...fieldStyle, resize: 'vertical' }} />
+                <input type="url" aria-label="Cover image URL" placeholder="Cover image link (optional)" value={form.imageUrl} onChange={e => set('imageUrl', e.target.value)} style={fieldStyle} />
+              </div>
+            )}
+
+            {!isEdit && (
+              <>
+                <SectionCell icon="gift" label="Wishlist" summary={wishlistSummary} open={openSection.wishlist} onToggle={() => toggleSection('wishlist')} />
+                {openSection.wishlist && (
+                  <div style={panel}>
+                    <input
+                      aria-label="Add a gift"
+                      placeholder="Add a gift, press Enter"
+                      value={gift}
+                      maxLength={200}
+                      onChange={e => setGift(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addGift() } }}
+                      onBlur={addGift}
+                      style={fieldStyle}
+                    />
+                    {giftDrafts.map((g, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, minHeight: 36 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 3, background: 'var(--text-3)' }} />
+                        <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{g.title}</span>
+                        <IconButton name="close" size={36} isz={14} title={`Remove ${g.title}`} onClick={() => setGiftDrafts(d => d.filter((_, n) => n !== i))} />
+                      </div>
+                    ))}
+                    <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Guests can reserve a gift. You never see who took what.</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            <SectionCell icon="repeat" label="Repeat & reminder" summary={repeatLine} open={openSection.repeat} onToggle={() => toggleSection('repeat')} />
+            {openSection.repeat && (
+              <div style={{ ...panel, gap: 12 }}>
+                <Segmented
+                  full
+                  size="md"
+                  label="Repeat"
+                  options={[
+                    { value: 'none', label: 'Never' },
+                    { value: 'daily', label: 'Daily' },
+                    { value: 'weekly', label: 'Weekly' },
+                    { value: 'monthly', label: 'Monthly' },
+                    { value: 'yearly', label: 'Yearly' },
+                  ]}
+                  value={rec.repeat}
+                  onChange={(v) => setRec(r => ({ ...r, repeat: v as RepeatFreq }))}
+                />
+                {customRuleKept && (
+                  <p style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                    Custom repeat from another calendar ({originalRule}). It is kept unless you change it.
+                  </p>
+                )}
+                {rec.repeat !== 'none' && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
+                      <span>Every</span>
+                      <input type="number" min={1} max={99} aria-label="Repeat interval" value={rec.interval}
+                        onChange={e => setRec(r => ({ ...r, interval: Math.max(1, parseInt(e.target.value) || 1) }))}
+                        style={{ ...fieldStyle, width: 64 }} />
+                      <span>{rec.repeat === 'daily' ? 'day(s)' : rec.repeat === 'weekly' ? 'week(s)' : rec.repeat === 'monthly' ? 'month(s)' : 'year(s)'}</span>
+                    </div>
+                    {rec.repeat === 'weekly' && (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {WEEKDAYS.map((d, i) => {
+                          const on = rec.weekdays.includes(d)
+                          return (
+                            <button key={d} type="button" aria-pressed={on} aria-label={d}
+                              onClick={() => setRec(r => ({ ...r, weekdays: on ? r.weekdays.filter(x => x !== d) : [...r.weekdays, d] }))}
+                              style={{
+                                flex: 1, height: 36, borderRadius: 18, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                border: on ? 'none' : '1px solid var(--pill-line)',
+                                background: on ? 'var(--accent)' : (i >= 5 ? 'var(--weekend)' : 'var(--bg)'),
+                                color: on ? 'var(--accent-text)' : 'var(--text-1)',
+                              }}>{WEEKDAY_LABEL[d]}</button>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 15, position: 'relative' }}>
+                      <span>Ends</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-2)' }}>
+                        <select aria-label="Repeat ends" value={rec.endMode} onChange={e => setRec(r => ({ ...r, endMode: e.target.value as EndMode }))} style={bareSelect}>
+                          <option value="never">Never</option>
+                          <option value="on">On a date</option>
+                          <option value="after">After a number of times</option>
+                        </select>
+                        {rec.endMode === 'on' && <input type="date" aria-label="Repeat end date" value={rec.endDate} onChange={e => setRec(r => ({ ...r, endDate: e.target.value }))} style={{ ...fieldStyle, width: 150 }} />}
+                        {rec.endMode === 'after' && <input type="number" min={1} aria-label="Number of times" value={rec.count} onChange={e => setRec(r => ({ ...r, count: Math.max(1, parseInt(e.target.value) || 1) }))} style={{ ...fieldStyle, width: 64 }} />}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--text-3)' }}>{summarize(rec)}</p>
+                  </>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 15 }}>
+                  <span>Reminder</span>
+                  <select aria-label="Reminder" value={reminderMinutes === null ? '' : String(reminderMinutes)}
+                    onChange={e => setReminderMinutes(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                    style={bareSelect}>
+                    {REMINDER_OPTIONS.map(o => (
+                      <option key={o.label} value={o.value === null ? '' : String(o.value)}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
           </div>
 
-          {/* ── Reminder ── */}
-          <div>
-            <label style={labelStyle}>Remind me</label>
-            <select
-              value={reminderMinutes === null ? '' : String(reminderMinutes)}
-              onChange={e => setReminderMinutes(e.target.value === '' ? null : parseInt(e.target.value, 10))}
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            >
-              {REMINDER_OPTIONS.map(o => (
-                <option key={o.label} value={o.value === null ? '' : String(o.value)}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* ── Group section ── */}
-          {isGroupType && (
-            <>
-              <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
-
-              <div>
-                <label style={labelStyle}>Group</label>
-                <select
-                  value={form.groupsId}
-                  onChange={e => set('groupsId', e.target.value)}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                >
-                  <option value="">Select a group…</option>
-                  {groups.filter(g => g.groups_id != null).map(g => (
-                    <option key={String(g.groups_id)} value={String(g.groups_id)}>
-                      {g.groups_title || g.tag_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Social: info banner */}
-              {eventType === 'social' && form.groupsId && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 14px',
-                  borderRadius: 'var(--r-md)',
-                  background: 'var(--accent-softer)',
-                  border: '1px solid var(--accent-line)',
-                }}>
-                  <Icon name="groups" size={16} sw={1.8} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>
-                    Everyone in this group will be invited and can RSVP.
-                  </p>
-                </div>
-              )}
-
-              {/* Appointment: member checkboxes */}
-              {eventType === 'appointment' && groupMembers.length > 0 && (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <label style={{ ...labelStyle, marginBottom: 0 }}>Who's invited</label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" onClick={() => setSelectedParticipants(groupMembers.map(m => m.user_id))}
-                        style={{ fontSize: 11.5, color: 'var(--accent)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                        All
-                      </button>
-                      <span style={{ color: 'var(--border-2)' }}>·</span>
-                      <button type="button" onClick={() => setSelectedParticipants([])}
-                        style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                        None
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                    {groupMembers.map((m, i) => {
-                      const checked = selectedParticipants.includes(m.user_id)
-                      return (
-                        <label
-                          key={m.user_id}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', cursor: 'pointer',
-                            borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-                            background: checked ? 'var(--accent-softer)' : 'transparent',
-                            transition: 'var(--transition)',
-                          }}
-                        >
-                          <input type="checkbox" checked={checked} onChange={() => toggleParticipant(m.user_id)}
-                            style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }} />
-                          <div style={{
-                            width: 28, height: 28, borderRadius: '50%',
-                            background: 'var(--accent-soft)', color: 'var(--accent)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 12, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            {m.username?.[0]?.toUpperCase()}
-                          </div>
-                          <span style={{ fontSize: 13.5, color: 'var(--text-1)', fontWeight: 500 }}>{m.username}</span>
-                          {checked && (
-                            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--accent)', fontWeight: 650 }}>Invited</span>
-                          )}
-                        </label>
-                      )
-                    })}
-                  </div>
-
-                  {selectedParticipants.length === 0 && (
-                    <p style={{ fontSize: 12, color: '#fb7185', marginTop: 8 }}>
-                      Pick at least one person — an event needs at least one attendee.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {eventType === 'appointment' && form.groupsId && groupMembers.length === 0 && (
-                <p style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Loading members…</p>
-              )}
-            </>
-          )}
-
-          {!isEdit && (
-            <WishlistDraft enabled={wishlistEnabled} onEnabled={setWishlistEnabled} items={giftDrafts} onChange={setGiftDrafts} disabled={saving} />
-          )}
-
-          {/* ── Error ── */}
-          {error && (
-            <p style={{
-              fontSize: 13, color: '#fb7185',
-              background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.2)',
-              borderRadius: 'var(--r-sm)', padding: '9px 12px', margin: 0,
-            }}>
-              {error}
-            </p>
-          )}
-
-          {/* ── Actions ── */}
-          <div style={{ display: 'flex', gap: 10, paddingTop: 4, paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                flex: 1,
-                background: saving ? 'var(--accent-soft)' : 'var(--accent)',
-                color: 'var(--accent-text)',
-                border: 'none',
-                borderRadius: 'var(--r-sm)',
-                padding: '11px 16px',
-                fontSize: 13.5,
-                fontWeight: 650,
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.7 : 1,
-                transition: 'var(--transition)',
-                boxShadow: saving ? 'none' : '0 4px 14px var(--accent-glow)',
-              }}
-            >
-              {submitLabel}
+          {isEdit && (
+            <button type="button" onClick={handleDelete} disabled={deleting} style={{ ...textBtn, color: 'var(--danger)', alignSelf: 'center', marginTop: 12 }}>
+              {deleting ? 'Deleting…' : 'Delete event'}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                background: 'var(--surface-3)',
-                color: 'var(--text-2)',
-                border: '1px solid var(--border-2)',
-                borderRadius: 'var(--r-sm)',
-                padding: '11px 16px',
-                fontSize: 13.5,
-                fontWeight: 650,
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
+          )}
+
+          {error && <p role="alert" style={{ fontSize: 13, color: 'var(--danger)', margin: '0 4px' }}>{error}</p>}
         </form>
-      </div>
+      </Sheet>
 
-      {/* ── Recurring scope chooser ── */}
       {scopePrompt && (
         <RecurringScopePrompt
           mode={scopePrompt}
@@ -1117,7 +647,50 @@ export default function EventFormModal({ event, selectInfo, groups, currentUserI
           onCancel={() => setScopePrompt(null)}
         />
       )}
-    </div>,
-    document.body
+    </>
+  )
+}
+
+// ── Board styles (PhoneEvent mockup) ─────────────────────────────────────
+function openPicker(e: React.MouseEvent<HTMLInputElement>) {
+  try { e.currentTarget.showPicker?.() } catch { /* not allowed or unsupported: native focus still works */ }
+}
+/** Next full hour (and the hour after) for a new timed event */
+function nextHourSlot(): [string, string] {
+  const h = (new Date().getHours() + 1) % 24
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return [`${pad(h)}:00`, `${pad((h + 1) % 24)}:00`]
+}
+const grp: React.CSSProperties = { background: 'var(--fill)', borderRadius: 12, overflow: 'hidden' }
+const cell: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: '0 14px', fontSize: 15,
+  border: 0, borderTop: '1px solid var(--divider)', background: 'transparent', width: '100%',
+  boxSizing: 'border-box', textAlign: 'left', color: 'var(--text-1)', cursor: 'pointer', position: 'relative',
+}
+const val: React.CSSProperties = { marginLeft: 'auto', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }
+const panel: React.CSSProperties = { padding: '4px 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }
+/** Invisible native picker stretched over a row value (tap the row, get the OS picker) */
+const overlayInput: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', border: 0, fontSize: 16 }
+const bareSelect: React.CSSProperties = {
+  border: 0, background: 'transparent', color: 'var(--text-2)', fontSize: 15, fontFamily: 'inherit',
+  textAlign: 'right', cursor: 'pointer', padding: '4px 0', boxShadow: 'none',
+}
+const textBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 4px', border: 0,
+  background: 'transparent', color: 'var(--text-1)', fontSize: 14, fontWeight: 500, cursor: 'pointer',
+}
+
+function SectionCell({ icon, label, summary, open, onToggle, first }: {
+  icon: string; label: string; summary: string; open: boolean; onToggle: () => void; first?: boolean
+}) {
+  return (
+    <button type="button" aria-expanded={open} onClick={onToggle} style={{ ...cell, borderTop: first ? 'none' : cell.borderTop }}>
+      <span style={{ width: 20, display: 'flex', color: 'var(--text-2)' }} aria-hidden="true"><Icon name={icon} size={18} sw={1.8} /></span>
+      <span>{label}</span>
+      <span style={val}>
+        <span style={{ fontSize: 14, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>
+        <Icon name={open ? 'chevD' : 'chevR'} size={12} sw={2.2} />
+      </span>
+    </button>
   )
 }

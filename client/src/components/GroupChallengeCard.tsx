@@ -153,7 +153,7 @@ export default function GroupChallengeCard({ challenge, groupId, isAdmin, onDele
           {/* End date countdown */}
           {challenge.end_date && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', margin: '0 0 6px' }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 6px' }}>
                 Deadline
               </p>
               <CountdownPill targetDate={challenge.end_date + 'T23:59:59'} />
@@ -169,7 +169,7 @@ export default function GroupChallengeCard({ challenge, groupId, isAdmin, onDele
 
           {/* Leaderboard */}
           <div>
-            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', margin: '0 0 10px' }}>
+            <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 10px' }}>
               Leaderboard
             </p>
             {loadingLB ? (
@@ -185,7 +185,7 @@ export default function GroupChallengeCard({ challenge, groupId, isAdmin, onDele
                     <span style={{
                       fontSize: 12,
                       fontWeight: 700,
-                      color: i === 0 ? '#f59e0b' : i === 1 ? 'var(--text-2)' : 'var(--text-3)',
+                      color: i === 0 ? 'var(--text-1)' : i === 1 ? 'var(--text-2)' : 'var(--text-3)',
                       width: 20,
                       flexShrink: 0,
                       textAlign: 'center',

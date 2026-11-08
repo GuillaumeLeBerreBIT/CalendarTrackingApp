@@ -12,14 +12,14 @@ function Logo() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
       <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px var(--accent-glow)', flexShrink: 0 }}>
-        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ color: 'var(--accent-text)' }} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="3" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
           <line x1="3" y1="10" x2="21" y2="10" />
         </svg>
       </div>
-      <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-1)' }}>Eventli</span>
+      <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-1)' }}>Eventli</span>
     </div>
   )
 }
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
       <div style={{ maxWidth: 680, margin: '0 auto' }}>
         <Logo />
 
-        <h1 style={{ fontSize: 30, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.035em', margin: '0 0 6px' }}>
+        <h1 style={{ fontSize: 30, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.035em', margin: '0 0 6px' }}>
           Privacy Policy
         </h1>
         <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 8px' }}>Last updated: {LAST_UPDATED}</p>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/api/client'
 import Button from '@/components/ui/Button'
@@ -21,7 +22,7 @@ function Logo() {
         flexShrink: 0,
       }}>
         <svg width={20} height={20} viewBox="0 0 24 24" fill="none"
-          stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          stroke="currentColor" style={{ color: 'var(--accent-text)' }} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="3" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
@@ -30,7 +31,7 @@ function Logo() {
       </div>
       <span style={{
         fontSize: 22,
-        fontWeight: 800,
+        fontWeight: 700,
         letterSpacing: '-0.03em',
         color: 'var(--text-1)',
         lineHeight: 1,
@@ -81,7 +82,7 @@ interface EventPreview {
 const AVAILABILITY_PILLS: { value: Availability; label: string; title: string; color: string; bg: string }[] = [
   { value: 'yes',   label: '✓', title: 'Yes, I can make it',  color: 'var(--g-work)',   bg: 'rgba(34,211,170,0.14)' },
   { value: 'maybe', label: '~', title: 'Maybe',                color: 'var(--g-family)', bg: 'rgba(245,158,11,0.14)' },
-  { value: 'no',    label: '✕', title: "No, I can't",          color: '#fb7185',         bg: 'rgba(244,63,94,0.12)' },
+  { value: 'no',    label: '✕', title: "No, I can't",          color: 'var(--danger)',         bg: 'color-mix(in srgb, var(--danger) 12%, transparent)' },
 ]
 
 function formatDateTime(date: string, time?: string | null): string {
@@ -232,13 +233,13 @@ export default function PublicEventPage() {
                 width: 52,
                 height: 52,
                 borderRadius: '50%',
-                background: 'rgba(244,63,94,0.12)',
-                border: '1px solid rgba(244,63,94,0.25)',
+                background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                color: '#fb7185',
+                color: 'var(--danger)',
               }}>
                 <Icon name="calendar" size={22} sw={1.8} />
               </div>
@@ -249,14 +250,14 @@ export default function PublicEventPage() {
           {!loading && event && (
             <>
               {/* Category label */}
-              <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: isPoll ? '#f59e0b' : 'var(--accent)', margin: 0 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: isPoll ? 'var(--text-1)' : 'var(--accent)', margin: 0 }}>
                 {isPoll ? 'Pick a date' : 'Event'}
               </p>
 
               {/* Title */}
               <h1 style={{
                 fontSize: 26,
-                fontWeight: 800,
+                fontWeight: 700,
                 color: 'var(--text-1)',
                 margin: 0,
                 letterSpacing: '-0.03em',
@@ -430,7 +431,7 @@ export default function PublicEventPage() {
                   </div>
 
                   {voteError && (
-                    <p style={{ fontSize: 12.5, color: '#fb7185', margin: 0 }}>{voteError}</p>
+                    <p style={{ fontSize: 12.5, color: 'var(--danger)', margin: 0 }}>{voteError}</p>
                   )}
 
                   <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
@@ -465,16 +466,7 @@ export default function PublicEventPage() {
   )
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 'var(--r-sm)',
-  border: '1px solid var(--border-2)',
-  background: 'var(--surface-2)',
-  color: 'var(--text-1)',
-  fontSize: 13.5,
-  outline: 'none',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const linkBtn: React.CSSProperties = {
   background: 'none',

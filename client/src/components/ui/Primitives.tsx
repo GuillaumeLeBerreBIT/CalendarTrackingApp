@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import Icon from './Icon'
 
@@ -69,49 +70,105 @@ interface SegmentedProps {
   options: SegmentedOption[]
   value: string
   onChange: (value: string) => void
+  /** sm = 28px toolbar switch, md = 34px tabs / RSVP (board) */
   size?: 'sm' | 'md'
+  /** Stretch to the container width, segments share it equally */
+  full?: boolean
+  label?: string
 }
 
-export function Segmented({ options, value, onChange, size = 'md' }: SegmentedProps) {
-  const pad = size === 'sm' ? '5px 11px' : '7px 14px'
-  const fs  = size === 'sm' ? 12 : 13
+export function Segmented({ options, value, onChange, size = 'sm', full, label }: SegmentedProps) {
+  const big = size === 'md'
   return (
-    <div style={{
-      display: 'inline-flex',
-      gap: 2,
-      padding: 3,
-      background: 'var(--surface-3)',
-      borderRadius: 'var(--r-sm)',
-      border: '1px solid var(--border)',
+    <div role="group" aria-label={label} style={{
+      display: full ? 'flex' : 'inline-flex',
+      width: full ? '100%' : undefined,
+      padding: big ? 3 : 2,
+      background: 'var(--seg-track)',
+      borderRadius: big ? 10 : 8,
+      boxSizing: 'border-box',
     }}>
       {options.map(o => {
         const active = o.value === value
         return (
           <button
             key={o.value}
+            type="button"
+            aria-pressed={active}
             onClick={() => onChange(o.value)}
             style={{
+              flex: full ? 1 : undefined,
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 6,
-              padding: pad,
-              borderRadius: 'calc(var(--r-sm) - 3px)',
+              height: big ? 34 : 28,
+              padding: '0 12px',
+              borderRadius: big ? 8 : 6,
               border: 'none',
-              background: active ? 'var(--surface-hi)' : 'transparent',
-              color: active ? 'var(--text-1)' : 'var(--text-3)',
-              fontSize: fs,
-              fontWeight: 650,
-              boxShadow: active ? 'var(--shadow-sm)' : 'none',
+              background: active ? 'var(--seg-on)' : 'transparent',
+              color: active ? 'var(--text-1)' : 'var(--text-2)',
+              fontSize: big ? 14 : 13,
+              fontWeight: active ? 600 : 500,
+              boxShadow: active ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+              whiteSpace: 'nowrap',
               transition: 'var(--transition)',
               cursor: 'pointer',
             }}
           >
-            {o.icon && <Icon name={o.icon} size={fs + 2} />}
+            {o.icon && <Icon name={o.icon} size={big ? 15 : 14} />}
             {o.label}
           </button>
         )
       })}
     </div>
+  )
+}
+
+/* ── Pill: round outline chip (people, lists, claims). Pressed = ink. ── */
+interface PillProps {
+  children: ReactNode
+  on?: boolean
+  onClick?: () => void
+  /** Group colour dot in front of the label */
+  dot?: string
+  icon?: string
+  title?: string
+  disabled?: boolean
+}
+
+export function Pill({ children, on, onClick, dot, icon, title, disabled }: PillProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        height: 36,
+        padding: '0 12px',
+        borderRadius: 999,
+        border: `1px solid ${on ? 'var(--accent)' : 'var(--pill-line)'}`,
+        background: on ? 'var(--accent)' : 'var(--bg)',
+        color: on ? 'var(--accent-text)' : 'var(--text-1)',
+        fontSize: 14,
+        fontWeight: 500,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'var(--transition)',
+      }}
+    >
+      {dot && <span style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: on && dot.startsWith('var(') ? 'var(--accent-text)' : dot }} />}
+      {icon && <Icon name={icon} size={14} sw={2} />}
+      {children}
+    </button>
   )
 }
 
@@ -152,9 +209,9 @@ interface SectionProps {
 
 export function Section({ title, count, children }: SectionProps) {
   return (
-    <section style={{ marginBottom: 30 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
-        <h2 style={{ fontSize: 16, color: 'var(--text-1)' }}>{title}</h2>
+    <section style={{ marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 4px 8px' }}>
+        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0, color: 'var(--text-2)' }}>{title}</h2>
         {count !== undefined && (
           <span style={{
             fontSize: 12,
@@ -229,7 +286,7 @@ export function MapPreview({ area, venue }: { area: string; venue: string }) {
 export function Stat({ n, label }: { n: number | string; label: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
       <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
     </div>
   )

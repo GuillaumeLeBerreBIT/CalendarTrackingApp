@@ -20,7 +20,7 @@ function Logo() {
         flexShrink: 0,
       }}>
         <svg width={20} height={20} viewBox="0 0 24 24" fill="none"
-          stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          stroke="currentColor" style={{ color: 'var(--accent-text)' }} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="3" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
@@ -29,7 +29,7 @@ function Logo() {
       </div>
       <span style={{
         fontSize: 22,
-        fontWeight: 800,
+        fontWeight: 700,
         letterSpacing: '-0.03em',
         color: 'var(--text-1)',
         lineHeight: 1,
@@ -166,13 +166,13 @@ export default function JoinGroupPage() {
                 width: 52,
                 height: 52,
                 borderRadius: '50%',
-                background: 'rgba(244,63,94,0.12)',
-                border: '1px solid rgba(244,63,94,0.25)',
+                background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                color: '#fb7185',
+                color: 'var(--danger)',
               }}>
                 <Icon name="close" size={22} sw={2} />
               </div>
@@ -183,7 +183,7 @@ export default function JoinGroupPage() {
           {!loading && group && (
             <>
               {/* Header label */}
-              <p style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', margin: 0 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-3)', margin: 0 }}>
                 You've been invited to join
               </p>
 
@@ -192,7 +192,7 @@ export default function JoinGroupPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <h2 style={{
                     fontSize: 26,
-                    fontWeight: 800,
+                    fontWeight: 700,
                     color: 'var(--text-1)',
                     margin: 0,
                     letterSpacing: '-0.03em',
@@ -214,12 +214,12 @@ export default function JoinGroupPage() {
               {/* Error from join attempt */}
               {joinError && (
                 <div style={{
-                  background: 'rgba(244,63,94,0.12)',
-                  border: '1px solid rgba(244,63,94,0.3)',
+                  background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)',
                   borderRadius: 'var(--r-sm)',
                   padding: '10px 13px',
                   fontSize: 13,
-                  color: '#fb7185',
+                  color: 'var(--danger)',
                 }}>
                   {joinError}
                 </div>

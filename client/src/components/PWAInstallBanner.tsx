@@ -68,7 +68,7 @@ export default function PWAInstallBanner() {
         justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <Icon name="calendar" size={20} sw={2} style={{ color: '#fff' }} />
+        <Icon name="calendar" size={20} sw={2} style={{ color: 'var(--accent-text)' }} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>

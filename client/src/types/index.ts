@@ -231,3 +231,14 @@ export interface Wishlist {
   isOwner: boolean
   items: WishItem[]
 }
+
+/** A date range picked on the calendar, handed to EventFormModal for a new event.
+ *  For all-day picks `endStr` is EXCLUSIVE (day after the last day), matching what the
+ *  form converts with fromCalendarAllDayEnd(). */
+export interface DateSelection {
+  start: Date
+  end: Date
+  startStr: string
+  endStr: string
+  allDay: boolean
+}

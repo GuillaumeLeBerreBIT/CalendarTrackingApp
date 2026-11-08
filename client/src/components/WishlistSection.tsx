@@ -1,33 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
 import api from '@/api/client'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
+import { Pill } from '@/components/ui/Primitives'
 import QuickAddInput, { errorText } from '@/components/QuickAddInput'
 import { isSafeLink } from '@/lib/lists'
 import type { Wishlist, WishItem } from '@/types'
 
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 10px', borderRadius: 'var(--r-sm)',
-  border: '1px solid var(--border-2)', background: 'var(--surface-2)',
-  color: 'var(--text-1)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-}
-const errStyle: React.CSSProperties = { fontSize: 13, color: 'var(--danger, #ef4444)', margin: 0 }
+const inputStyle: React.CSSProperties = fieldStyle
+const errStyle: React.CSSProperties = { fontSize: 13, color: 'var(--danger)', margin: 0 }
 const plainBtn: React.CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4,
   display: 'inline-flex', alignItems: 'center',
 }
 
 function ItemDetails({ item }: { item: WishItem }) {
+  const safe = item.link && isSafeLink(item.link) ? item.link : null
+  let host = ''
+  if (safe) { try { host = new URL(safe).hostname.replace(/^www\./, '') } catch { host = safe } }
+  if (!safe && !item.note) return null
   return (
-    <>
-      {item.link && isSafeLink(item.link) && (
-        <a href={item.link} target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 12.5, color: 'var(--accent)', overflowWrap: 'anywhere' }}>
-          {item.link}
+    <span style={{ fontSize: 13, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', overflowWrap: 'anywhere' }}>
+      {safe && (
+        <a href={safe} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+          style={{ color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}>
+          <Icon name="external" size={12} sw={2} />{host}
         </a>
       )}
-      {item.note && <span style={{ fontSize: 12.5, color: 'var(--text-3)', overflowWrap: 'anywhere' }}>{item.note}</span>}
-    </>
+      {safe && item.note && <span>·</span>}
+      {item.note && <span>{item.note}</span>}
+    </span>
   )
 }
 
@@ -64,13 +67,14 @@ function OwnerRow({ item, onSave, onRemove }: {
     )
   }
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <button type="button" aria-label={`Edit ${item.title}`}
         onClick={() => { setTitle(item.title); setLink(item.link ?? ''); setNote(item.note ?? ''); setEditing(true) }}
-        style={{ ...plainBtn, flex: 1, minWidth: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 2, textAlign: 'left', padding: '6px 0' }}>
-        <span style={{ fontSize: 14.5, color: 'var(--text-1)', overflowWrap: 'anywhere' }}>{item.title}</span>
+        style={{ ...plainBtn, flex: 1, minWidth: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 2, textAlign: 'left', padding: 0 }}>
+        <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-1)', overflowWrap: 'anywhere' }}>{item.title}</span>
+        <ItemDetails item={item} />
       </button>
-      <button type="button" onClick={() => onRemove(item)} aria-label={`Remove ${item.title}`} style={plainBtn}>
+      <button type="button" onClick={() => onRemove(item)} aria-label={`Remove ${item.title}`} style={{ ...plainBtn, width: 36, height: 36, justifyContent: 'center' }}>
         <Icon name="close" size={16} />
       </button>
     </div>
@@ -187,7 +191,7 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
   if (!loaded) return null
   if (loadError) {
     return (
-      <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <p role="alert" style={errStyle}>Couldn't load the wishlist: {loadError}</p>
         <Button variant="ghost" size="sm" onClick={() => setReload((n) => n + 1)}>Retry</Button>
       </div>
@@ -195,51 +199,57 @@ export default function WishlistSection({ eventId }: { eventId: string | number 
   }
   if (!wl) {
     return (
-      <div style={{ marginTop: 16 }}>
-        <Button variant="soft" size="md" icon="plus" onClick={create} disabled={creating}>Add a wishlist</Button>
-        {error && <p role="alert" style={{ ...errStyle, marginTop: 8 }}>{error}</p>}
+      <div style={{ padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, fontWeight: 600 }}><Icon name="gift" size={18} sw={1.8} />Wishlist</span>
+        <Button variant="secondary" size="sm" onClick={create} disabled={creating}>Add a wishlist</Button>
+        {error && <p role="alert" style={{ ...errStyle, width: '100%' }}>{error}</p>}
       </div>
     )
   }
 
   return (
-    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <h4 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0, overflowWrap: 'anywhere' }}>
-          {wl.ownerName ?? 'Someone'}'s wishlist
-        </h4>
+    <section>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '0 16px' }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-1)', overflowWrap: 'anywhere', letterSpacing: 0 }}>
+          <Icon name="gift" size={18} sw={1.8} />
+          {wl.isOwner ? 'Your wishlist' : `${wl.ownerName ?? 'Someone'}'s wishlist`}
+        </h2>
         {wl.isOwner && (
-          <button type="button" onClick={deleteWishlist} aria-label="Delete wishlist" style={plainBtn}>
+          <button type="button" onClick={deleteWishlist} aria-label="Delete wishlist" style={{ ...plainBtn, width: 36, height: 36, justifyContent: 'center' }}>
             <Icon name="trash" size={16} />
           </button>
         )}
       </div>
+      <p style={{ margin: '6px 16px 8px', fontSize: 13, color: 'var(--text-3)', lineHeight: 1.4 }}>
+        {wl.isOwner
+          ? 'Guests can reserve a gift. You never see who took what.'
+          : `Reserve a gift so nobody buys the same thing. ${wl.ownerName ?? 'They'} never sees who took what.`}
+      </p>
+      {wl.isOwner && <div style={{ padding: '4px 16px 8px' }}><QuickAddInput kind="wishlist" placeholder="Add a wish, press Enter" onAdd={add} /></div>}
+      {itemError && <p role="alert" style={{ ...errStyle, margin: '0 16px 8px' }}>{itemError}</p>}
+      {wl.items.length === 0 && <p style={{ fontSize: 14, color: 'var(--text-3)', margin: '4px 16px' }}>Nothing on the wishlist yet.</p>}
 
-      {wl.isOwner && <QuickAddInput kind="wishlist" placeholder="Add something you'd like" onAdd={add} />}
-      {itemError && <p role="alert" style={errStyle}>{itemError}</p>}
-
-      {wl.items.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Nothing on the wishlist yet.</p>}
-
-      {wl.items.map((item) => wl.isOwner ? (
-        <div key={item.itemId}>
-          <OwnerRow item={item} onSave={save} onRemove={remove} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><ItemDetails item={item} /></div>
-        </div>
-      ) : (
-        <div key={item.itemId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 14.5, color: 'var(--text-1)', overflowWrap: 'anywhere' }}>{item.title}</span>
-            <ItemDetails item={item} />
-          </div>
-          {item.claimedByMe ? (
-            <Button variant="outline" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>You're getting this — undo</Button>
-          ) : item.taken ? (
-            <Button variant="ghost" size="sm" style={{ flexShrink: 0 }} disabled>Taken</Button>
+      {wl.items.map((item, idx) => (
+        <div key={item.itemId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: 44, borderTop: idx ? '1px solid var(--border)' : 'none' }}>
+          {wl.isOwner ? (
+            <div style={{ flex: 1, minWidth: 0 }}><OwnerRow item={item} onSave={save} onRemove={remove} /></div>
           ) : (
-            <Button variant="soft" size="sm" style={{ flexShrink: 0 }} onClick={() => toggleClaim(item)}>I'll get this</Button>
+            <>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-1)', overflowWrap: 'anywhere' }}>{item.title}</span>
+                <ItemDetails item={item} />
+              </div>
+              {item.claimedByMe ? (
+                <Pill on icon="check" onClick={() => toggleClaim(item)} title="You're getting this. Tap to undo">You · Undo</Pill>
+              ) : item.taken ? (
+                <span style={{ fontSize: 14, color: 'var(--text-3)', padding: '0 6px' }}>Taken</span>
+              ) : (
+                <Pill onClick={() => toggleClaim(item)}>I'll get this</Pill>
+              )}
+            </>
           )}
         </div>
       ))}
-    </div>
+    </section>
   )
 }

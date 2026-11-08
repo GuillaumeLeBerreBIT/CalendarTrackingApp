@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { fieldStyle } from '@/components/ui/Controls'
+import Sheet from '@/components/ui/Sheet'
 import { useNavigate } from 'react-router-dom'
 import { useCountdownStore, type Countdown } from '@/store/timerStore'
 import { useCountdown, formatCountdown } from '@/lib/countdown'
@@ -76,18 +78,10 @@ function CountdownCard({ countdown, onDelete }: { countdown: Countdown; onDelete
 }
 
 // ── Shared form styles ─────────────────────────────────────────────────────────
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 12px',
-  borderRadius: 'var(--r-sm)',
-  border: '1px solid var(--border-2)',
-  background: 'var(--surface-2)',
-  color: 'var(--text-1)', fontSize: 14,
-  outline: 'none', boxSizing: 'border-box',
-}
+const inputStyle: React.CSSProperties = fieldStyle
 
 const labelStyle: React.CSSProperties = {
   fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)',
-  letterSpacing: '0.04em', textTransform: 'uppercase',
   marginBottom: 6, display: 'block',
 }
 
@@ -120,37 +114,10 @@ function AddCountdownModal({ onClose, onCreate }: {
     }
   }
 
-  // Bottom sheet on mobile, centred dialog on desktop (same split as EventFormModal).
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : 16,
-        background: 'hsl(0 0% 0% / 0.5)',
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div style={{
-        width: '100%', maxWidth: 480, margin: '0 auto',
-        background: 'var(--surface)',
-        borderRadius: isMobile ? 'var(--r-lg) var(--r-lg) 0 0' : 'var(--r-lg)',
-        boxShadow: isMobile ? undefined : 'var(--shadow-lg)',
-        padding: isMobile ? '20px 20px 32px' : 24, display: 'flex', flexDirection: 'column', gap: 16,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>
-            Add Countdown
-          </h3>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}
-          >
-            <Icon name="close" size={20} />
-          </button>
-        </div>
-
+    <Sheet title="Add countdown" onClose={onClose} width={440}>
+      <div style={{ padding: '18px 18px 24px' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={labelStyle}>Title</label>
@@ -219,7 +186,7 @@ function AddCountdownModal({ onClose, onCreate }: {
           </Button>
         </form>
       </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -264,10 +231,7 @@ export default function CountdownsPage() {
         gap: 12, marginBottom: 24,
       }}>
         <div>
-          <h1 style={{
-            fontSize: 26, fontWeight: 900, color: 'var(--text-1)',
-            letterSpacing: '-0.03em', margin: 0,
-          }}>
+          <h1 className="page-title">
             Countdowns
           </h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-3)', margin: '6px 0 0' }}>
