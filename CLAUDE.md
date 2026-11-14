@@ -120,7 +120,8 @@ client/
       PactCelebration.tsx — CSS confetti on pact success
       PWAInstallBanner.tsx — beforeinstallprompt banner (dismissed via localStorage)
       MobileMonthGrid.tsx — Phone month grid (dot per covered day + day list, weekend shading)
-      MonthGrid.tsx      — Desktop month grid (own; replaced FullCalendar): chips, +N more, weekends;
+      MonthGrid.tsx      — Desktop month grid (own; replaced FullCalendar): multi-day events as one bar per week
+                           spanning their days (lanes above the chips), chips for single days, +N more, weekends;
                            `compact` = phone "Titles" month layout (default; Dots/Titles switch, eventli.mobileMonthLayout);
                            tapping a day or "+N more" opens a day sheet with that day's events (past days too)
       DayPanel.tsx       — Desktop right panel: selected day's events + calendar filter
@@ -136,7 +137,7 @@ client/
       design.ts          — Group color map, design constants
       lists.ts           — splitPasted() (paste → items), isSafeLink(), splitDone()
       allDayDates.ts     — addDaysStr + inclusive ↔ exclusive all-day end helpers
-      monthGrid.ts       — buildMonthGrid(), weekKeys(), eventsOnDay(), isWeekendKey()
+      monthGrid.ts       — buildMonthWeeks() (weeks with bars + chips), buildMonthGrid() (flat cells), weekKeys(), eventsOnDay(), isWeekendKey()
       theme.ts           — per-device theme preference (light/dark/system)
       calendarEvents.ts  — Calendar event normalisation,
                            day coverage, agenda bucketing, fetch window

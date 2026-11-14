@@ -10,7 +10,7 @@ import DayPanel from '@/components/DayPanel'
 import WeekStrip from '@/components/WeekStrip'
 import { addDaysStr } from '@/lib/allDayDates'
 import { normalizeApiEvent, agendaDayKey, eventWindow } from '@/lib/calendarEvents'
-import { buildMonthGrid, eventsOnDay } from '@/lib/monthGrid'
+import { buildMonthWeeks, eventsOnDay } from '@/lib/monthGrid'
 import Button, { IconButton } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Primitives'
 import { createPortal } from 'react-dom'
@@ -450,13 +450,13 @@ export default function CalendarPage() {
     })
   }, [events, activeGroups, groupsLoaded])
 
-  const monthCells = useMemo(
-    () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey),
+  const monthWeeks = useMemo(
+    () => buildMonthWeeks(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey),
     [currentDate, filteredEvents, todayKey],
   )
   // Phone "Titles" month: 3 chips, then "+N more" (rows grow to fit)
-  const phoneMonthCells = useMemo(
-    () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey, 3),
+  const phoneMonthWeeks = useMemo(
+    () => buildMonthWeeks(currentDate.getFullYear(), currentDate.getMonth(), filteredEvents, todayKey, 3),
     [currentDate, filteredEvents, todayKey],
   )
   const selectedDayEvents = useMemo(() => eventsOnDay(filteredEvents, selectedKey), [filteredEvents, selectedKey])
@@ -637,7 +637,7 @@ export default function CalendarPage() {
               >
                 <MonthGrid
                   compact
-                  cells={phoneMonthCells}
+                  weeks={phoneMonthWeeks}
                   selectedKey={selectedKey}
                   onSelectDay={(key) => { selectDay(key); setDaySheetKey(key) }}
                   onEventClick={handleAgendaEventClick}
@@ -675,7 +675,7 @@ export default function CalendarPage() {
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
             {calView === 'month' ? (
               <MonthGrid
-                cells={monthCells}
+                weeks={monthWeeks}
                 selectedKey={selectedKey}
                 onSelectDay={setSelectedKey}
                 onEventClick={handleAgendaEventClick}
